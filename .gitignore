@@ -1,0 +1,14 @@
+node_modules
+.aider*
+.dev.vars
+*.tsbuildinfo
+
+dist/
+
+CLAUDE.local.md
+
+# The ghost of Steve Jobs
+.DS_Store
+
+# Claude config files with .local
+.claude/*.local*
