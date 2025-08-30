@@ -1,0 +1,40 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+- Root: Bun monorepo with workspaces in `packages/*` and `playground`.
+- Core library: `packages/core`
+  - Source: `packages/core/src`
+  - Tests: `packages/core/tests/integration/*.test.ts`
+  - Build scripts: `packages/core/scripts`
+- Playground app: `playground/minimal-server.ts` (Hono + MCP HTTP transport)
+
+## Build, Test, and Development Commands
+- Install deps: `bun install`
+- Build all packages: `bun run build`
+- Type-check all: `bun run typecheck`
+- Lint/format (Biome): `bun run lint`
+- Test all (Vitest): `bun run test`
+- Watch tests: `bun run test:watch`
+- Per-package example: `bun run --filter=core build` (or `cd packages/core && bun run build`)
+
+## Coding Style & Naming Conventions
+- Language: TypeScript (ESM). Prefer explicit exports.
+- Formatting: enforced by Biome; run `bun run lint` before pushing.
+- Files: kebab-case for multi-word files (e.g., `transport-http.ts`).
+- Classes: `PascalCase` (e.g., `McpServer`). Functions/vars: `camelCase`.
+- Types/interfaces: `PascalCase`; constants `SCREAMING_SNAKE_CASE`.
+
+## Testing Guidelines
+- Framework: Vitest with Node environment.
+- Location: place tests under `packages/<name>/tests/**` and name as `*.test.ts`.
+- Run: `bun run test` (all) or `bun run --filter=core test` (package).
+- Write integration tests for public behavior (HTTP transport, JSON-RPC). Favor black-box tests over internals.
+
+## Commit & Pull Request Guidelines
+- Commits: concise, imperative subject; scope by package when relevant (e.g., `core: add StreamableHttpTransport validation`).
+- PRs: include description, motivation, and any breaking changes. Link issues. Add before/after snippets or curl examples for protocol changes.
+- Requirements: green tests, lint clean, typecheck clean. Update docs (`README.md`, examples) when APIs change.
+
+## Architecture Notes
+- Core exports live in `packages/core/src`; HTTP entry is `StreamableHttpTransport` bound to an `McpServer`.
+- Protocol version and header are defined in `packages/core/src/constants.ts` and enforced for non-initialize requests.
