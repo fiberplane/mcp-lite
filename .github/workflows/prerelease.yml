@@ -19,10 +19,19 @@ jobs:
             - name: Install
               run: bun install --frozen-lockfile
 
-            - name: Version packages for prerelease
-              run: bun changeset version --snapshot canary-$(git rev-parse --short HEAD)
+            - name: Check for changesets
+              id: changesets
+              run: |
+                if ls .changeset/*.md 2>/dev/null | grep -v README > /dev/null; then
+                  echo "hasChangesets=true" >> $GITHUB_OUTPUT
+                else
+                  echo "hasChangesets=false" >> $GITHUB_OUTPUT
+                fi
 
-            - name: Publish prerelease with bun
-              run: cd packages/core && bun publish --tag canary
+            - name: Version and publish snapshot
+              if: steps.changesets.outputs.hasChangesets == 'true'
+              run: |
+                bun changeset version --snapshot canary-$(git rev-parse --short HEAD)
+                cd packages/core && bun publish --tag canary
               env:
                   NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -6,14 +6,6 @@ import {
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 
-export interface StreamableHttpTransportOptions {
-  protocol?: {
-    version?: string;
-    headerName?: string;
-  };
-  headers?: Record<string, string>;
-}
-
 const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 const DEFAULT_PROTOCOL_HEADER = "MCP-Protocol-Version";
 
@@ -26,27 +18,7 @@ function parseJsonRpc(body: string): unknown {
 }
 
 export class StreamableHttpTransport {
-  private options: {
-    protocol: {
-      version: string;
-      headerName: string;
-    };
-    headers: Record<string, string>;
-  };
   private server?: McpServer;
-
-  constructor(options: StreamableHttpTransportOptions = {}) {
-    this.options = {
-      protocol: {
-        version: options.protocol?.version ?? DEFAULT_PROTOCOL_VERSION,
-        headerName: options.protocol?.headerName ?? DEFAULT_PROTOCOL_HEADER,
-      },
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    };
-  }
 
   bind(server: McpServer): (request: Request) => Promise<Response> {
     this.server = server;
@@ -70,7 +42,6 @@ export class StreamableHttpTransport {
       return new Response(JSON.stringify(errorResponse), {
         status: 405,
         headers: {
-          ...this.options.headers,
           Allow: "POST",
         },
       });
@@ -92,14 +63,14 @@ export class StreamableHttpTransport {
         );
         return new Response(JSON.stringify(errorResponse), {
           status: 400,
-          headers: this.options.headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
         });
       }
 
       // Protocol header enforcement: Be lenient on initialize, strict after
-      const protocolHeader = request.headers.get(
-        this.options.protocol.headerName,
-      );
+      const protocolHeader = request.headers.get(DEFAULT_PROTOCOL_HEADER);
       const isInitializeRequest = jsonRpcRequest.method === "initialize";
 
       if (!isInitializeRequest) {
@@ -111,32 +82,36 @@ export class StreamableHttpTransport {
               JSON_RPC_ERROR_CODES.INVALID_REQUEST,
               "Missing required MCP protocol version header",
               {
-                expectedHeader: this.options.protocol.headerName,
-                expectedVersion: this.options.protocol.version,
+                expectedHeader: DEFAULT_PROTOCOL_HEADER,
+                expectedVersion: DEFAULT_PROTOCOL_VERSION,
               },
             ).toJson(),
           );
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
-            headers: this.options.headers,
+            headers: {
+              "Content-Type": "application/json",
+            },
           });
         }
 
-        if (protocolHeader !== this.options.protocol.version) {
+        if (protocolHeader !== DEFAULT_PROTOCOL_VERSION) {
           const errorResponse = createJsonRpcError(
             jsonRpcRequest.id,
             new RpcError(
               JSON_RPC_ERROR_CODES.SERVER_ERROR,
               "Protocol version mismatch",
               {
-                expectedVersion: this.options.protocol.version,
+                expectedVersion: DEFAULT_PROTOCOL_VERSION,
                 receivedVersion: protocolHeader,
               },
             ).toJson(),
           );
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
-            headers: this.options.headers,
+            headers: {
+              "Content-Type": "application/json",
+            },
           });
         }
       }
@@ -146,7 +121,9 @@ export class StreamableHttpTransport {
 
       return new Response(JSON.stringify(response), {
         status: 200,
-        headers: this.options.headers,
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
     } catch (error) {
       // Handle parsing errors
@@ -161,7 +138,9 @@ export class StreamableHttpTransport {
 
       return new Response(JSON.stringify(errorResponse), {
         status: 400,
-        headers: this.options.headers,
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
     }
   }
