@@ -20,7 +20,7 @@ jobs:
               run: bun install --frozen-lockfile
 
             - name: Version packages for prerelease
-              run: bun run changeset:version --snapshot canary-$(git rev-parse --short HEAD)
+              run: bun changeset version --snapshot canary-$(git rev-parse --short HEAD)
 
             - name: Publish prerelease with bun
               run: cd packages/core && bun publish --tag canary
