@@ -50,9 +50,7 @@ mcp.tool("add", {
 });
 
 // Create HTTP transport
-const transport = new StreamableHttpTransport({
-  protocol: { version: "2025-06-18" },
-});
+const transport = new StreamableHttpTransport();
 const httpHandler = transport.bind(mcp);
 
 // Create Hono app

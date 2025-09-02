@@ -22,5 +22,14 @@
         "recommended": true
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/core/**/*.test.ts"],
+      "linter": {
+        "rules": { "suspicious": { "noExplicitAny": "warn" } }
+      }
+    }
+  ],
+  "files": { "includes": ["**", "!**/dist"] }
 }
