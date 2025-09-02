@@ -1,6 +1,11 @@
-# mcp-mcp-mcp
 
-A TypeScript framework for building MCP (Model Context Protocol) servers with HTTP transport support. Provides a simple, type-safe way to create MCP servers that work with any HTTP framework.
+A small, simple, web-first framework for building MCP servers.
+
+## Features
+- Lightweight and zero dependencies
+- Supports Streamable HTTP
+- Composable middleware
+- Plug your own validation (uses Standard Schema interface)
 
 ## Installation
 
@@ -141,19 +146,6 @@ mcp.use(async (ctx, next) => {
   console.log("Request:", ctx.request.method);
   await next();
 });
-
-// Authentication middleware
-mcp.use(async (ctx, next) => {
-  // Access request context
-  const { request, session } = ctx;
-  
-  // Perform auth checks
-  if (!isAuthenticated(request)) {
-    throw new RpcError("Unauthorized", -32000);
-  }
-  
-  await next();
-});
 ```
 
 ## Error Handling
@@ -211,58 +203,45 @@ All communication follows JSON-RPC 2.0 specification with proper request/respons
 Works with any HTTP framework that provides standard `Request`/`Response` objects:
 
 ```typescript
-// Express.js
-app.post("/mcp", async (req, res) => {
-  const response = await httpHandler(req);
-  res.json(await response.json());
+// Hono
+import { Hono } from "hono";
+import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+
+// Create MCP server
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
 });
 
-// Node.js built-in
-const server = http.createServer(async (req, res) => {
-  if (req.url === "/mcp") {
-    const response = await httpHandler(req);
-    res.writeHead(response.status, response.headers);
-    res.end(await response.text());
-  }
-});
-```
-
-## TypeScript Support
-
-### Full Type Safety
-
-```typescript
-import type { Ctx, Middleware } from "mcp-mcp-mcp";
-
-// Typed middleware
-const myMiddleware: Middleware = async (ctx: Ctx, next) => {
-  // ctx is fully typed
-  console.log(ctx.request.method);
-  await next();
-};
-
-// Typed tool handler
-mcp.tool("example", {
-  handler: (args: { input: string }, ctx: Ctx) => {
-    // Both args and ctx are typed
-    return { content: [{ type: "text", text: args.input }] };
+// Add some tools
+mcp.tool("echo", {
+  description: "Echoes the input message",
+  inputSchema: {
+    type: "object",
+    properties: {
+      message: { type: "string" },
+    },
+    required: ["message"],
   },
+  handler: (args: { message: string }) => ({
+    content: [{ type: "text", text: args.message }],
+  }),
 });
-```
 
-### Context Interface
+// Create HTTP transport and bind server
+const transport = new StreamableHttpTransport();
+const httpHandler = transport.bind(mcp);
 
-The `Ctx` (MCPServerContext) interface provides:
+// Setup Hono app
+const app = new Hono();
 
-```typescript
-interface MCPServerContext {
-  request: JsonRpcReq;
-  requestId: JsonRpcId;
-  env: Record<string, unknown>;
-  state: { cancel?: AbortSignal };
-  session?: { id: string; protocolVersion: string };
-  validate<T>(validator: unknown, input: unknown): T;
-}
+// Basic MCP endpoint
+app.all("/mcp", async (c) => {
+  const response = await httpHandler(c.req.raw);
+  return response;
+});
+
+export default app;
 ```
 
 ## Examples
