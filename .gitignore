@@ -1,9 +1,19 @@
-node_modules
-.aider*
-.dev.vars
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+lib/
 *.tsbuildinfo
 
-dist/
+# Environment variables
+.env
+.env.local
+.dev.vars
+
+# Logs
+*.log
 
 CLAUDE.local.md
 
