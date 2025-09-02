@@ -1,39 +1,39 @@
 {
-	"name": "mcp-mcp-mcp",
-	"type": "module",
-	"version": "0.0.1",
-	"dependencies": {
-		"hono": "^4.6.12"
-	},
-	"devDependencies": {
-		"typescript": "^5.7.3",
-		"vitest": "^2.1.8"
-	},
-	"files": [
-		"src",
-		"dist",
-		"README.md"
-	],
-	"sideEffects": false,
-	"scripts": {
-		"build": "bun run scripts/build.ts",
-		"build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
-		"typecheck": "tsc --noEmit",
-		"lint": "biome check --write .",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"prepublish": "bun run build && bun run build:types"
-	},
-	"exports": {
-		".": "./src/index.ts"
-	},
-	"publishConfig": {
-		"access": "public",
-		"exports": {
-			".": {
-				"types": "./dist/types/index.d.ts",
-				"import": "./dist/index.js"
-			}
-		}
-	}
+  "name": "mcp-mcp-mcp",
+  "type": "module",
+  "version": "0.0.1",
+  "dependencies": {
+    "hono": "^4.6.12"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "bun run build && bun run build:types"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/types/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  }
 }

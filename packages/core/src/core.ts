@@ -145,6 +145,7 @@ export interface McpServerOptions {
  */
 export class McpServer {
 	private methods: Record<string, MethodHandler> = {};
+	// biome-ignore lint/correctness/noUnusedPrivateClassMembers: supressing for now 
 	private initialized = false;
 	private serverInfo: { name: string; version: string };
 	private middlewares: Middleware[] = [];
