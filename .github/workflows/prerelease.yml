@@ -25,4 +25,4 @@ jobs:
             - name: Publish prerelease with bun
               run: cd packages/core && bun publish --tag canary
               env:
-                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
