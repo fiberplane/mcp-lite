@@ -2,9 +2,6 @@
   "name": "mcp-mcp-mcp",
   "type": "module",
   "version": "0.1.2",
-  "dependencies": {
-    "hono": "^4.6.12"
-  },
   "devDependencies": {
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
