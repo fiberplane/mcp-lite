@@ -836,39 +836,4 @@ export class McpServer {
 			method: ctx.request.method,
 		});
 	}
-
-	/**
-	 * Check if the server has been initialized by a client.
-	 *
-	 * @returns True if the server has received a valid initialize request
-	 *
-	 * @example
-	 * ```typescript
-	 * if (server.isInitialized()) {
-	 *   console.log("Server is ready to handle requests");
-	 * }
-	 * ```
-	 */
-	isInitialized(): boolean {
-		return this.initialized;
-	}
-
-	/**
-	 * Get the server's current capabilities.
-	 *
-	 * Capabilities are automatically determined based on registered tools,
-	 * prompts, and resources. This method returns a copy of the capabilities
-	 * object that will be sent to clients during initialization.
-	 *
-	 * @returns Copy of the server's capabilities object
-	 *
-	 * @example
-	 * ```typescript
-	 * const caps = server.getCapabilities();
-	 * console.log("Tools supported:", caps.tools?.listChanged);
-	 * ```
-	 */
-	getCapabilities(): InitializeResult["capabilities"] {
-		return { ...this.capabilities };
-	}
 }
