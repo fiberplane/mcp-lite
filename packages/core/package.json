@@ -22,7 +22,7 @@
 		"lint": "biome check --write .",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"prepublish": "bun run build && bun run build:types"
+		"prepublishOnly": "bun run build && bun run build:types"
 	},
 	"exports": {
 		".": "./src/index.ts"
