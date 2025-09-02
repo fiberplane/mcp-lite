@@ -1,11 +1,11 @@
 {
-	"extends": "./tsconfig.json",
-	"compilerOptions": {
-		"noEmit": false,
-		"emitDeclarationOnly": true,
-		"declaration": true,
-		"declarationMap": true
-	},
-	"include": ["src/**/*"],
-	"exclude": ["dist", "node_modules", "tests", "scripts", "*.config.*"]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules", "tests", "scripts", "*.config.*"]
 }

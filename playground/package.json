@@ -1,14 +1,14 @@
 {
-	"name": "playground",
-	"private": true,
-	"devDependencies": {
-		"@types/bun": "latest"
-	},
-	"peerDependencies": {
-		"typescript": "^5"
-	},
-	"dependencies": {
-		"hono": "^4.9.5",
-		"mcp-mcp-mcp": "workspace:*"
-	}
+  "name": "playground",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.9.5",
+    "mcp-mcp-mcp": "workspace:*"
+  }
 }
