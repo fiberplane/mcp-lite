@@ -1,5 +1,5 @@
 import { McpServer } from "../../src/core.js";
-import { RpcError } from "../../src/errors.js";
+
 import { JSON_RPC_ERROR_CODES } from "../../src/types.js";
 import { describe, it, expect, beforeEach } from "vitest";
 
@@ -16,18 +16,20 @@ describe("Resource API", () => {
   describe("Static resources", () => {
     it("should register and read static resources", async () => {
       const configData = { appName: "test", version: "1.0" };
-      
+
       server.resource(
         "file://config.json",
         { description: "App configuration", mimeType: "application/json" },
         async (uri) => ({
-          contents: [{ 
-            uri: uri.href, 
-            text: JSON.stringify(configData),
-            mimeType: "application/json",
-            type: "text"
-          }]
-        })
+          contents: [
+            {
+              uri: uri.href,
+              text: JSON.stringify(configData),
+              mimeType: "application/json",
+              type: "text",
+            },
+          ],
+        }),
       );
 
       // Test resources/list
@@ -35,15 +37,17 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/list",
-        params: {}
+        params: {},
       });
 
       expect(listResult?.result).toEqual({
-        resources: [{
-          uri: "file://config.json",
-          description: "App configuration",
-          mimeType: "application/json"
-        }]
+        resources: [
+          {
+            uri: "file://config.json",
+            description: "App configuration",
+            mimeType: "application/json",
+          },
+        ],
       });
 
       // Test resources/read
@@ -51,16 +55,18 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 2,
         method: "resources/read",
-        params: { uri: "file://config.json" }
+        params: { uri: "file://config.json" },
       });
 
       expect(readResult?.result).toEqual({
-        contents: [{
-          uri: "file://config.json",
-          text: JSON.stringify(configData),
-          mimeType: "application/json",
-          type: "text"
-        }]
+        contents: [
+          {
+            uri: "file://config.json",
+            text: JSON.stringify(configData),
+            mimeType: "application/json",
+            type: "text",
+          },
+        ],
       });
     });
 
@@ -69,7 +75,7 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/list",
-        params: {}
+        params: {},
       });
 
       expect(result?.result).toEqual({ resources: [] });
@@ -82,13 +88,15 @@ describe("Resource API", () => {
         "github://repos/{owner}/{repo}",
         { description: "GitHub repository" },
         async (uri, { owner, repo }) => ({
-          contents: [{
-            uri: uri.href,
-            text: `Repository: ${owner}/${repo}`,
-            mimeType: "text/plain",
-            type: "text"
-          }]
-        })
+          contents: [
+            {
+              uri: uri.href,
+              text: `Repository: ${owner}/${repo}`,
+              mimeType: "text/plain",
+              type: "text",
+            },
+          ],
+        }),
       );
 
       // Test resources/templates/list
@@ -96,14 +104,16 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/templates/list",
-        params: {}
+        params: {},
       });
 
       expect(templatesResult?.result).toEqual({
-        resourceTemplates: [{
-          uriTemplate: "github://repos/{owner}/{repo}",
-          description: "GitHub repository"
-        }]
+        resourceTemplates: [
+          {
+            uriTemplate: "github://repos/{owner}/{repo}",
+            description: "GitHub repository",
+          },
+        ],
       });
 
       // Test resources/read with template matching
@@ -111,16 +121,18 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 2,
         method: "resources/read",
-        params: { uri: "github://repos/octocat/Hello-World" }
+        params: { uri: "github://repos/octocat/Hello-World" },
       });
 
       expect(readResult?.result).toEqual({
-        contents: [{
-          uri: "github://repos/octocat/Hello-World",
-          text: "Repository: octocat/Hello-World",
-          mimeType: "text/plain",
-          type: "text"
-        }]
+        contents: [
+          {
+            uri: "github://repos/octocat/Hello-World",
+            text: "Repository: octocat/Hello-World",
+            mimeType: "text/plain",
+            type: "text",
+          },
+        ],
       });
     });
 
@@ -134,11 +146,11 @@ describe("Resource API", () => {
             if (typeof input === "string" && /^\d+$/.test(input)) {
               return { value: input };
             }
-            return { 
-              issues: [{ message: "Must be numeric" }]
+            return {
+              issues: [{ message: "Must be numeric" }],
             };
-          }
-        }
+          },
+        },
       };
 
       server.resource(
@@ -146,13 +158,15 @@ describe("Resource API", () => {
         { description: "User by ID" },
         { userId: userIdValidator },
         async (uri, { userId }) => ({
-          contents: [{
-            uri: uri.href,
-            text: JSON.stringify({ id: userId, name: `User ${userId}` }),
-            mimeType: "application/json",
-            type: "text"
-          }]
-        })
+          contents: [
+            {
+              uri: uri.href,
+              text: JSON.stringify({ id: userId, name: `User ${userId}` }),
+              mimeType: "application/json",
+              type: "text",
+            },
+          ],
+        }),
       );
 
       // Valid request
@@ -160,16 +174,18 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/read",
-        params: { uri: "api://users/123" }
+        params: { uri: "api://users/123" },
       });
 
       expect(validResult?.result).toEqual({
-        contents: [{
-          uri: "api://users/123",
-          text: JSON.stringify({ id: "123", name: "User 123" }),
-          mimeType: "application/json",
-          type: "text"
-        }]
+        contents: [
+          {
+            uri: "api://users/123",
+            text: JSON.stringify({ id: "123", name: "User 123" }),
+            mimeType: "application/json",
+            type: "text",
+          },
+        ],
       });
 
       // Invalid request (non-numeric userId)
@@ -177,10 +193,12 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 2,
         method: "resources/read",
-        params: { uri: "api://users/abc" }
+        params: { uri: "api://users/abc" },
       });
 
-      expect(invalidResult?.error?.code).toBe(JSON_RPC_ERROR_CODES.INVALID_PARAMS);
+      expect(invalidResult?.error?.code).toBe(
+        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+      );
       expect(invalidResult?.error?.message).toContain("Validation failed");
     });
 
@@ -189,18 +207,20 @@ describe("Resource API", () => {
         "database://tables/{schema}/{table}/rows{?limit,offset}",
         { description: "Database table rows" },
         async (uri, vars) => ({
-          contents: [{
-            uri: uri.href,
-            text: JSON.stringify({
-              schema: vars.schema,
-              table: vars.table,
-              limit: vars.limit || "10",
-              offset: vars.offset || "0"
-            }),
-            mimeType: "application/json",
-            type: "text"
-          }]
-        })
+          contents: [
+            {
+              uri: uri.href,
+              text: JSON.stringify({
+                schema: vars.schema,
+                table: vars.table,
+                limit: vars.limit || "10",
+                offset: vars.offset || "0",
+              }),
+              mimeType: "application/json",
+              type: "text",
+            },
+          ],
+        }),
       );
 
       // With query parameters
@@ -208,21 +228,25 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/read",
-        params: { uri: "database://tables/public/users/rows?limit=5&offset=10" }
+        params: {
+          uri: "database://tables/public/users/rows?limit=5&offset=10",
+        },
       });
 
       expect(withQueryResult?.result).toEqual({
-        contents: [{
-          uri: "database://tables/public/users/rows?limit=5&offset=10",
-          text: JSON.stringify({
-            schema: "public",
-            table: "users", 
-            limit: "5",
-            offset: "10"
-          }),
-          mimeType: "application/json",
-          type: "text"
-        }]
+        contents: [
+          {
+            uri: "database://tables/public/users/rows?limit=5&offset=10",
+            text: JSON.stringify({
+              schema: "public",
+              table: "users",
+              limit: "5",
+              offset: "10",
+            }),
+            mimeType: "application/json",
+            type: "text",
+          },
+        ],
       });
 
       // Without query parameters
@@ -230,21 +254,23 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 2,
         method: "resources/read",
-        params: { uri: "database://tables/public/users/rows" }
+        params: { uri: "database://tables/public/users/rows" },
       });
 
       expect(withoutQueryResult?.result).toEqual({
-        contents: [{
-          uri: "database://tables/public/users/rows",
-          text: JSON.stringify({
-            schema: "public",
-            table: "users",
-            limit: "10",
-            offset: "0"
-          }),
-          mimeType: "application/json",
-          type: "text"
-        }]
+        contents: [
+          {
+            uri: "database://tables/public/users/rows",
+            text: JSON.stringify({
+              schema: "public",
+              table: "users",
+              limit: "10",
+              offset: "0",
+            }),
+            mimeType: "application/json",
+            type: "text",
+          },
+        ],
       });
     });
   });
@@ -255,7 +281,7 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/read",
-        params: { uri: "unknown://resource" }
+        params: { uri: "unknown://resource" },
       });
 
       expect(result?.error?.code).toBe(JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND);
@@ -267,7 +293,7 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/read",
-        params: { notUri: "invalid" }
+        params: { notUri: "invalid" },
       });
 
       expect(result?.error?.code).toBe(JSON_RPC_ERROR_CODES.INVALID_PARAMS);
@@ -279,14 +305,14 @@ describe("Resource API", () => {
         { description: "Error test" },
         async () => {
           throw new Error("Handler error");
-        }
+        },
       );
 
       const result = await server._dispatch({
         jsonrpc: "2.0",
         id: 1,
         method: "resources/read",
-        params: { uri: "error://test" }
+        params: { uri: "error://test" },
       });
 
       expect(result?.error?.code).toBe(JSON_RPC_ERROR_CODES.INTERNAL_ERROR);
@@ -300,8 +326,10 @@ describe("Resource API", () => {
         "test://specific",
         { description: "Specific route" },
         async () => ({
-          contents: [{ uri: "test://specific", text: "specific", type: "text" }]
-        })
+          contents: [
+            { uri: "test://specific", text: "specific", type: "text" },
+          ],
+        }),
       );
 
       // Register general pattern second
@@ -309,18 +337,21 @@ describe("Resource API", () => {
         "test://{path}",
         { description: "General pattern" },
         async () => ({
-          contents: [{ uri: "test://general", text: "general", type: "text" }]
-        })
+          contents: [{ uri: "test://general", text: "general", type: "text" }],
+        }),
       );
 
       const result = await server._dispatch({
         jsonrpc: "2.0",
         id: 1,
         method: "resources/read",
-        params: { uri: "test://specific" }
+        params: { uri: "test://specific" },
       });
 
-      expect(result?.result?.contents[0].text).toBe("specific");
+      expect(
+        (result?.result as { contents?: Array<{ text?: string }> })
+          ?.contents?.[0]?.text,
+      ).toBe("specific");
     });
   });
 
@@ -330,7 +361,7 @@ describe("Resource API", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "resources/subscribe",
-        params: { uri: "test://resource" }
+        params: { uri: "test://resource" },
       });
 
       expect(result?.error?.code).toBe(JSON_RPC_ERROR_CODES.INTERNAL_ERROR);
