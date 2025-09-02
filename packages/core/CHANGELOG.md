@@ -1,5 +1,11 @@
 # mcp-mcp-mcp
 
+## 0.1.2
+
+### Patch Changes
+
+- 341fff3: This fixes notification handling in the JSON-RPC parsing. We'd previously break - no longer. Also refactors the code to make it more readable.
+
 ## 0.1.1
 
 ### Patch Changes
