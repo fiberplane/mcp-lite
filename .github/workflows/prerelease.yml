@@ -1,11 +1,13 @@
-name: Snapshot pre-release
+name: Prerelease
 
 on:
     push:
         branches: [main]
 
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
-    snapshot:
+    prerelease:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -14,24 +16,13 @@ jobs:
             - name: Setup Bun
               uses: oven-sh/setup-bun@v1
 
-            - name: Setup Node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  registry-url: "https://registry.npmjs.org/"
-
             - name: Install
               run: bun install --frozen-lockfile
 
-            - name: Build
-              run: bun run prepublish
-              working-directory: packages/core
+            - name: Version packages for prerelease
+              run: bun run changeset:version --snapshot canary-$(git rev-parse --short HEAD)
 
-            - name: Version snapshot (unique per commit)
-              run: changeset version --snapshot canary-$(git rev-parse --short HEAD)
-
-            - name: Publish snapshot under tag=canary
+            - name: Publish prerelease with bun
+              run: cd packages/core && bun publish --tag canary
               env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
                   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-              run: changeset publish --tag canary --no-git-tag

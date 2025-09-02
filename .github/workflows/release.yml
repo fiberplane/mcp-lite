@@ -1,8 +1,10 @@
-name: Release package
+name: Release
 
 on:
     push:
         branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
     contents: write
@@ -18,12 +20,6 @@ jobs:
             - name: Setup Bun
               uses: oven-sh/setup-bun@v1
 
-            - name: Setup Node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  registry-url: "https://registry.npmjs.org/"
-
             - name: Install
               run: bun install --frozen-lockfile
 
@@ -33,15 +29,21 @@ jobs:
             - name: Lint
               run: bun run lint
 
-            - name: Build
-              run: bun run prepublish
-              working-directory: packages/core
+            - name: Test
+              run: bun run test
 
-            - name: Create Release PR or Publish
+            - name: Create Release Pull Request or Version & Publish
+              id: changesets
               uses: changesets/action@v1
               with:
-                  version: changeset version
-                  publish: changeset publish
+                  version: bun run changeset:version
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Publish with bun
+              if: steps.changesets.outputs.hasChangesets == 'false'
+              run: |
+                  bun run changeset tag
+                  cd packages/core && bun publish
+              env:
                   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
