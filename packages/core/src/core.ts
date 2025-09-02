@@ -8,6 +8,7 @@ import type {
   JsonRpcRes,
   ListPromptsResult,
   ListResourcesResult,
+  ListResourceTemplatesResult,
   ListToolsResult,
   MCPServerContext,
   MethodHandler,
@@ -15,8 +16,14 @@ import type {
   OnError,
   PromptEntry,
   PromptGetResult,
-  ResourceEntry,
+
+  ResourceHandler,
+  ResourceMeta,
   ResourceReadResult,
+  ResourceRegistration,
+
+  ResourceVars,
+  ResourceVarValidators,
   StandardSchemaV1,
   Tool,
   ToolCallResult,
@@ -109,6 +116,98 @@ function createContext(
     validate: <T>(validator: unknown, input: unknown): T =>
       createValidationFunction<T>(validator, input),
   };
+}
+
+/**
+ * Compiles a URI template into a matcher function.
+ * Supports Hono-style path parameters: {name}, {name*}, and query groups {?a,b,c}
+ */
+function compileUriTemplate(template: string): {
+  match: (uri: string) => ResourceVars | null;
+  isStatic: boolean;
+} {
+  const isStatic = !template.includes("{");
+  
+  if (isStatic) {
+    return {
+      match: (uri: string) => (uri === template ? {} : null),
+      isStatic: true,
+    };
+  }
+
+  // Extract query parameter group if present: {?param1,param2}
+  const queryMatch = template.match(/\{\?([^}]+)\}/);
+  const queryParams = queryMatch?.[1] ? queryMatch[1].split(",").map(p => p.trim()) : [];
+  
+  // Remove query group from template for path matching
+  const pathTemplate = template.replace(/\{\?[^}]+\}/, "");
+  
+  // Convert path template to regex
+  // Escape special regex characters except our placeholders
+  let escapedTemplate = pathTemplate
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  
+  // Convert placeholders to regex groups
+  escapedTemplate = escapedTemplate
+    .replace(/\\{([^}*]+)\\*\\}/g, "(?<$1>.*)")  // {name*} -> greedy capture
+    .replace(/\\{([^}]+)\\}/g, "(?<$1>[^/?]+)"); // {name} -> non-greedy capture (allow query params)
+  
+  const regex = new RegExp(`^${escapedTemplate}$`);
+
+  return {
+    match: (uri: string) => {
+      try {
+        // For templates with query params, match against the path part only
+        const [pathPart] = uri.split('?');
+        const matchTarget = queryParams.length > 0 ? (pathPart ?? uri) : uri;
+        
+        const pathMatch = matchTarget.match(regex);
+        
+        if (!pathMatch) return null;
+        
+        const vars: ResourceVars = { ...pathMatch.groups };
+        
+        // Extract query parameters if specified in template
+        if (queryParams.length > 0) {
+          try {
+            const url = new URL(uri);
+            for (const param of queryParams) {
+              const value = url.searchParams.get(param);
+              if (value !== null) {
+                vars[param] = value;
+              }
+            }
+          } catch {
+            // If URL parsing fails, skip query params extraction
+          }
+        }
+        
+        return vars;
+      } catch {
+        return null;
+      }
+    },
+    isStatic: false,
+  };
+}
+
+/**
+ * Matches a URI against resource registrations and returns the handler and extracted variables.
+ */
+function matchResourceUri(
+  uri: string,
+  registrations: ResourceRegistration[]
+): { registration: ResourceRegistration; vars: ResourceVars } | null {
+  for (const registration of registrations) {
+    const matcher = compileUriTemplate(registration.template);
+    const vars = matcher.match(uri);
+    
+    if (vars !== null) {
+      return { registration, vars };
+    }
+  }
+  
+  return null;
 }
 
 /**
@@ -288,7 +387,9 @@ export class McpServer {
   // Consolidated registries for MCP spec compliance
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
-  private resources = new Map<string, ResourceEntry>();
+  
+  // New resource system
+  private resourceRegistrations: ResourceRegistration[] = [];
 
   /**
    * Create a new MCP server instance.
@@ -322,8 +423,9 @@ export class McpServer {
       "prompts/get": this.handlePromptsGet.bind(this),
       // Resources
       "resources/list": this.handleResourcesList.bind(this),
+      "resources/templates/list": this.handleResourceTemplatesList.bind(this),
       "resources/read": this.handleResourcesRead.bind(this),
-      "resources/subscribe": this.handleResourcesSubscribe.bind(this),
+      "resources/subscribe": this.handleNotImplemented.bind(this),
       // Notifications (client → server)
       "notifications/cancelled": this.handleNotificationCancelled.bind(this),
       "notifications/initialized":
@@ -335,7 +437,6 @@ export class McpServer {
       "logging/setLevel": this.handleLoggingSetLevel.bind(this),
       // Stubs for yet-unimplemented endpoints
       "resources/unsubscribe": this.handleNotImplemented.bind(this),
-      "resources/templates/list": this.handleNotImplemented.bind(this),
       "completion/complete": this.handleNotImplemented.bind(this),
     };
   }
@@ -490,6 +591,103 @@ export class McpServer {
       validator,
     };
     this.tools.set(name, entry);
+    return this;
+  }
+
+  /**
+   * Register a resource that clients can list and read.
+   *
+   * Resources are URI-identified content that can be static or template-based.
+   * Templates support parameter extraction using Hono-style syntax.
+   *
+   * @param template - URI template string (e.g. "file://config.json" or "github://repos/{owner}/{repo}")
+   * @param meta - Resource metadata for listing
+   * @param handler - Function that returns resource content
+   * @returns This server instance for chaining
+   *
+   * @example Static resource
+   * ```typescript
+   * server.resource(
+   *   "file://config.json",
+   *   { description: "App configuration", mimeType: "application/json" },
+   *   async (uri) => ({
+   *     contents: [{ uri: uri.href, text: JSON.stringify(config) }]
+   *   })
+   * );
+   * ```
+   *
+   * @example Template resource
+   * ```typescript
+   * server.resource(
+   *   "github://repos/{owner}/{repo}",
+   *   { description: "GitHub repository" },
+   *   async (uri, { owner, repo }) => ({
+   *     contents: [{ uri: uri.href, text: await fetchRepo(owner, repo) }]
+   *   })
+   * );
+   * ```
+   */
+  resource(
+    template: string,
+    meta: ResourceMeta,
+    handler: ResourceHandler
+  ): this;
+
+  /**
+   * Register a resource with parameter validation.
+   *
+   * @param template - URI template string with variables
+   * @param meta - Resource metadata for listing
+   * @param validators - Parameter validators (StandardSchema-compatible)
+   * @param handler - Function that returns resource content
+   * @returns This server instance for chaining
+   *
+   * @example With validation
+   * ```typescript
+   * server.resource(
+   *   "api://users/{userId}",
+   *   { description: "User by ID" },
+   *   { userId: z.string().regex(/^\d+$/) },
+   *   async (uri, { userId }) => ({
+   *     contents: [{ uri: uri.href, text: JSON.stringify(await getUser(userId)) }]
+   *   })
+   * );
+   * ```
+   */
+  resource(
+    template: string,
+    meta: ResourceMeta,
+    validators: ResourceVarValidators,
+    handler: ResourceHandler
+  ): this;
+
+  resource(
+    template: string,
+    meta: ResourceMeta,
+    validatorsOrHandler: ResourceVarValidators | ResourceHandler,
+    handler?: ResourceHandler
+  ): this {
+    // Enable resources capability
+    if (!this.capabilities.resources) {
+      this.capabilities.resources = {};
+    }
+
+    // Determine if this is the 3-param or 4-param overload
+    const actualHandler = handler || (validatorsOrHandler as ResourceHandler);
+    const validators = handler ? (validatorsOrHandler as ResourceVarValidators) : undefined;
+
+    // Detect if template contains variables (static vs template)
+    const isStatic = !template.includes("{");
+
+    const registration: ResourceRegistration = {
+      template,
+      meta,
+      handler: actualHandler,
+      validators,
+      isStatic,
+    };
+
+    this.resourceRegistrations.push(registration);
     return this;
   }
 
@@ -681,9 +879,28 @@ export class McpServer {
     _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<ListResourcesResult> {
-    return {
-      resources: Array.from(this.resources.values()).map((r) => r.metadata),
-    };
+    const resources = this.resourceRegistrations
+      .filter(reg => reg.isStatic)
+      .map(reg => ({
+        uri: reg.template,
+        ...reg.meta,
+      }));
+    
+    return { resources };
+  }
+
+  private async handleResourceTemplatesList(
+    _params: unknown,
+    _ctx: MCPServerContext,
+  ): Promise<ListResourceTemplatesResult> {
+    const resourceTemplates = this.resourceRegistrations
+      .filter(reg => !reg.isStatic)
+      .map(reg => ({
+        uriTemplate: reg.template,
+        ...reg.meta,
+      }));
+    
+    return { resourceTemplates };
   }
 
   private async handleResourcesRead(
@@ -709,97 +926,59 @@ export class McpServer {
 
     const uri = readParams.uri;
 
-    // Extract resource name from URI (resource://name format)
-    const match = uri.match(/^resource:\/\/(.+)$/);
+    // Match URI against registered resources
+    const match = matchResourceUri(uri, this.resourceRegistrations);
     if (!match) {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "Invalid resource URI format. Expected: resource://<name>",
-      );
-    }
-
-    const resourceName = match[1];
-    if (!resourceName) {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "Invalid resource URI format. Expected: resource://<name>",
-      );
-    }
-
-    const entry = this.resources.get(resourceName);
-    const provider = entry?.provider;
-
-    if (!provider || !provider.read) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
         "Method not found",
-        { method: `resources/read for ${resourceName}` },
+        { uri },
       );
     }
 
-    // Call the resource read handler
-    const result = await provider.read(uri, ctx);
-    return result as ResourceReadResult;
-  }
+    const { registration, vars } = match;
 
-  private async handleResourcesSubscribe(
-    params: unknown,
-    ctx: MCPServerContext,
-  ): Promise<unknown> {
-    // Validate params structure
-    if (typeof params !== "object" || params === null) {
+    // Validate parameters if validators are provided
+    let validatedVars = vars;
+    if (registration.validators) {
+      validatedVars = {};
+      for (const [key, validator] of Object.entries(registration.validators)) {
+        if (key in vars) {
+          try {
+            validatedVars[key] = ctx.validate(validator, vars[key]);
+          } catch (validationError) {
+            // Re-throw validation errors as INVALID_PARAMS
+            throw new RpcError(
+              JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+              `Validation failed for parameter '${key}': ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+            );
+          }
+        }
+      }
+      // Also include any vars that don't have validators
+      for (const [key, value] of Object.entries(vars)) {
+        if (!(key in registration.validators)) {
+          validatedVars[key] = value;
+        }
+      }
+    }
+
+    // Call the resource handler
+    try {
+      // Create a simple URL-like object that preserves the original URI
+      const url = { href: uri } as URL;
+      const result = await registration.handler(url, validatedVars, ctx);
+      return result;
+    } catch (error) {
+      if (error instanceof RpcError) {
+        throw error;
+      }
       throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "resources/subscribe requires an object with uri",
+        JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+        "Internal error",
+        error instanceof Error ? { message: error.message } : error,
       );
     }
-
-    const subscribeParams = params as Record<string, unknown>;
-
-    if (typeof subscribeParams.uri !== "string") {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "resources/subscribe requires a string 'uri' field",
-      );
-    }
-
-    const uri = subscribeParams.uri;
-
-    // Extract resource name from URI (resource://name format)
-    const match = uri.match(/^resource:\/\/(.+)$/);
-    if (!match) {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "Invalid resource URI format. Expected: resource://<name>",
-      );
-    }
-
-    const resourceName = match[1];
-    if (!resourceName) {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "Invalid resource URI format. Expected: resource://<name>",
-      );
-    }
-
-    const entry = this.resources.get(resourceName);
-    const provider = entry?.provider;
-
-    if (!provider || !provider.subscribe) {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
-        "Method not found",
-        { method: `resources/subscribe for ${resourceName}` },
-      );
-    }
-
-    const onChange = (_n: { uri: string }) => {
-      // Handle subscription notification - in real implementation would send notification to client
-      // FIXME: connect to transport-level notification emitter when available
-    };
-
-    // Call the resource subscribe handler
-    return await provider.subscribe(uri, ctx, onChange);
   }
 
   private async handleInitialize(

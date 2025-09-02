@@ -359,3 +359,39 @@ export interface ListPromptsResult {
 export interface ListResourcesResult {
   resources: Resource[];
 }
+
+export interface ListResourceTemplatesResult {
+  resourceTemplates: ResourceTemplate[];
+}
+
+export interface ResourceTemplate {
+  uriTemplate: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+// New resource system types
+export type ResourceVars = Record<string, string>;
+
+export interface ResourceMeta {
+  name?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export type ResourceVarValidators = Record<string, unknown>; // StandardSchema-compatible
+
+export type ResourceHandler = (
+  uri: URL,
+  vars: ResourceVars,
+  ctx: MCPServerContext
+) => Promise<ResourceReadResult>;
+
+export interface ResourceRegistration {
+  template: string;
+  meta: ResourceMeta;
+  handler: ResourceHandler;
+  validators?: ResourceVarValidators;
+  isStatic: boolean;
+}
