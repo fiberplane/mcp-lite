@@ -1,7 +1,6 @@
+import { beforeEach, describe, expect, it } from "vitest";
 import { McpServer } from "../../src/core.js";
-
 import { JSON_RPC_ERROR_CODES } from "../../src/types.js";
-import { describe, it, expect, beforeEach } from "vitest";
 
 describe("Resource API", () => {
   let server: McpServer;

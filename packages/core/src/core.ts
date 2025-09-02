@@ -16,13 +16,12 @@ import type {
   OnError,
   PromptEntry,
   PromptGetResult,
-
+  Resource,
+  ResourceEntry,
   ResourceHandler,
   ResourceMeta,
   ResourceReadResult,
-  ResourceRegistration,
-
-  ResourceVars,
+  ResourceTemplate,
   ResourceVarValidators,
   StandardSchemaV1,
   Tool,
@@ -34,181 +33,13 @@ import {
   createJsonRpcResponse,
   isInitializeParams,
   isJsonRpcNotification,
-  isStandardSchema,
   isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
+import { compileUriTemplate } from "./uri-template.js";
+import { createContext, resolveToolSchema } from "./validation.js";
 
-// Helper functions for schema normalization and request processing
-
-/**
- * Resolves tool input schema, normalizing Standard Schema validators
- * for MCP compliance while preserving validators for runtime use.
- */
-function resolveToolSchema(inputSchema?: unknown): {
-  mcpInputSchema: unknown;
-  validator?: unknown;
-} {
-  if (!inputSchema) return { mcpInputSchema: { type: "object" } };
-  if (isStandardSchema(inputSchema)) {
-    return { mcpInputSchema: { type: "object" }, validator: inputSchema };
-  }
-  return { mcpInputSchema: inputSchema };
-}
-
-/**
- * Creates a validation function for the MCPServerContext.
- * Supports Standard Schema V1 validators and legacy validator interface.
- */
-function createValidationFunction<T>(validator: unknown, input: unknown): T {
-  if (isStandardSchema(validator)) {
-    const result = validator["~standard"].validate(input);
-    if (result instanceof Promise) {
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        "Async validation not supported in this context",
-      );
-    }
-    if ("issues" in result && result.issues?.length) {
-      const messages = result.issues.map((i) => i.message).join(", ");
-      throw new RpcError(
-        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-        `Validation failed: ${messages}`,
-      );
-    }
-    return (result as { value: T }).value;
-  }
-
-  if (validator && typeof validator === "object" && "validate" in validator) {
-    const validatorObj = validator as {
-      validate(input: unknown): {
-        ok: boolean;
-        data?: unknown;
-        issues?: unknown[];
-      };
-    };
-    const result = validatorObj.validate(input);
-    if (result?.ok && result.data !== undefined) {
-      return result.data as T;
-    }
-    throw new RpcError(
-      JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-      "Validation failed",
-    );
-  }
-
-  throw new RpcError(JSON_RPC_ERROR_CODES.INVALID_PARAMS, "Invalid validator");
-}
-
-/**
- * Creates an MCPServerContext with validation support.
- */
-function createContext(
-  message: JsonRpcMessage,
-  requestId: JsonRpcId | undefined,
-): MCPServerContext {
-  return {
-    request: message,
-    requestId,
-    response: null,
-    env: {},
-    state: {},
-    validate: <T>(validator: unknown, input: unknown): T =>
-      createValidationFunction<T>(validator, input),
-  };
-}
-
-/**
- * Compiles a URI template into a matcher function.
- * Supports Hono-style path parameters: {name}, {name*}, and query groups {?a,b,c}
- */
-function compileUriTemplate(template: string): {
-  match: (uri: string) => ResourceVars | null;
-  isStatic: boolean;
-} {
-  const isStatic = !template.includes("{");
-  
-  if (isStatic) {
-    return {
-      match: (uri: string) => (uri === template ? {} : null),
-      isStatic: true,
-    };
-  }
-
-  // Extract query parameter group if present: {?param1,param2}
-  const queryMatch = template.match(/\{\?([^}]+)\}/);
-  const queryParams = queryMatch?.[1] ? queryMatch[1].split(",").map(p => p.trim()) : [];
-  
-  // Remove query group from template for path matching
-  const pathTemplate = template.replace(/\{\?[^}]+\}/, "");
-  
-  // Convert path template to regex
-  // Escape special regex characters except our placeholders
-  let escapedTemplate = pathTemplate
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  
-  // Convert placeholders to regex groups
-  escapedTemplate = escapedTemplate
-    .replace(/\\{([^}*]+)\\*\\}/g, "(?<$1>.*)")  // {name*} -> greedy capture
-    .replace(/\\{([^}]+)\\}/g, "(?<$1>[^/?]+)"); // {name} -> non-greedy capture (allow query params)
-  
-  const regex = new RegExp(`^${escapedTemplate}$`);
-
-  return {
-    match: (uri: string) => {
-      try {
-        // For templates with query params, match against the path part only
-        const [pathPart] = uri.split('?');
-        const matchTarget = queryParams.length > 0 ? (pathPart ?? uri) : uri;
-        
-        const pathMatch = matchTarget.match(regex);
-        
-        if (!pathMatch) return null;
-        
-        const vars: ResourceVars = { ...pathMatch.groups };
-        
-        // Extract query parameters if specified in template
-        if (queryParams.length > 0) {
-          try {
-            const url = new URL(uri);
-            for (const param of queryParams) {
-              const value = url.searchParams.get(param);
-              if (value !== null) {
-                vars[param] = value;
-              }
-            }
-          } catch {
-            // If URL parsing fails, skip query params extraction
-          }
-        }
-        
-        return vars;
-      } catch {
-        return null;
-      }
-    },
-    isStatic: false,
-  };
-}
-
-/**
- * Matches a URI against resource registrations and returns the handler and extracted variables.
- */
-function matchResourceUri(
-  uri: string,
-  registrations: ResourceRegistration[]
-): { registration: ResourceRegistration; vars: ResourceVars } | null {
-  for (const registration of registrations) {
-    const matcher = compileUriTemplate(registration.template);
-    const vars = matcher.match(uri);
-    
-    if (vars !== null) {
-      return { registration, vars };
-    }
-  }
-  
-  return null;
-}
+// Helper functions for middleware execution and error handling
 
 /**
  * Runs middleware chain with the provided tail handler.
@@ -387,9 +218,7 @@ export class McpServer {
   // Consolidated registries for MCP spec compliance
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
-  
-  // New resource system
-  private resourceRegistrations: ResourceRegistration[] = [];
+  private resources = new Map<string, ResourceEntry>();
 
   /**
    * Create a new MCP server instance.
@@ -630,7 +459,7 @@ export class McpServer {
   resource(
     template: string,
     meta: ResourceMeta,
-    handler: ResourceHandler
+    handler: ResourceHandler,
   ): this;
 
   /**
@@ -658,14 +487,14 @@ export class McpServer {
     template: string,
     meta: ResourceMeta,
     validators: ResourceVarValidators,
-    handler: ResourceHandler
+    handler: ResourceHandler,
   ): this;
 
   resource(
     template: string,
     meta: ResourceMeta,
     validatorsOrHandler: ResourceVarValidators | ResourceHandler,
-    handler?: ResourceHandler
+    handler?: ResourceHandler,
   ): this {
     // Enable resources capability
     if (!this.capabilities.resources) {
@@ -674,20 +503,38 @@ export class McpServer {
 
     // Determine if this is the 3-param or 4-param overload
     const actualHandler = handler || (validatorsOrHandler as ResourceHandler);
-    const validators = handler ? (validatorsOrHandler as ResourceVarValidators) : undefined;
+    const validators = handler
+      ? (validatorsOrHandler as ResourceVarValidators)
+      : undefined;
 
     // Detect if template contains variables (static vs template)
     const isStatic = !template.includes("{");
+    const type = isStatic ? "resource" : "resource_template";
 
-    const registration: ResourceRegistration = {
-      template,
-      meta,
+    // Pre-compile matcher for non-static resources
+    const matcher = isStatic ? undefined : compileUriTemplate(template);
+
+    // Create proper metadata (Resource for static, ResourceTemplate for templates)
+    const metadata = isStatic
+      ? {
+          uri: template,
+          ...meta,
+        }
+      : {
+          uriTemplate: template,
+          ...meta,
+        };
+
+    const entry: ResourceEntry = {
+      metadata,
       handler: actualHandler,
       validators,
-      isStatic,
+      matcher,
+      type,
     };
 
-    this.resourceRegistrations.push(registration);
+    // Use template as Map key for uniqueness
+    this.resources.set(template, entry);
     return this;
   }
 
@@ -879,13 +726,10 @@ export class McpServer {
     _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<ListResourcesResult> {
-    const resources = this.resourceRegistrations
-      .filter(reg => reg.isStatic)
-      .map(reg => ({
-        uri: reg.template,
-        ...reg.meta,
-      }));
-    
+    const resources = Array.from(this.resources.values())
+      .filter((entry) => entry.type === "resource")
+      .map((entry) => entry.metadata as Resource);
+
     return { resources };
   }
 
@@ -893,13 +737,10 @@ export class McpServer {
     _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<ListResourceTemplatesResult> {
-    const resourceTemplates = this.resourceRegistrations
-      .filter(reg => !reg.isStatic)
-      .map(reg => ({
-        uriTemplate: reg.template,
-        ...reg.meta,
-      }));
-    
+    const resourceTemplates = Array.from(this.resources.values())
+      .filter((entry) => entry.type === "resource_template")
+      .map((entry) => entry.metadata as ResourceTemplate);
+
     return { resourceTemplates };
   }
 
@@ -927,8 +768,30 @@ export class McpServer {
     const uri = readParams.uri;
 
     // Match URI against registered resources
-    const match = matchResourceUri(uri, this.resourceRegistrations);
-    if (!match) {
+    let matchedEntry: ResourceEntry | null = null;
+    let vars: Record<string, string> = {};
+
+    // First, try direct lookup for static resources (O(1) optimization)
+    const directEntry = this.resources.get(uri);
+    if (directEntry?.type === "resource") {
+      matchedEntry = directEntry;
+    }
+
+    // If no direct match, iterate through templates (O(n) but with pre-compiled matchers)
+    if (!matchedEntry) {
+      for (const entry of this.resources.values()) {
+        if (entry.type === "resource_template" && entry.matcher) {
+          const matchResult = entry.matcher.match(uri);
+          if (matchResult !== null) {
+            matchedEntry = entry;
+            vars = matchResult;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!matchedEntry) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
         "Method not found",
@@ -936,13 +799,11 @@ export class McpServer {
       );
     }
 
-    const { registration, vars } = match;
-
     // Validate parameters if validators are provided
     let validatedVars = vars;
-    if (registration.validators) {
+    if (matchedEntry.validators) {
       validatedVars = {};
-      for (const [key, validator] of Object.entries(registration.validators)) {
+      for (const [key, validator] of Object.entries(matchedEntry.validators)) {
         if (key in vars) {
           try {
             validatedVars[key] = ctx.validate(validator, vars[key]);
@@ -957,7 +818,7 @@ export class McpServer {
       }
       // Also include any vars that don't have validators
       for (const [key, value] of Object.entries(vars)) {
-        if (!(key in registration.validators)) {
+        if (!(key in matchedEntry.validators)) {
           validatedVars[key] = value;
         }
       }
@@ -967,7 +828,7 @@ export class McpServer {
     try {
       // Create a simple URL-like object that preserves the original URI
       const url = { href: uri } as URL;
-      const result = await registration.handler(url, validatedVars, ctx);
+      const result = await matchedEntry.handler(url, validatedVars, ctx);
       return result;
     } catch (error) {
       if (error instanceof RpcError) {

@@ -1,4 +1,5 @@
 import { JSON_RPC_VERSION } from "./constants.js";
+import type { UriMatcher } from "./uri-template.js";
 
 export const JSON_RPC_ERROR_CODES = {
   /** Malformed JSON payload. Occurs when the receiver cannot parse an MCP message (e.g., HTTP/WebSocket body is not valid JSON). */
@@ -273,8 +274,11 @@ export interface PromptEntry {
 }
 
 export interface ResourceEntry {
-  metadata: Resource;
-  provider: ResourceProvider;
+  metadata: Resource | ResourceTemplate; // Depending on type
+  handler: ResourceHandler;
+  validators?: ResourceVarValidators;
+  matcher?: UriMatcher; // Pre-compiled matcher for templates
+  type: "resource" | "resource_template";
 }
 
 // Standard Schema V1 interface for supporting schema validators like Zod, Valibot, etc.
@@ -385,13 +389,5 @@ export type ResourceVarValidators = Record<string, unknown>; // StandardSchema-c
 export type ResourceHandler = (
   uri: URL,
   vars: ResourceVars,
-  ctx: MCPServerContext
+  ctx: MCPServerContext,
 ) => Promise<ResourceReadResult>;
-
-export interface ResourceRegistration {
-  template: string;
-  meta: ResourceMeta;
-  handler: ResourceHandler;
-  validators?: ResourceVarValidators;
-  isStatic: boolean;
-}
