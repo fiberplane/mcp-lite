@@ -9,6 +9,8 @@ export type {
   InitializeResult,
   JsonRpcError,
   JsonRpcId,
+  JsonRpcMessage,
+  JsonRpcNotification,
   JsonRpcReq,
   JsonRpcRes,
   MCPServerContext as Ctx,
@@ -18,6 +20,8 @@ export type {
 export {
   createJsonRpcError,
   createJsonRpcResponse,
-  isValidJsonRpcRequest,
+  isJsonRpcNotification,
+  isJsonRpcRequest,
+  isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";

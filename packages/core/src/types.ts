@@ -1,20 +1,16 @@
 import { JSON_RPC_VERSION } from "./constants.js";
 
-// Standard JSON-RPC and MCP-adjacent error codes
-// Includes JSON-RPC 2.0 + commonly adopted extensions (inspired by LSP)
 export const JSON_RPC_ERROR_CODES = {
+  /** Malformed JSON payload. Occurs when the receiver cannot parse an MCP message (e.g., HTTP/WebSocket body is not valid JSON). */
   PARSE_ERROR: -32700,
+  /** Structurally invalid JSON-RPC message per MCP Base Protocol (e.g., missing 'jsonrpc'/'method', notification includes 'id', or request id is null). */
   INVALID_REQUEST: -32600,
+  /** Unknown method name. Typical MCP cases: calling an unimplemented route (e.g., 'tools/call' when tools capability isn't advertised) or a misspelled method like 'prompts/gett'. */
   METHOD_NOT_FOUND: -32601,
+  /** Parameter validation failed. Typical MCP cases: invalid 'name' or arguments in 'tools/call', bad 'uri' in 'resources/read' or 'resources/subscribe', or malformed 'initialize' params. */
   INVALID_PARAMS: -32602,
+  /** Unhandled server error. Typical MCP cases: handler/provider throws during 'tools/call', 'prompts/get', 'resources/*', or other internal failures. */
   INTERNAL_ERROR: -32603,
-  // Server error range (-32099 to -32000) – we expose a few well-known ones
-  SERVER_ERROR: -32000,
-  UNKNOWN_ERROR_CODE: -32001, // Non-standard, used by LSP
-  SERVER_NOT_INITIALIZED: -32002, // Non-standard, used by LSP
-  // Extended, widely used in cancellation-aware protocols
-  REQUEST_CANCELLED: -32800, // Non-standard, used by LSP
-  CONTENT_MODIFIED: -32801, // Non-standard, used by LSP
 } as const;
 
 export type JsonRpcStandardErrorCode =
@@ -28,6 +24,14 @@ export interface JsonRpcReq {
   method: string;
   params?: unknown;
 }
+
+export interface JsonRpcNotification {
+  jsonrpc: typeof JSON_RPC_VERSION;
+  method: string;
+  params?: unknown;
+}
+
+export type JsonRpcMessage = JsonRpcReq | JsonRpcNotification;
 
 export interface JsonRpcRes {
   jsonrpc: typeof JSON_RPC_VERSION;
@@ -74,10 +78,11 @@ export interface InitializeResult {
 }
 
 export interface MCPServerContext {
-  request: JsonRpcReq;
-  requestId: JsonRpcId;
+  request: JsonRpcMessage;
+  requestId: JsonRpcId | undefined;
+  response: JsonRpcRes | null;
   env: Record<string, unknown>;
-  state: { cancel?: AbortSignal };
+  state: Record<string, unknown>;
   session?: { id: string; protocolVersion: string };
   validate<T>(validator: unknown, input: unknown): T;
 }
@@ -93,7 +98,9 @@ export type MethodHandler = (
   ctx: MCPServerContext,
 ) => Promise<unknown> | unknown;
 
-export function isValidJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
+export function isJsonRpcNotification(
+  obj: unknown,
+): obj is JsonRpcNotification {
   if (typeof obj !== "object" || obj === null) {
     return false;
   }
@@ -101,16 +108,41 @@ export function isValidJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
   const candidate = obj as Record<string, unknown>;
 
   // Check jsonrpc field
-  if (!("jsonrpc" in candidate) || candidate.jsonrpc !== "2.0") {
+  if (candidate.jsonrpc !== "2.0") {
     return false;
   }
 
   // Check method field
-  if (!("method" in candidate) || typeof candidate.method !== "string") {
+  if (typeof candidate.method !== "string") {
     return false;
   }
 
-  // Check id field
+  // Notification must NOT have an id field
+  if ("id" in candidate) {
+    return false;
+  }
+
+  return true;
+}
+
+export function isJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
+  if (typeof obj !== "object" || obj === null) {
+    return false;
+  }
+
+  const candidate = obj as Record<string, unknown>;
+
+  // Check jsonrpc field
+  if (candidate.jsonrpc !== "2.0") {
+    return false;
+  }
+
+  // Check method field
+  if (typeof candidate.method !== "string") {
+    return false;
+  }
+
+  // Request must have an id field
   if (!("id" in candidate)) {
     return false;
   }
@@ -120,6 +152,10 @@ export function isValidJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
   }
 
   return true;
+}
+
+export function isValidJsonRpcMessage(obj: unknown): obj is JsonRpcMessage {
+  return isJsonRpcRequest(obj) || isJsonRpcNotification(obj);
 }
 
 export function createJsonRpcResponse(

@@ -2,6 +2,9 @@ import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
   InitializeResult,
+  JsonRpcId,
+  JsonRpcMessage,
+  JsonRpcReq,
   JsonRpcRes,
   ListPromptsResult,
   ListResourcesResult,
@@ -23,10 +26,139 @@ import {
   createJsonRpcError,
   createJsonRpcResponse,
   isInitializeParams,
+  isJsonRpcNotification,
   isStandardSchema,
-  isValidJsonRpcRequest,
+  isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
+
+// Helper functions for schema normalization and request processing
+
+/**
+ * Resolves tool input schema, normalizing Standard Schema validators
+ * for MCP compliance while preserving validators for runtime use.
+ */
+function resolveToolSchema(inputSchema?: unknown): {
+  mcpInputSchema: unknown;
+  validator?: unknown;
+} {
+  if (!inputSchema) return { mcpInputSchema: { type: "object" } };
+  if (isStandardSchema(inputSchema)) {
+    return { mcpInputSchema: { type: "object" }, validator: inputSchema };
+  }
+  return { mcpInputSchema: inputSchema };
+}
+
+/**
+ * Creates a validation function for the MCPServerContext.
+ * Supports Standard Schema V1 validators and legacy validator interface.
+ */
+function createValidationFunction<T>(validator: unknown, input: unknown): T {
+  if (isStandardSchema(validator)) {
+    const result = validator["~standard"].validate(input);
+    if (result instanceof Promise) {
+      throw new RpcError(
+        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+        "Async validation not supported in this context",
+      );
+    }
+    if ("issues" in result && result.issues?.length) {
+      const messages = result.issues.map((i) => i.message).join(", ");
+      throw new RpcError(
+        JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+        `Validation failed: ${messages}`,
+      );
+    }
+    return (result as { value: T }).value;
+  }
+
+  if (validator && typeof validator === "object" && "validate" in validator) {
+    const validatorObj = validator as {
+      validate(input: unknown): {
+        ok: boolean;
+        data?: unknown;
+        issues?: unknown[];
+      };
+    };
+    const result = validatorObj.validate(input);
+    if (result?.ok && result.data !== undefined) {
+      return result.data as T;
+    }
+    throw new RpcError(
+      JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+      "Validation failed",
+    );
+  }
+
+  throw new RpcError(JSON_RPC_ERROR_CODES.INVALID_PARAMS, "Invalid validator");
+}
+
+/**
+ * Creates an MCPServerContext with validation support.
+ */
+function createContext(
+  message: JsonRpcMessage,
+  requestId: JsonRpcId | undefined,
+): MCPServerContext {
+  return {
+    request: message,
+    requestId,
+    response: null,
+    env: {},
+    state: {},
+    validate: <T>(validator: unknown, input: unknown): T =>
+      createValidationFunction<T>(validator, input),
+  };
+}
+
+/**
+ * Runs middleware chain with the provided tail handler.
+ */
+async function runMiddlewares(
+  middlewares: Middleware[],
+  ctx: MCPServerContext,
+  tail: () => Promise<void>,
+): Promise<void> {
+  const dispatch = async (i: number): Promise<void> => {
+    if (i < middlewares.length) {
+      const middleware = middlewares[i];
+      if (middleware) {
+        await middleware(ctx, () => dispatch(i + 1));
+      } else {
+        await dispatch(i + 1);
+      }
+    } else {
+      await tail();
+    }
+  };
+  await dispatch(0);
+}
+
+/**
+ * Converts errors to appropriate JSON-RPC responses.
+ * Returns null for notifications (which should never produce responses).
+ */
+function errorToResponse(
+  err: unknown,
+  requestId: JsonRpcId | undefined,
+): JsonRpcRes | null {
+  // Notifications never produce responses
+  if (requestId === undefined) return null;
+
+  if (err instanceof RpcError) {
+    return createJsonRpcError(requestId, err.toJson());
+  }
+  const errorData =
+    err instanceof Error ? { message: err.message, stack: err.stack } : err;
+  return createJsonRpcError(
+    requestId,
+    new RpcError(
+      JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+      "Internal error",
+      errorData,
+    ).toJson(),
+  );
+}
 
 export interface McpServerOptions {
   name: string;
@@ -81,6 +213,7 @@ export interface McpServerOptions {
  * server.use(async (ctx, next) => {
  *   console.log("Request:", ctx.request.method);
  *   await next();
+ *   console.log("Response:", ctx.response?.result);
  * });
  * ```
  *
@@ -224,6 +357,9 @@ export class McpServer {
    *   ctx.state.startTime = Date.now();
    *   await next();
    *   console.log(`Request took ${Date.now() - ctx.state.startTime}ms`);
+   *   if (ctx.response?.result) {
+   *     console.log("Tool executed successfully:", ctx.response.result);
+   *   }
    * });
    * ```
    */
@@ -336,21 +472,7 @@ export class McpServer {
       this.capabilities.tools = { listChanged: true };
     }
 
-    // Determine the input schema for MCP metadata
-    let mcpInputSchema: unknown;
-
-    if (def.inputSchema) {
-      if (isStandardSchema(def.inputSchema)) {
-        // For standard schema validators, store them separately and use a generic object schema for MCP
-        // Validator stored in consolidated entry below
-        mcpInputSchema = { type: "object" };
-      } else {
-        // Regular JSON schema
-        mcpInputSchema = def.inputSchema;
-      }
-    } else {
-      mcpInputSchema = { type: "object" };
-    }
+    const { mcpInputSchema, validator } = resolveToolSchema(def.inputSchema);
 
     // Store tool metadata
     const metadata: Tool = {
@@ -365,146 +487,94 @@ export class McpServer {
     const entry: ToolEntry = {
       metadata,
       handler: def.handler as MethodHandler,
-      validator: isStandardSchema(def.inputSchema)
-        ? def.inputSchema
-        : undefined,
+      validator,
     };
     this.tools.set(name, entry);
     return this;
   }
 
-  async _dispatch(req: unknown): Promise<JsonRpcRes> {
-    // Early validation - if it's not a valid JSON-RPC request, return error
-    if (!isValidJsonRpcRequest(req)) {
+  async _dispatch(message: unknown): Promise<JsonRpcRes | null> {
+    // Early validation - if it's not a valid JSON-RPC message, return error
+    if (!isValidJsonRpcMessage(message)) {
       return createJsonRpcError(
         null,
         new RpcError(
           JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-          "Invalid JSON-RPC 2.0 request format",
-        ),
+          "Invalid JSON-RPC 2.0 message format",
+        ).toJson(),
       );
     }
 
-    // Now we know req is a valid JsonRpcReq, so we can create the context
-    const baseCtx: MCPServerContext = {
-      request: req,
-      requestId: req.id,
-      env: {},
-      state: {},
-      validate: <T>(validator: unknown, input: unknown): T => {
-        // Support standard schema validators
-        if (isStandardSchema(validator)) {
-          const result = validator["~standard"].validate(input);
-          if (result instanceof Promise) {
-            throw new Error("Async validation not supported in this context");
-          }
-          if ("issues" in result && result.issues) {
-            const messages = result.issues.map((i) => i.message).join(", ");
-            throw new RpcError(
-              JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-              `Validation failed: ${messages}`,
-            );
-          }
-          return result.value as T;
-        }
+    const isNotification = isJsonRpcNotification(message);
+    const requestId = isNotification ? undefined : (message as JsonRpcReq).id;
+    const ctx = createContext(message, requestId);
 
-        // Fallback to existing validator interface
-        if (
-          validator &&
-          typeof validator === "object" &&
-          "validate" in validator
-        ) {
-          const validatorObj = validator as {
-            validate(input: unknown): {
-              ok: boolean;
-              data?: unknown;
-              issues?: unknown[];
-            };
-          };
-          const result = validatorObj.validate(input);
-          if (result?.ok && result.data !== undefined) {
-            return result.data as T;
-          }
-          throw new RpcError(
-            JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-            "Validation failed",
-          );
-        }
+    const method = (message as JsonRpcMessage).method;
+    const handler = this.methods[method];
 
-        throw new RpcError(
-          JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-          "Invalid validator",
-        );
-      },
-    };
-
-    // Apply middleware
-    let middlewareIndex = 0;
-    const next = async (): Promise<void> => {
-      if (middlewareIndex < this.middlewares.length) {
-        const middleware = this.middlewares[middlewareIndex++];
-        if (middleware) {
-          await middleware(baseCtx, next);
-        }
-      } else {
-        // Final step: dispatch to actual handler
-        return;
-      }
-    };
-
-    // Run middleware chain
-    await next();
-
-    // After middleware, dispatch to the actual handler
-    try {
-      // Check if method exists
-      const handler = this.methods[req.method];
+    // Handler function that runs as the tail of the middleware chain
+    const tail = async (): Promise<void> => {
       if (!handler) {
-        return createJsonRpcError(
-          req.id,
+        if (requestId === undefined) {
+          return;
+        }
+        ctx.response = createJsonRpcError(
+          requestId,
           new RpcError(
             JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
             "Method not found",
-            req.method ? { method: req.method } : undefined,
+            method ? { method } : undefined,
+          ).toJson(),
+        );
+        return;
+      }
+
+      const result = await handler((message as JsonRpcMessage).params, ctx);
+      if (requestId !== undefined) {
+        // Only create response for requests, not notifications
+        ctx.response = createJsonRpcResponse(requestId, result);
+      }
+    };
+
+    try {
+      await runMiddlewares(this.middlewares, ctx, tail);
+
+      if (requestId === undefined) {
+        // For notifications, always return null (no response)
+        return null;
+      }
+
+      if (!ctx.response) {
+        // Middleware short-circuited without setting a response for request
+        return createJsonRpcError(
+          requestId,
+          new RpcError(
+            JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+            "No response generated",
           ).toJson(),
         );
       }
-
-      // Call the method handler
-      const result = await handler(req.params, baseCtx);
-      return createJsonRpcResponse(req.id, result);
+      return ctx.response;
     } catch (error) {
-      // Call onError callback first
+      // Handle notifications: return null for errors
+      if (requestId === undefined) {
+        return null;
+      }
+
+      // Try custom error handler first
       if (this.onErrorHandler) {
         try {
-          const customError = await this.onErrorHandler(error, baseCtx);
+          const customError = await this.onErrorHandler(error, ctx);
           if (customError) {
-            return createJsonRpcError(req.id, customError);
+            return createJsonRpcError(requestId, customError);
           }
-        } catch (handlerError) {
-          // If onError handler throws, fall back to default handling
-          console.warn("onError handler threw:", handlerError);
+        } catch (_handlerError) {
+          // onError handler threw, continue with default error handling
         }
       }
 
-      // Check if this is an RpcError
-      if (error instanceof RpcError) {
-        return createJsonRpcError(req.id, error.toJson());
-      }
-
-      // Otherwise treat as internal error
-      const errorData =
-        error instanceof Error
-          ? { message: error.message, stack: error.stack }
-          : error;
-      return createJsonRpcError(
-        req.id,
-        new RpcError(
-          JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
-          "Internal error",
-          errorData,
-        ).toJson(),
-      );
+      // Default error handling
+      return errorToResponse(error, requestId);
     }
   }
 
@@ -752,7 +822,7 @@ export class McpServer {
     // Check protocol version compatibility
     if (initParams.protocolVersion !== SUPPORTED_MCP_PROTOCOL_VERSION) {
       throw new RpcError(
-        JSON_RPC_ERROR_CODES.SERVER_ERROR,
+        -32000, // Custom application error for protocol version mismatch
         `Unsupported protocol version. Server supports: ${SUPPORTED_MCP_PROTOCOL_VERSION}, client requested: ${initParams.protocolVersion}`,
         {
           supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
@@ -780,19 +850,18 @@ export class McpServer {
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
     if (typeof params === "object" && params !== null) {
-      const p = params as Record<string, unknown>;
-      const id = (p.requestId ?? p.id) as unknown;
-      const reason = p.reason as unknown;
-      console.warn("notifications/cancelled received", { id, reason });
+      const _p = params as Record<string, unknown>;
+      const _id = (_p.requestId ?? _p.id) as unknown;
+      const _reason = _p.reason as unknown;
+      // Handle cancelled notification
     }
     return {};
   }
 
   private async handleNotificationInitialized(
-    params: unknown,
+    _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
-    console.info("notifications/initialized received", params ?? {});
     return {};
   }
 
@@ -801,31 +870,25 @@ export class McpServer {
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
     if (typeof params === "object" && params !== null) {
-      const p = params as Record<string, unknown>;
-      console.info("notifications/progress received", {
-        progressToken: p.progressToken,
-        progress: p.progress,
-        total: p.total,
-      });
+      const _p = params as Record<string, unknown>;
+      // Handle progress notification
     }
     return {};
   }
 
   private async handleNotificationRootsListChanged(
-    params: unknown,
+    _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
-    console.info("notifications/roots/list_changed received", params ?? {});
     return {};
   }
 
   private async handleLoggingSetLevel(
-    params: unknown,
+    _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
     // Expected shape: { level: string }
     // NOTE: handle this
-    console.info("logging/setLevel received (noop)", params ?? {});
     return {};
   }
 
@@ -833,7 +896,7 @@ export class McpServer {
     _params: unknown,
     ctx: MCPServerContext,
   ): Promise<never> {
-    throw new RpcError(JSON_RPC_ERROR_CODES.SERVER_ERROR, "Not implemented", {
+    throw new RpcError(JSON_RPC_ERROR_CODES.INTERNAL_ERROR, "Not implemented", {
       method: ctx.request.method,
     });
   }
