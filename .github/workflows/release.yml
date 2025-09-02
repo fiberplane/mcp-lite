@@ -46,4 +46,4 @@ jobs:
                   bun run changeset tag
                   cd packages/core && bun publish
               env:
-                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
