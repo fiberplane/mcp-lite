@@ -10,4 +10,4 @@ await Bun.build({
 	sourcemap: "linked",
 });
 
-await $`pnpm build:types`;
+await $`bun run build:types`;

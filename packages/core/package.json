@@ -17,7 +17,7 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "bun run scripts/build.ts",
-		"build:types": "tsc --outDir dist/types --emitDeclarationOnly --declaration --declarationMap",
+		"build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check --write .",
 		"test": "vitest run",
