@@ -13,8 +13,7 @@
 - Build all packages: `bun run build`
 - Type-check all: `bun run typecheck`
 - Lint/format (Biome): `bun run lint`
-- Test all (Vitest): `bun run test`
-- Watch tests: `bun run test:watch`
+- Test all (Bun): `bun test`
 - Per-package example: `bun run --filter=core build` (or `cd packages/core && bun run build`)
 
 ## Coding Style & Naming Conventions
@@ -25,9 +24,9 @@
 - Types/interfaces: `PascalCase`; constants `SCREAMING_SNAKE_CASE`.
 
 ## Testing Guidelines
-- Framework: Vitest with Node environment.
+- Framework: Bun.
 - Location: place tests under `packages/<name>/tests/**` and name as `*.test.ts`.
-- Run: `bun run test` (all) or `bun run --filter=core test` (package).
+- Run: `bun test` (all). Run all test files with "foo" or "bar" in the file name `bun test foo bar`. Run all test files, only including tests whose names includes "baz" `bun test --test-name-pattern baz`.
 - Write integration tests for public behavior (HTTP transport, JSON-RPC). Favor black-box tests over internals.
 
 ## Commit & Pull Request Guidelines

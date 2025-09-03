@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { McpServer } from "../../src/core.js";
 import { JSON_RPC_ERROR_CODES } from "../../src/types.js";
 
