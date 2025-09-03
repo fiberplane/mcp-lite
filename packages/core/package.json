@@ -29,8 +29,5 @@
         "import": "./dist/index.js"
       }
     }
-  },
-  "dependencies": {
-    "zod-to-json-schema": "^3.24.6"
   }
 }
