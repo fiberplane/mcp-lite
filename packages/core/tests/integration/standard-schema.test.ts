@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
+import type { Converter, StandardSchemaV1 } from "../../src/types.js";
+import type { JsonRpcRes } from "../../src/types.js";
 
 // Mock Standard Schema validator
-const createMockValidator = <T>(validator: (input: unknown) => T) => {
+const createMockValidator = <T>(
+  validator: (input: unknown) => T,
+  jsonSchema?: unknown,
+): StandardSchemaV1 & { _mockJsonSchema?: unknown } => {
   return {
     "~standard": {
       version: 1 as const,
@@ -24,20 +29,18 @@ const createMockValidator = <T>(validator: (input: unknown) => T) => {
         }
       },
     },
+    _mockJsonSchema: jsonSchema,
   };
 };
 
-// Type for JSON-RPC response
-interface JsonRpcResponse {
-  jsonrpc: string;
-  id: string | number | null;
-  result?: unknown;
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
-}
+// Mock converter for tests
+const mockConverter: Converter = (schema: StandardSchemaV1) => {
+  return (
+    (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
+      type: "object",
+    }
+  );
+};
 
 describe("Standard Schema Support", () => {
   let handler: (request: Request) => Promise<Response>;
@@ -46,19 +49,29 @@ describe("Standard Schema Support", () => {
     const mcp = new McpServer({
       name: "schema-test-server",
       version: "1.0.0",
+      converter: mockConverter,
     });
 
     // Tool with Standard Schema validation
-    const numberValidator = createMockValidator((input: unknown) => {
-      if (typeof input !== "object" || input === null) {
-        throw new Error("Expected object");
-      }
-      const obj = input as Record<string, unknown>;
-      if (typeof obj.value !== "number") {
-        throw new Error("Expected value to be a number");
-      }
-      return { value: obj.value };
-    });
+    const numberValidator = createMockValidator(
+      (input: unknown) => {
+        if (typeof input !== "object" || input === null) {
+          throw new Error("Expected object");
+        }
+        const obj = input as Record<string, unknown>;
+        if (typeof obj.value !== "number") {
+          throw new Error("Expected value to be a number");
+        }
+        return { value: obj.value };
+      },
+      {
+        type: "object",
+        properties: {
+          value: { type: "number" },
+        },
+        required: ["value"],
+      },
+    );
 
     mcp.tool("doubleNumber", {
       description: "Doubles a number with validation",
@@ -116,7 +129,7 @@ describe("Standard Schema Support", () => {
     });
 
     const validResponse = await handler(validRequest);
-    const validResult = (await validResponse.json()) as JsonRpcResponse;
+    const validResult = (await validResponse.json()) as JsonRpcRes;
     expect(validResult.error).toBeUndefined();
     expect(validResult.result).toEqual({
       content: [{ type: "text", text: "10" }],
@@ -141,7 +154,7 @@ describe("Standard Schema Support", () => {
     });
 
     const invalidResponse = await handler(invalidRequest);
-    const invalidResult = (await invalidResponse.json()) as JsonRpcResponse;
+    const invalidResult = (await invalidResponse.json()) as JsonRpcRes;
     expect(invalidResult.error).toBeDefined();
     expect(invalidResult.error?.code).toBe(-32602);
     // The validation error message should appear in the data field or message
@@ -165,14 +178,20 @@ describe("Standard Schema Support", () => {
     });
 
     const response = await handler(request);
-    const result = (await response.json()) as JsonRpcResponse;
+    const result = (await response.json()) as JsonRpcRes;
 
     expect(result.result).toEqual({
       tools: [
         {
           name: "doubleNumber",
           description: "Doubles a number with validation",
-          inputSchema: { type: "object" }, // Standard Schema stored as generic object
+          inputSchema: {
+            type: "object",
+            properties: {
+              value: { type: "number" },
+            },
+            required: ["value"],
+          }, // Converted by mock converter
         },
         {
           name: "concat",
@@ -216,7 +235,7 @@ describe("Standard Schema Support", () => {
     });
 
     const response = await handler(request);
-    const result = (await response.json()) as JsonRpcResponse;
+    const result = (await response.json()) as JsonRpcRes;
 
     // Verify the result has the proper ToolCallResult structure
     expect(result.result).toHaveProperty("content");

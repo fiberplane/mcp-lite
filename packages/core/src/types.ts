@@ -322,6 +322,10 @@ export type StandardSchemaResult<Output> =
     };
 
 // Helper to detect standard schema validators
+// Converter types for Standard Schema support
+export type Converter = (schema: StandardSchemaV1) => JsonSchema;
+export type JsonSchema = unknown;
+
 export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
   return (
     value !== null &&

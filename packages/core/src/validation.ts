@@ -1,5 +1,6 @@
 import { RpcError } from "./errors.js";
 import type {
+  Converter,
   JsonRpcId,
   JsonRpcMessage,
   MCPServerContext,
@@ -11,14 +12,29 @@ import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
  * Resolves tool input schema, normalizing Standard Schema validators
  * for MCP compliance while preserving validators for runtime use.
  */
-export function resolveToolSchema(inputSchema?: unknown): {
+export function resolveToolSchema(
+  inputSchema?: unknown,
+  converter?: Converter,
+): {
   mcpInputSchema: unknown;
   validator?: unknown;
 } {
   if (!inputSchema) return { mcpInputSchema: { type: "object" } };
+
   if (isStandardSchema(inputSchema)) {
-    return { mcpInputSchema: { type: "object" }, validator: inputSchema };
+    if (!converter) {
+      const vendor = inputSchema["~standard"].vendor;
+      throw new Error(
+        `Cannot use Standard Schema (vendor: "${vendor}") without a converter. ` +
+          `Configure a converter when creating McpServer.`,
+      );
+    }
+    // Convert StandardSchemaV1 to proper JSON Schema for wire protocol
+    const jsonSchema = converter(inputSchema);
+    return { mcpInputSchema: jsonSchema, validator: inputSchema };
   }
+
+  // It's already JSON Schema or other supported format
   return { mcpInputSchema: inputSchema };
 }
 

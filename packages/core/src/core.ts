@@ -1,6 +1,7 @@
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
+  Converter,
   InitializeResult,
   JsonRpcId,
   JsonRpcMessage,
@@ -100,6 +101,7 @@ function errorToResponse(
 export interface McpServerOptions {
   name: string;
   version: string;
+  converter?: Converter;
 }
 
 /**
@@ -221,6 +223,7 @@ export class McpServer {
   private middlewares: Middleware[] = [];
   private capabilities: InitializeResult["capabilities"] = {};
   private onErrorHandler?: OnError;
+  private converter?: Converter;
 
   // Consolidated registries for MCP spec compliance
   private tools = new Map<string, ToolEntry>();
@@ -247,6 +250,7 @@ export class McpServer {
       name: options.name,
       version: options.version,
     };
+    this.converter = options.converter;
 
     // Register core MCP methods
     this.methods = {
@@ -393,6 +397,36 @@ export class McpServer {
    * });
    * ```
    */
+  // Method overloads for type safety
+
+  // Overload 1: When converter exists, allow StandardSchemaV1
+  tool<TArgs = unknown>(
+    this: McpServer & { converter: Converter },
+    name: string,
+    def: {
+      description?: string;
+      inputSchema?: unknown | StandardSchemaV1<TArgs>;
+      handler: (
+        args: TArgs,
+        ctx: MCPServerContext,
+      ) => Promise<ToolCallResult> | ToolCallResult;
+    },
+  ): this;
+
+  // Overload 2: When no converter, exclude StandardSchemaV1 types
+  tool<TArgs = unknown>(
+    name: string,
+    def: {
+      description?: string;
+      inputSchema?: Exclude<unknown, StandardSchemaV1<unknown>>;
+      handler: (
+        args: TArgs,
+        ctx: MCPServerContext,
+      ) => Promise<ToolCallResult> | ToolCallResult;
+    },
+  ): this;
+
+  // Implementation (handles both cases at runtime)
   tool<TArgs = unknown>(
     name: string,
     def: {
@@ -409,7 +443,11 @@ export class McpServer {
       this.capabilities.tools = { listChanged: true };
     }
 
-    const { mcpInputSchema, validator } = resolveToolSchema(def.inputSchema);
+    // Use updated resolveToolSchema that handles converter
+    const { mcpInputSchema, validator } = resolveToolSchema(
+      def.inputSchema,
+      this.converter,
+    );
 
     // Store tool metadata
     const metadata: Tool = {
@@ -615,13 +653,19 @@ export class McpServer {
         argumentDefs = def.arguments as PromptArgumentDef[];
       } else {
         // Otherwise treat as schema for validation
-        const { validator: schemaValidator } = resolveToolSchema(def.arguments);
+        const { validator: schemaValidator } = resolveToolSchema(
+          def.arguments,
+          this.converter,
+        );
         validator = schemaValidator;
         argumentDefs = extractArgumentsFromSchema(def.arguments);
       }
     } else if (def.inputSchema) {
       // Handle inputSchema for validation and metadata extraction
-      const { validator: schemaValidator } = resolveToolSchema(def.inputSchema);
+      const { validator: schemaValidator } = resolveToolSchema(
+        def.inputSchema,
+        this.converter,
+      );
       validator = schemaValidator;
       argumentDefs = extractArgumentsFromSchema(def.inputSchema);
     }
