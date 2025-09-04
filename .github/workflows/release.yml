@@ -30,7 +30,7 @@ jobs:
               run: bun run lint
 
             - name: Test
-              run: bun run test
+              run: bun test
 
             - name: Create Release Pull Request or Version & Publish
               id: changesets
