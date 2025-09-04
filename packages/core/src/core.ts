@@ -47,11 +47,6 @@ import {
   resolveToolSchema,
 } from "./validation.js";
 
-// Helper functions for middleware execution and error handling
-
-/**
- * Runs middleware chain with the provided tail handler.
- */
 async function runMiddlewares(
   middlewares: Middleware[],
   ctx: MCPServerContext,
@@ -72,15 +67,10 @@ async function runMiddlewares(
   await dispatch(0);
 }
 
-/**
- * Converts errors to appropriate JSON-RPC responses.
- * Returns null for notifications (which should never produce responses).
- */
 function errorToResponse(
   err: unknown,
   requestId: JsonRpcId | undefined,
 ): JsonRpcRes | null {
-  // Notifications never produce responses
   if (requestId === undefined) return null;
 
   if (err instanceof RpcError) {
@@ -217,7 +207,7 @@ export interface McpServerOptions {
  */
 export class McpServer {
   private methods: Record<string, MethodHandler> = {};
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: supressing for now
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in handleInitialize
   private initialized = false;
   private serverInfo: { name: string; version: string };
   private middlewares: Middleware[] = [];
@@ -225,7 +215,6 @@ export class McpServer {
   private onErrorHandler?: OnError;
   private converter?: Converter;
 
-  // Consolidated registries for MCP spec compliance
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
   private resources = new Map<string, ResourceEntry>();
@@ -252,30 +241,24 @@ export class McpServer {
     };
     this.converter = options.converter;
 
-    // Register core MCP methods
     this.methods = {
       initialize: this.handleInitialize.bind(this),
       ping: this.handlePing.bind(this),
       "tools/list": this.handleToolsList.bind(this),
       "tools/call": this.handleToolsCall.bind(this),
-      // Prompts
       "prompts/list": this.handlePromptsList.bind(this),
       "prompts/get": this.handlePromptsGet.bind(this),
-      // Resources
       "resources/list": this.handleResourcesList.bind(this),
       "resources/templates/list": this.handleResourceTemplatesList.bind(this),
       "resources/read": this.handleResourcesRead.bind(this),
       "resources/subscribe": this.handleNotImplemented.bind(this),
-      // Notifications (client → server)
       "notifications/cancelled": this.handleNotificationCancelled.bind(this),
       "notifications/initialized":
         this.handleNotificationInitialized.bind(this),
       "notifications/progress": this.handleNotificationProgress.bind(this),
       "notifications/roots/list_changed":
         this.handleNotificationRootsListChanged.bind(this),
-      // Logging
       "logging/setLevel": this.handleLoggingSetLevel.bind(this),
-      // Stubs for yet-unimplemented endpoints
       "resources/unsubscribe": this.handleNotImplemented.bind(this),
       "completion/complete": this.handleNotImplemented.bind(this),
     };
@@ -408,18 +391,15 @@ export class McpServer {
       ) => Promise<ToolCallResult> | ToolCallResult;
     },
   ): this {
-    // Enable tools capability with listChanged flag
     if (!this.capabilities.tools) {
       this.capabilities.tools = { listChanged: true };
     }
 
-    // Use updated resolveToolSchema that handles converter
     const { mcpInputSchema, validator } = resolveToolSchema(
       def.inputSchema,
       this.converter,
     );
 
-    // Store tool metadata
     const metadata: Tool = {
       name,
       inputSchema: mcpInputSchema,
@@ -428,7 +408,6 @@ export class McpServer {
       metadata.description = def.description;
     }
 
-    // Store consolidated tool entry
     const entry: ToolEntry = {
       metadata,
       handler: def.handler as MethodHandler,
@@ -511,25 +490,20 @@ export class McpServer {
     validatorsOrHandler: ResourceVarValidators | ResourceHandler,
     handler?: ResourceHandler,
   ): this {
-    // Enable resources capability
     if (!this.capabilities.resources) {
       this.capabilities.resources = {};
     }
 
-    // Determine if this is the 3-param or 4-param overload
     const actualHandler = handler || (validatorsOrHandler as ResourceHandler);
     const validators = handler
       ? (validatorsOrHandler as ResourceVarValidators)
       : undefined;
 
-    // Detect if template contains variables (static vs template)
     const isStatic = !template.includes("{");
     const type = isStatic ? "resource" : "resource_template";
 
-    // Pre-compile matcher for non-static resources
     const matcher = isStatic ? undefined : compileUriTemplate(template);
 
-    // Create proper metadata (Resource for static, ResourceTemplate for templates)
     const metadata = isStatic
       ? {
           uri: template,
@@ -548,7 +522,6 @@ export class McpServer {
       type,
     };
 
-    // Use template as Map key for uniqueness
     this.resources.set(template, entry);
     return this;
   }
@@ -608,66 +581,53 @@ export class McpServer {
       handler: PromptHandler<TArgs>;
     },
   ): this {
-    // Auto-enable prompts capability
     if (!this.capabilities.prompts) {
       this.capabilities.prompts = { listChanged: true };
     }
 
-    // Process arguments - can be explicit argument definitions or a schema
     let validator: unknown;
     let argumentDefs: PromptArgumentDef[] | undefined;
 
     if (def.arguments) {
-      // Check if it's already an array of argument definitions
       if (Array.isArray(def.arguments)) {
         argumentDefs = def.arguments as PromptArgumentDef[];
       } else {
-        // Otherwise treat as schema for validation
-        const { validator: schemaValidator } = resolveToolSchema(
-          def.arguments,
-          this.converter,
-        );
+        const { mcpInputSchema, validator: schemaValidator } =
+          resolveToolSchema(def.arguments, this.converter);
         validator = schemaValidator;
-        argumentDefs = extractArgumentsFromSchema(def.arguments);
+        argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
       }
     } else if (def.inputSchema) {
-      // Handle inputSchema for validation and metadata extraction
-      const { validator: schemaValidator } = resolveToolSchema(
+      const { mcpInputSchema, validator: schemaValidator } = resolveToolSchema(
         def.inputSchema,
         this.converter,
       );
       validator = schemaValidator;
-      argumentDefs = extractArgumentsFromSchema(def.inputSchema);
+      argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
     }
 
-    // Create prompt metadata
     const metadata: PromptMetadata = {
       name,
       title: def.title,
       description: def.description,
     };
 
-    // Only add arguments if they exist and are not empty
     if (argumentDefs && argumentDefs.length > 0) {
       metadata.arguments = argumentDefs;
     }
 
-    // Create prompt entry
     const entry: PromptEntry = {
       metadata,
       handler: def.handler as PromptHandler,
       validator,
     };
 
-    // Store in registry
     this.prompts.set(name, entry);
 
-    // Return this for chaining
     return this;
   }
 
   async _dispatch(message: unknown): Promise<JsonRpcRes | null> {
-    // Early validation - if it's not a valid JSON-RPC message, return error
     if (!isValidJsonRpcMessage(message)) {
       return createJsonRpcError(
         null,
@@ -685,7 +645,6 @@ export class McpServer {
     const method = (message as JsonRpcMessage).method;
     const handler = this.methods[method];
 
-    // Handler function that runs as the tail of the middleware chain
     const tail = async (): Promise<void> => {
       if (!handler) {
         if (requestId === undefined) {
@@ -704,7 +663,6 @@ export class McpServer {
 
       const result = await handler((message as JsonRpcMessage).params, ctx);
       if (requestId !== undefined) {
-        // Only create response for requests, not notifications
         ctx.response = createJsonRpcResponse(requestId, result);
       }
     };
@@ -713,12 +671,10 @@ export class McpServer {
       await runMiddlewares(this.middlewares, ctx, tail);
 
       if (requestId === undefined) {
-        // For notifications, always return null (no response)
         return null;
       }
 
       if (!ctx.response) {
-        // Middleware short-circuited without setting a response for request
         return createJsonRpcError(
           requestId,
           new RpcError(
@@ -729,12 +685,10 @@ export class McpServer {
       }
       return ctx.response;
     } catch (error) {
-      // Handle notifications: return null for errors
       if (requestId === undefined) {
         return null;
       }
 
-      // Try custom error handler first
       if (this.onErrorHandler) {
         try {
           const customError = await this.onErrorHandler(error, ctx);
@@ -746,12 +700,10 @@ export class McpServer {
         }
       }
 
-      // Default error handling
       return errorToResponse(error, requestId);
     }
   }
 
-  // MCP spec-compliant method handlers
   private async handleToolsList(
     _params: unknown,
     _ctx: MCPServerContext,
@@ -765,7 +717,6 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<ToolCallResult> {
-    // Validate params structure
     if (typeof params !== "object" || params === null) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
@@ -793,13 +744,11 @@ export class McpServer {
       );
     }
 
-    // Validate arguments if a validator is stored
     let validatedArgs = callParams.arguments;
     if (entry.validator) {
       validatedArgs = ctx.validate(entry.validator, callParams.arguments);
     }
 
-    // Call the tool handler with the validated arguments
     const result = await entry.handler(validatedArgs, ctx);
     return result as ToolCallResult;
   }
@@ -817,7 +766,6 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<PromptGetResult> {
-    // Validate params structure
     if (typeof params !== "object" || params === null) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
@@ -845,13 +793,11 @@ export class McpServer {
       );
     }
 
-    // Validate arguments if validator exists
     let validatedArgs = getParams.arguments || {};
     if (entry.validator) {
       validatedArgs = ctx.validate(entry.validator, getParams.arguments);
     }
 
-    // Call the prompt handler with the validated arguments
     const result = await entry.handler(validatedArgs, ctx);
     return result as PromptGetResult;
   }
@@ -882,7 +828,6 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<ResourceReadResult> {
-    // Validate params structure
     if (typeof params !== "object" || params === null) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
@@ -901,17 +846,14 @@ export class McpServer {
 
     const uri = readParams.uri;
 
-    // Match URI against registered resources
     let matchedEntry: ResourceEntry | null = null;
     let vars: Record<string, string> = {};
 
-    // First, try direct lookup for static resources (O(1) optimization)
     const directEntry = this.resources.get(uri);
     if (directEntry?.type === "resource") {
       matchedEntry = directEntry;
     }
 
-    // If no direct match, iterate through templates (O(n) but with pre-compiled matchers)
     if (!matchedEntry) {
       for (const entry of this.resources.values()) {
         if (entry.type === "resource_template" && entry.matcher) {
@@ -933,7 +875,6 @@ export class McpServer {
       );
     }
 
-    // Validate parameters if validators are provided
     let validatedVars = vars;
     if (matchedEntry.validators) {
       validatedVars = {};
@@ -942,7 +883,6 @@ export class McpServer {
           try {
             validatedVars[key] = ctx.validate(validator, vars[key]);
           } catch (validationError) {
-            // Re-throw validation errors as INVALID_PARAMS
             throw new RpcError(
               JSON_RPC_ERROR_CODES.INVALID_PARAMS,
               `Validation failed for parameter '${key}': ${validationError instanceof Error ? validationError.message : String(validationError)}`,
@@ -950,7 +890,6 @@ export class McpServer {
           }
         }
       }
-      // Also include any vars that don't have validators
       for (const [key, value] of Object.entries(vars)) {
         if (!(key in matchedEntry.validators)) {
           validatedVars[key] = value;
@@ -958,9 +897,7 @@ export class McpServer {
       }
     }
 
-    // Call the resource handler
     try {
-      // Create a simple URL-like object that preserves the original URI
       const url = { href: uri } as URL;
       const result = await matchedEntry.handler(url, validatedVars, ctx);
       return result;
@@ -980,10 +917,6 @@ export class McpServer {
     params: unknown,
     _ctx: MCPServerContext,
   ): Promise<InitializeResult> {
-    // For HTTP transport, allow re-initialization since each request is stateless
-    // In persistent connection transports (WebSocket/stdio), this would need session management
-
-    // Use type guard for proper validation
     if (!isInitializeParams(params)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
@@ -993,10 +926,9 @@ export class McpServer {
 
     const initParams = params;
 
-    // Check protocol version compatibility
     if (initParams.protocolVersion !== SUPPORTED_MCP_PROTOCOL_VERSION) {
       throw new RpcError(
-        -32000, // Custom application error for protocol version mismatch
+        -32000,
         `Unsupported protocol version. Server supports: ${SUPPORTED_MCP_PROTOCOL_VERSION}, client requested: ${initParams.protocolVersion}`,
         {
           supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
@@ -1018,17 +950,10 @@ export class McpServer {
     return {};
   }
 
-  // --- Notification handlers (no-ops for now) ---
   private async handleNotificationCancelled(
-    params: unknown,
+    _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
-    if (typeof params === "object" && params !== null) {
-      const _p = params as Record<string, unknown>;
-      const _id = (_p.requestId ?? _p.id) as unknown;
-      const _reason = _p.reason as unknown;
-      // Handle cancelled notification
-    }
     return {};
   }
 
@@ -1040,13 +965,9 @@ export class McpServer {
   }
 
   private async handleNotificationProgress(
-    params: unknown,
+    _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
-    if (typeof params === "object" && params !== null) {
-      const _p = params as Record<string, unknown>;
-      // Handle progress notification
-    }
     return {};
   }
 
@@ -1061,8 +982,6 @@ export class McpServer {
     _params: unknown,
     _ctx: MCPServerContext,
   ): Promise<Record<string, never>> {
-    // Expected shape: { level: string }
-    // NOTE: handle this
     return {};
   }
 

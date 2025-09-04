@@ -2,15 +2,10 @@ import { JSON_RPC_VERSION } from "./constants.js";
 import type { UriMatcher } from "./uri-template.js";
 
 export const JSON_RPC_ERROR_CODES = {
-  /** Malformed JSON payload. Occurs when the receiver cannot parse an MCP message (e.g., HTTP/WebSocket body is not valid JSON). */
   PARSE_ERROR: -32700,
-  /** Structurally invalid JSON-RPC message per MCP Base Protocol (e.g., missing 'jsonrpc'/'method', notification includes 'id', or request id is null). */
   INVALID_REQUEST: -32600,
-  /** Unknown method name. Typical MCP cases: calling an unimplemented route (e.g., 'tools/call' when tools capability isn't advertised) or a misspelled method like 'prompts/gett'. */
   METHOD_NOT_FOUND: -32601,
-  /** Parameter validation failed. Typical MCP cases: invalid 'name' or arguments in 'tools/call', bad 'uri' in 'resources/read' or 'resources/subscribe', or malformed 'initialize' params. */
   INVALID_PARAMS: -32602,
-  /** Unhandled server error. Typical MCP cases: handler/provider throws during 'tools/call', 'prompts/get', 'resources/*', or other internal failures. */
   INTERNAL_ERROR: -32603,
 } as const;
 
