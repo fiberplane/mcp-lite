@@ -2,10 +2,17 @@ import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
 import { z } from "zod";
 
+// Mock converter for Zod schemas (in real usage, use zod-to-json-schema)
+const mockZodToJsonSchema = (_schema: unknown) => {
+  // This is a simplified converter - in real usage, use a proper library
+  return { type: "object", additionalProperties: true };
+};
+
 // Create comprehensive MCP server showcasing all features
 const mcp = new McpServer({
   name: "comprehensive-mcp-demo",
   version: "2.0.0",
+  converter: mockZodToJsonSchema,
 });
 
 // ===== MIDDLEWARE =====

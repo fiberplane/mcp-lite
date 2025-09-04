@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { Converter, StandardSchemaV1 } from "../../src/types.js";
-import type { JsonRpcRes } from "../../src/types.js";
+import type {
+  Converter,
+  JsonRpcRes,
+  StandardSchemaV1,
+} from "../../src/types.js";
 
 // Mock Standard Schema validator
 const createMockValidator = <T>(

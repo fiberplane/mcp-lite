@@ -397,36 +397,6 @@ export class McpServer {
    * });
    * ```
    */
-  // Method overloads for type safety
-
-  // Overload 1: When converter exists, allow StandardSchemaV1
-  tool<TArgs = unknown>(
-    this: McpServer & { converter: Converter },
-    name: string,
-    def: {
-      description?: string;
-      inputSchema?: unknown | StandardSchemaV1<TArgs>;
-      handler: (
-        args: TArgs,
-        ctx: MCPServerContext,
-      ) => Promise<ToolCallResult> | ToolCallResult;
-    },
-  ): this;
-
-  // Overload 2: When no converter, exclude StandardSchemaV1 types
-  tool<TArgs = unknown>(
-    name: string,
-    def: {
-      description?: string;
-      inputSchema?: Exclude<unknown, StandardSchemaV1<unknown>>;
-      handler: (
-        args: TArgs,
-        ctx: MCPServerContext,
-      ) => Promise<ToolCallResult> | ToolCallResult;
-    },
-  ): this;
-
-  // Implementation (handles both cases at runtime)
   tool<TArgs = unknown>(
     name: string,
     def: {

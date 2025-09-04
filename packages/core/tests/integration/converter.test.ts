@@ -3,16 +3,17 @@ import { McpServer, StreamableHttpTransport } from "../../src/index.js";
 import type { Converter, StandardSchemaV1 } from "../../src/types.js";
 
 // Mock Zod-like Standard Schema
-const createMockZodSchema = (
-  jsonSchema: unknown,
-): StandardSchemaV1 & { _mockJsonSchema: unknown } => ({
-  "~standard": {
-    version: 1,
-    vendor: "zod",
-    validate: (value: unknown) => ({ value }),
-  },
-  _mockJsonSchema: jsonSchema, // For converter to extract
-});
+const createMockZodSchema = (jsonSchema: unknown): StandardSchemaV1 => {
+  const schema: StandardSchemaV1 & { _mockJsonSchema: unknown } = {
+    "~standard": {
+      version: 1,
+      vendor: "zod",
+      validate: (value: unknown) => ({ value }),
+    },
+    _mockJsonSchema: jsonSchema, // For converter to extract
+  };
+  return schema;
+};
 
 // Mock converter
 const mockConverter: Converter = (schema: StandardSchemaV1) => {
@@ -126,5 +127,58 @@ describe("Converter Support", () => {
     const data = await response.json();
 
     expect(data.result.tools).toHaveLength(1);
+  });
+
+  it("should maintain backward compatibility with existing inputSchema", async () => {
+    const mcp = new McpServer({
+      name: "backward-compatible",
+      version: "1.0.0",
+    });
+
+    // Test with no inputSchema (should use default)
+    mcp.tool("noSchema", {
+      description: "Tool without schema",
+      handler: () => ({ content: [{ type: "text", text: "ok" }] }),
+    });
+
+    // Test with JSON Schema
+    mcp.tool("jsonSchema", {
+      inputSchema: {
+        type: "object",
+        properties: { test: { type: "string" } },
+      },
+      handler: () => ({ content: [{ type: "text", text: "ok" }] }),
+    });
+
+    const transport = new StreamableHttpTransport();
+    const handler = transport.bind(mcp);
+
+    const request = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+      }),
+    });
+
+    const response = await handler(request);
+    const data = await response.json();
+
+    expect(data.result.tools).toHaveLength(2);
+
+    const noSchemaTool = data.result.tools.find(
+      (t: { name: string }) => t.name === "noSchema",
+    );
+    expect(noSchemaTool.inputSchema).toEqual({ type: "object" });
+
+    const jsonSchemaTool = data.result.tools.find(
+      (t: { name: string }) => t.name === "jsonSchema",
+    );
+    expect(jsonSchemaTool.inputSchema).toEqual({
+      type: "object",
+      properties: { test: { type: "string" } },
+    });
   });
 });
