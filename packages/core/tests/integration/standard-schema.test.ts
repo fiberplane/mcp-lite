@@ -37,7 +37,7 @@ const createMockValidator = <T>(
 };
 
 // Mock converter for tests
-const mockConverter: Converter = (schema: StandardSchemaV1) => {
+const mockConverter: Converter = (schema: StandardSchemaV1 | unknown) => {
   return (
     (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
       type: "object",

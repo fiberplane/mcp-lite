@@ -2,53 +2,11 @@ import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
 import { z } from "zod";
 
-const mockZodToJsonSchema = (schema: unknown) => {
-  if (schema && typeof schema === "object" && "_def" in schema) {
-    const zodSchema = schema as {
-      _def?: { typeName: string; shape?: Record<string, unknown> };
-    };
-    if (zodSchema._def?.typeName === "ZodObject") {
-      const properties: Record<
-        string,
-        { type: string; items?: { type: string } }
-      > = {};
-      const required: string[] = [];
-
-      for (const [key, field] of Object.entries(zodSchema._def.shape || {})) {
-        const fieldDef = (field as { _def?: { typeName: string } })._def;
-        properties[key] = { type: "string" };
-
-        if (fieldDef?.typeName === "ZodNumber") {
-          properties[key].type = "number";
-        } else if (fieldDef?.typeName === "ZodBoolean") {
-          properties[key].type = "boolean";
-        } else if (fieldDef?.typeName === "ZodArray") {
-          properties[key] = { type: "array", items: { type: "string" } };
-        }
-
-        if (
-          !fieldDef?.typeName?.includes("Optional") &&
-          fieldDef?.typeName !== "ZodDefault"
-        ) {
-          required.push(key);
-        }
-      }
-
-      return {
-        type: "object",
-        properties,
-        ...(required.length > 0 && { required }),
-      };
-    }
-  }
-
-  return { type: "object", additionalProperties: true };
-};
 
 const mcp = new McpServer({
   name: "comprehensive-mcp-demo",
   version: "2.0.0",
-  converter: mockZodToJsonSchema,
+  converter: (s) => z.toJSONSchema(s as z.ZodType),
 });
 
 // ===== MIDDLEWARE =====
