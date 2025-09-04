@@ -3,8 +3,7 @@
   "type": "module",
   "version": "0.1.2",
   "devDependencies": {
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "typescript": "^5.7.3"
   },
   "files": [
     "src",
@@ -17,8 +16,6 @@
     "build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
     "typecheck": "tsc --noEmit",
     "lint": "biome check --write .",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "prepublishOnly": "bun run build && bun run build:types"
   },
   "exports": {

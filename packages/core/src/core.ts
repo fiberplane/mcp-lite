@@ -14,8 +14,11 @@ import type {
   MethodHandler,
   Middleware,
   OnError,
+  PromptArgumentDef,
   PromptEntry,
   PromptGetResult,
+  PromptHandler,
+  PromptMetadata,
   Resource,
   ResourceEntry,
   ResourceHandler,
@@ -37,7 +40,11 @@ import {
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
-import { createContext, resolveToolSchema } from "./validation.js";
+import {
+  createContext,
+  extractArgumentsFromSchema,
+  resolveToolSchema,
+} from "./validation.js";
 
 // Helper functions for middleware execution and error handling
 
@@ -538,6 +545,113 @@ export class McpServer {
     return this;
   }
 
+  /**
+   * Register a prompt that clients can invoke.
+   *
+   * Prompts are templates that generate messages for LLM conversations.
+   * They can accept arguments and return a structured set of messages.
+   *
+   * @template TArgs - Type of the prompt's input arguments
+   * @param name - Unique prompt name
+   * @param def - Prompt definition with schema, description, and handler
+   * @returns This server instance for chaining
+   *
+   * @example Basic prompt
+   * ```typescript
+   * server.prompt("greet", {
+   *   description: "Generate a greeting message",
+   *   handler: () => ({
+   *     messages: [{
+   *       role: "user",
+   *       content: { type: "text", text: "Hello, how are you?" }
+   *     }]
+   *   })
+   * });
+   * ```
+   *
+   * @example Prompt with arguments and schema
+   * ```typescript
+   * server.prompt("summarize", {
+   *   description: "Create a summary prompt",
+   *   arguments: z.object({
+   *     text: z.string(),
+   *     length: z.enum(["short", "medium", "long"]).optional()
+   *   }),
+   *   handler: (args: { text: string; length?: string }) => ({
+   *     description: "Summarization prompt",
+   *     messages: [{
+   *       role: "user",
+   *       content: {
+   *         type: "text",
+   *         text: `Please summarize this text in ${args.length || "medium"} length:\n\n${args.text}`
+   *       }
+   *     }]
+   *   })
+   * });
+   * ```
+   */
+  prompt<TArgs = unknown>(
+    name: string,
+    def: {
+      title?: string;
+      description?: string;
+      arguments?: unknown | StandardSchemaV1<TArgs>;
+      inputSchema?: unknown | StandardSchemaV1<TArgs>;
+      handler: PromptHandler<TArgs>;
+    },
+  ): this {
+    // Auto-enable prompts capability
+    if (!this.capabilities.prompts) {
+      this.capabilities.prompts = { listChanged: true };
+    }
+
+    // Process arguments - can be explicit argument definitions or a schema
+    let validator: unknown;
+    let argumentDefs: PromptArgumentDef[] | undefined;
+
+    if (def.arguments) {
+      // Check if it's already an array of argument definitions
+      if (Array.isArray(def.arguments)) {
+        argumentDefs = def.arguments as PromptArgumentDef[];
+      } else {
+        // Otherwise treat as schema for validation
+        const { validator: schemaValidator } = resolveToolSchema(def.arguments);
+        validator = schemaValidator;
+        argumentDefs = extractArgumentsFromSchema(def.arguments);
+      }
+    } else if (def.inputSchema) {
+      // Handle inputSchema for validation and metadata extraction
+      const { validator: schemaValidator } = resolveToolSchema(def.inputSchema);
+      validator = schemaValidator;
+      argumentDefs = extractArgumentsFromSchema(def.inputSchema);
+    }
+
+    // Create prompt metadata
+    const metadata: PromptMetadata = {
+      name,
+      title: def.title,
+      description: def.description,
+    };
+
+    // Only add arguments if they exist and are not empty
+    if (argumentDefs && argumentDefs.length > 0) {
+      metadata.arguments = argumentDefs;
+    }
+
+    // Create prompt entry
+    const entry: PromptEntry = {
+      metadata,
+      handler: def.handler as PromptHandler,
+      validator,
+    };
+
+    // Store in registry
+    this.prompts.set(name, entry);
+
+    // Return this for chaining
+    return this;
+  }
+
   async _dispatch(message: unknown): Promise<JsonRpcRes | null> {
     // Early validation - if it's not a valid JSON-RPC message, return error
     if (!isValidJsonRpcMessage(message)) {
@@ -717,8 +831,14 @@ export class McpServer {
       );
     }
 
-    // Call the prompt handler with the arguments
-    const result = await entry.handler(getParams.arguments, ctx);
+    // Validate arguments if validator exists
+    let validatedArgs = getParams.arguments || {};
+    if (entry.validator) {
+      validatedArgs = ctx.validate(entry.validator, getParams.arguments);
+    }
+
+    // Call the prompt handler with the validated arguments
+    const result = await entry.handler(validatedArgs, ctx);
     return result as PromptGetResult;
   }
 

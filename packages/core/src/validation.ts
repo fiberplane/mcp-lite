@@ -1,5 +1,10 @@
 import { RpcError } from "./errors.js";
-import type { JsonRpcId, JsonRpcMessage, MCPServerContext } from "./types.js";
+import type {
+  JsonRpcId,
+  JsonRpcMessage,
+  MCPServerContext,
+  PromptArgumentDef,
+} from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
 /**
@@ -62,6 +67,39 @@ export function createValidationFunction<T>(
   }
 
   throw new RpcError(JSON_RPC_ERROR_CODES.INVALID_PARAMS, "Invalid validator");
+}
+
+/**
+ * Extracts argument definitions from a schema for prompt metadata.
+ * Parses JSON Schema to extract parameter information.
+ */
+export function extractArgumentsFromSchema(
+  schema: unknown,
+): PromptArgumentDef[] {
+  if (!schema || typeof schema !== "object") {
+    return [];
+  }
+
+  const schemaObj = schema as Record<string, unknown>;
+
+  // Handle JSON Schema
+  if (schemaObj.type === "object" && schemaObj.properties) {
+    const properties = schemaObj.properties as Record<string, unknown>;
+    const required = (schemaObj.required as string[]) || [];
+
+    return Object.entries(properties).map(([name, propSchema]) => {
+      const prop = propSchema as Record<string, unknown>;
+      return {
+        name,
+        description: prop.description as string | undefined,
+        required: required.includes(name),
+      };
+    });
+  }
+
+  // Handle Standard Schema (Zod, etc.) - would need more complex parsing
+  // For now, return empty array for Standard Schema
+  return [];
 }
 
 /**

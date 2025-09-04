@@ -244,6 +244,30 @@ export interface Prompt {
   arguments?: unknown[];
 }
 
+export interface PromptArgumentDef {
+  name: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface PromptMetadata {
+  name: string;
+  title?: string;
+  description?: string;
+  arguments?: PromptArgumentDef[];
+}
+
+export type PromptHandler<TArgs = unknown> = (
+  args: TArgs,
+  ctx: MCPServerContext,
+) => Promise<PromptGetResult> | PromptGetResult;
+
+export interface PromptEntry {
+  metadata: PromptMetadata;
+  handler: PromptHandler;
+  validator?: unknown;
+}
+
 export interface Resource {
   uri: string;
   name?: string;
@@ -266,11 +290,6 @@ export interface ToolEntry {
   metadata: Tool;
   handler: MethodHandler;
   validator?: unknown;
-}
-
-export interface PromptEntry {
-  metadata: Prompt;
-  handler: MethodHandler;
 }
 
 export interface ResourceEntry {
@@ -315,6 +334,7 @@ export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
 
 export interface Content {
   type: "text" | "image" | "resource";
+  uri?: string;
   text?: string;
   data?: string;
   mimeType?: string;

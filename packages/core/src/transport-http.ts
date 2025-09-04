@@ -81,30 +81,31 @@ export class StreamableHttpTransport {
 
       if (!isInitializeRequest) {
         // Post-initialization: require exact protocol version match
-        if (!protocolHeader) {
-          const responseId = isNotification
-            ? null
-            : (jsonRpcRequest as JsonRpcReq).id;
-          const errorResponse = createJsonRpcError(
-            responseId,
-            new RpcError(
-              JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-              "Missing required MCP protocol version header",
-              {
-                expectedHeader: DEFAULT_PROTOCOL_HEADER,
-                expectedVersion: DEFAULT_PROTOCOL_VERSION,
-              },
-            ).toJson(),
-          );
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-        }
+        // Commented out: assume default protocol version when header is missing
+        // if (!protocolHeader) {
+        //   const responseId = isNotification
+        //     ? null
+        //     : (jsonRpcRequest as JsonRpcReq).id;
+        //   const errorResponse = createJsonRpcError(
+        //     responseId,
+        //     new RpcError(
+        //       JSON_RPC_ERROR_CODES.INVALID_REQUEST,
+        //       "Missing required MCP protocol version header",
+        //       {
+        //         expectedHeader: DEFAULT_PROTOCOL_HEADER,
+        //         expectedVersion: DEFAULT_PROTOCOL_VERSION,
+        //       },
+        //     ).toJson(),
+        //   );
+        //   return new Response(JSON.stringify(errorResponse), {
+        //     status: 400,
+        //     headers: {
+        //       "Content-Type": "application/json",
+        //     },
+        //   });
+        // }
 
-        if (protocolHeader !== DEFAULT_PROTOCOL_VERSION) {
+        if (protocolHeader && protocolHeader !== DEFAULT_PROTOCOL_VERSION) {
           const responseId = isNotification
             ? null
             : (jsonRpcRequest as JsonRpcReq).id;

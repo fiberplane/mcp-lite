@@ -1,0 +1,947 @@
+import { Hono } from "hono";
+import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+import { z } from "zod";
+
+// Create comprehensive MCP server showcasing all features
+const mcp = new McpServer({
+  name: "comprehensive-mcp-demo",
+  version: "2.0.0",
+});
+
+// ===== MIDDLEWARE =====
+
+// Request logging middleware with timing
+mcp.use(async (ctx, next) => {
+  const startTime = Date.now();
+  console.log(
+    `[${new Date().toISOString()}] ${ctx.request.method} - Request ID: ${ctx.requestId}`,
+  );
+
+  ctx.state.startTime = startTime;
+  await next();
+
+  const duration = Date.now() - (ctx.state.startTime as number);
+  console.log(
+    `[${new Date().toISOString()}] ${ctx.request.method} completed in ${duration}ms`,
+  );
+});
+
+// Error handling middleware
+mcp.use(async (_ctx, next) => {
+  try {
+    await next();
+  } catch (error) {
+    console.error("Middleware caught error:", error);
+    throw error;
+  }
+});
+
+// Rate limiting simulation middleware
+mcp.use(async (ctx, next) => {
+  ctx.state.rateLimited = false;
+  // Simulate rate limiting check
+  const requestCount = (ctx.state.requestCount as number) || 0;
+  if (requestCount > 100) {
+    ctx.state.rateLimited = true;
+    throw new Error("Rate limit exceeded");
+  }
+  ctx.state.requestCount = requestCount + 1;
+  await next();
+});
+
+// Authentication demo middleware
+mcp.use(async (ctx, next) => {
+  // Extract hypothetical auth from request params
+  const params = (ctx.request.params as Record<string, unknown>) || {};
+  ctx.state.authenticated = params.apiKey === "demo-key" || true; // Always pass for demo
+  await next();
+});
+
+// ===== TOOLS =====
+
+// Simple echo tool with Zod validation
+const echoSchema = z.object({
+  message: z.string().min(1, "Message cannot be empty"),
+  repeat: z.number().min(1).max(10).optional().default(1),
+});
+
+mcp.tool("echo", {
+  description: "Echoes a message with optional repetition",
+  inputSchema: echoSchema,
+  handler: (args: z.infer<typeof echoSchema>) => ({
+    content: [
+      {
+        type: "text",
+        text: Array(args.repeat).fill(args.message).join(" "),
+      },
+    ],
+  }),
+});
+
+// Math operations with number validation
+const addSchema = z.object({
+  a: z.number(),
+  b: z.number(),
+});
+
+mcp.tool("add", {
+  description: "Adds two numbers together",
+  inputSchema: addSchema,
+  handler: (args: z.infer<typeof addSchema>) => ({
+    content: [
+      {
+        type: "text",
+        text: `${args.a} + ${args.b} = ${args.a + args.b}`,
+      },
+    ],
+  }),
+});
+
+const multiplySchema = z.object({
+  numbers: z.array(z.number()).min(1, "At least one number required"),
+  precision: z.number().min(0).max(10).optional().default(2),
+});
+
+mcp.tool("multiply", {
+  description: "Multiplies multiple numbers with optional precision",
+  inputSchema: multiplySchema,
+  handler: (args: z.infer<typeof multiplySchema>) => {
+    const result = args.numbers.reduce((acc, num) => acc * num, 1);
+    const formatted =
+      args.precision > 0 ? result.toFixed(args.precision) : result.toString();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `${args.numbers.join(" × ")} = ${formatted}`,
+        },
+      ],
+    };
+  },
+});
+
+// Weather API with structured input/output and enum validation
+const weatherSchema = z.object({
+  location: z.string().min(1, "Location is required"),
+  unit: z.enum(["celsius", "fahrenheit", "kelvin"]).default("celsius"),
+  includeHumidity: z.boolean().optional().default(false),
+});
+
+mcp.tool("getWeather", {
+  description: "Gets weather information for a location",
+  inputSchema: weatherSchema,
+  handler: (args: z.infer<typeof weatherSchema>) => {
+    // Mock weather data
+    const baseTemp = Math.floor(Math.random() * 30) + 10; // 10-40°C
+    let temp = baseTemp;
+    let unit = "°C";
+
+    if (args.unit === "fahrenheit") {
+      temp = Math.round((baseTemp * 9) / 5 + 32);
+      unit = "°F";
+    } else if (args.unit === "kelvin") {
+      temp = Math.round(baseTemp + 273.15);
+      unit = "K";
+    }
+
+    const conditions = ["sunny", "cloudy", "rainy", "snowy"][
+      Math.floor(Math.random() * 4)
+    ];
+    let response = `Weather in ${args.location}: ${temp}${unit}, ${conditions}`;
+
+    if (args.includeHumidity) {
+      const humidity = Math.floor(Math.random() * 100);
+      response += `, humidity: ${humidity}%`;
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: response,
+        },
+      ],
+    };
+  },
+});
+
+// Base64 encoded tiny image tool
+const imageSchema = z.object({
+  color: z.enum(["red", "green", "blue", "yellow"]).default("blue"),
+  size: z.enum(["small", "medium", "large"]).default("small"),
+});
+
+mcp.tool("getTinyImage", {
+  description: "Returns a tiny base64 encoded image",
+  inputSchema: imageSchema,
+  handler: (args: z.infer<typeof imageSchema>) => {
+    // Create a minimal 1x1 pixel PNG (this is a real base64 encoded PNG)
+    const tinyPng =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+    return {
+      content: [
+        {
+          type: "image",
+          data: tinyPng,
+          mimeType: "image/png",
+        },
+        {
+          type: "text",
+          text: `Generated a tiny ${args.size} ${args.color} image`,
+        },
+      ],
+    };
+  },
+});
+
+// Rich message with different content types
+const annotatedSchema = z.object({
+  title: z.string(),
+  includeImage: z.boolean().default(true),
+  includeResource: z.boolean().default(true),
+});
+
+mcp.tool("annotatedMessage", {
+  description: "Returns a rich message with multiple content types",
+  inputSchema: annotatedSchema,
+  handler: (args: z.infer<typeof annotatedSchema>) => {
+    const content: Array<{
+      type: "text" | "image" | "resource";
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    }> = [
+      {
+        type: "text",
+        text: `# ${args.title}\n\nThis is a comprehensive response demonstrating multiple content types.`,
+      },
+    ];
+
+    if (args.includeImage) {
+      content.push({
+        type: "image",
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+        mimeType: "image/png",
+      });
+    }
+
+    if (args.includeResource) {
+      content.push({
+        type: "resource",
+        text: "file://config.json",
+      });
+    }
+
+    return { content };
+  },
+});
+
+// File system operations simulation
+const listFilesSchema = z.object({
+  path: z.string().default("/"),
+  includeHidden: z.boolean().default(false),
+  maxResults: z.number().min(1).max(100).default(20),
+});
+
+mcp.tool("listFiles", {
+  description: "Lists files in a directory (simulated)",
+  inputSchema: listFilesSchema,
+  handler: (args: z.infer<typeof listFilesSchema>) => {
+    // Mock file listing
+    const files = [
+      "package.json",
+      "README.md",
+      "src/",
+      "tests/",
+      "tsconfig.json",
+      ".gitignore",
+      "node_modules/",
+    ];
+
+    if (args.includeHidden) {
+      files.push(".env", ".env.local", ".DS_Store");
+    }
+
+    const limited = files.slice(0, args.maxResults);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Files in ${args.path}:\n${limited.map((f) => `- ${f}`).join("\n")}`,
+        },
+      ],
+    };
+  },
+});
+
+// UUID generation
+const idSchema = z.object({
+  type: z.enum(["uuid", "short", "numeric"]).default("uuid"),
+  count: z.number().min(1).max(10).default(1),
+});
+
+mcp.tool("generateId", {
+  description: "Generates various types of IDs",
+  inputSchema: idSchema,
+  handler: (args: z.infer<typeof idSchema>) => {
+    const ids: string[] = [];
+
+    for (let i = 0; i < args.count; i++) {
+      switch (args.type) {
+        case "uuid":
+          // Simple UUID v4 generation
+          ids.push(crypto.randomUUID());
+          break;
+        case "short":
+          ids.push(Math.random().toString(36).substring(2, 10));
+          break;
+        case "numeric":
+          ids.push(Math.floor(Math.random() * 1000000).toString());
+          break;
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: args.count === 1 ? ids[0] : ids.join("\n"),
+        },
+      ],
+    };
+  },
+});
+
+// ===== RESOURCES =====
+
+// Static resources
+mcp.resource(
+  "file://config.json",
+  {
+    name: "Application Configuration",
+    description: "Main application configuration file",
+    mimeType: "application/json",
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        type: "text",
+        text: JSON.stringify(
+          {
+            name: "comprehensive-mcp-demo",
+            version: "2.0.0",
+            environment: "development",
+            features: ["tools", "resources", "prompts"],
+            created: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+        mimeType: "application/json",
+      },
+    ],
+  }),
+);
+
+mcp.resource(
+  "file://readme.md",
+  {
+    name: "README Documentation",
+    description: "Project documentation and setup instructions",
+    mimeType: "text/markdown",
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        type: "text",
+        text: `# Comprehensive MCP Demo Server
+
+This server demonstrates all MCP (Model Context Protocol) features including:
+
+## Features
+- 🛠️ **Tools**: Various tools with different input/output types
+- 📚 **Resources**: Static and template-based resources  
+- 💬 **Prompts**: AI conversation templates
+- 🔧 **Middleware**: Request processing, logging, and error handling
+
+## Tools Available
+- \`echo\` - Message echoing with repetition
+- \`add\` / \`multiply\` - Mathematical operations
+- \`getWeather\` - Weather information (mocked)
+- \`longRunningOperation\` - Progress demonstration
+- \`getTinyImage\` - Base64 image generation
+- \`annotatedMessage\` - Rich content responses
+- \`listFiles\` - File system simulation
+- \`generateId\` - ID generation utilities
+
+## Resources Available
+- \`file://config.json\` - Application configuration
+- \`file://readme.md\` - This documentation
+- \`file://sample.txt\` - Sample text content
+- \`file://{path}\` - Dynamic file templates
+- \`data://{type}/{id}\` - Data resource templates
+
+## Usage
+Connect any MCP-compatible client to this server and explore the available tools, resources, and prompts.
+`,
+        mimeType: "text/markdown",
+      },
+    ],
+  }),
+);
+
+mcp.resource(
+  "file://sample.txt",
+  {
+    name: "Sample Text File",
+    description: "A sample text file for demonstration",
+    mimeType: "text/plain",
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        type: "text",
+        text: `This is a sample text file created at ${new Date().toISOString()}.
+
+It contains some example content to demonstrate resource reading capabilities.
+
+Features demonstrated:
+- Static resource serving
+- MIME type specification
+- Timestamped content generation
+- Multi-line text content
+
+You can use this resource in prompts or reference it from tools.`,
+        mimeType: "text/plain",
+      },
+    ],
+  }),
+);
+
+// Resource templates with parameter validation
+mcp.resource(
+  "file://{path}",
+  {
+    name: "Dynamic File Resource",
+    description: "Access files by path",
+    mimeType: "text/plain",
+  },
+  { path: z.string().regex(/^[a-zA-Z0-9/_.-]+$/) },
+  async (uri, { path }) => {
+    // Simulate file content based on path
+    const extension = path?.split(".").pop() || "";
+    let mimeType = "text/plain";
+    let content = `Content of file: ${path}`;
+
+    switch (extension) {
+      case "json":
+        mimeType = "application/json";
+        content = JSON.stringify(
+          { file: path, accessed: new Date().toISOString() },
+          null,
+          2,
+        );
+        break;
+      case "md":
+        mimeType = "text/markdown";
+        content = `# ${path}\n\nThis is a markdown file at path: ${path}`;
+        break;
+      case "js":
+      case "ts":
+        mimeType = "text/javascript";
+        content = `// File: ${path}\nconsole.log("Hello from ${path}");`;
+        break;
+      default:
+        content = `This is the content of ${path}.\nGenerated at: ${new Date().toISOString()}`;
+    }
+
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          type: "text",
+          text: content,
+          mimeType,
+        },
+      ],
+    };
+  },
+);
+
+mcp.resource(
+  "data://{type}/{id}",
+  {
+    name: "Data Resource",
+    description: "Access structured data by type and ID",
+    mimeType: "application/json",
+  },
+  {
+    type: z.enum(["user", "post", "comment", "product"]),
+    id: z.string().regex(/^\d+$/),
+  },
+  async (uri, { type, id }) => {
+    // Generate mock data based on type and ID
+    let data: Record<string, unknown> = {};
+
+    switch (type) {
+      case "user":
+        data = {
+          id: Number(id),
+          name: `User ${id}`,
+          email: `user${id}@example.com`,
+          created: new Date(Date.now() - Number(id) * 86400000).toISOString(),
+        };
+        break;
+      case "post":
+        data = {
+          id: Number(id),
+          title: `Post ${id}`,
+          content: `This is the content of post ${id}. Lorem ipsum dolor sit amet.`,
+          authorId: Math.floor(Math.random() * 100) + 1,
+          created: new Date(Date.now() - Number(id) * 3600000).toISOString(),
+        };
+        break;
+      case "comment":
+        data = {
+          id: Number(id),
+          text: `This is comment ${id}`,
+          postId: Math.floor(Math.random() * 50) + 1,
+          authorId: Math.floor(Math.random() * 100) + 1,
+          created: new Date(Date.now() - Number(id) * 1800000).toISOString(),
+        };
+        break;
+      case "product":
+        data = {
+          id: Number(id),
+          name: `Product ${id}`,
+          price: Number((Math.random() * 100).toFixed(2)),
+          category: ["electronics", "books", "clothing", "home"][
+            Math.floor(Math.random() * 4)
+          ],
+          inStock: Math.random() > 0.3,
+        };
+        break;
+    }
+
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+          mimeType: "application/json",
+        },
+      ],
+    };
+  },
+);
+
+// ===== PROMPTS =====
+
+// Code review prompt
+const codeReviewSchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  language: z.string().default("typescript"),
+  strictness: z.enum(["low", "medium", "high"]).default("medium"),
+});
+
+mcp.prompt("codeReview", {
+  description: "Generate a code review prompt with configurable strictness",
+  arguments: [
+    { name: "code", description: "The code to review", required: true },
+    { name: "language", description: "Programming language", required: false },
+    {
+      name: "strictness",
+      description: "Review strictness level",
+      required: false,
+    },
+  ],
+  inputSchema: codeReviewSchema,
+  handler: (args: z.infer<typeof codeReviewSchema>) => {
+    const strictnessPrompts = {
+      low: "Please provide a gentle code review focusing on major issues only.",
+      medium:
+        "Please provide a balanced code review covering functionality, style, and best practices.",
+      high: "Please provide a thorough code review examining all aspects including security, performance, maintainability, and adherence to best practices.",
+    };
+
+    return {
+      description: `Code review for ${args.language} code with ${args.strictness} strictness`,
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text",
+            text: `${strictnessPrompts[args.strictness]}
+
+Programming Language: ${args.language}
+
+Code to review:
+\`\`\`${args.language}
+${args.code}
+\`\`\`
+
+Please structure your review with:
+1. Overall assessment
+2. Specific issues (if any)
+3. Suggestions for improvement
+4. Positive aspects`,
+          },
+        },
+      ],
+    };
+  },
+});
+
+// Educational explanation prompt
+const explainSchema = z.object({
+  concept: z.string().min(1, "Concept is required"),
+  audience: z
+    .enum(["beginner", "intermediate", "advanced"])
+    .default("intermediate"),
+  includeExamples: z.boolean().default(true),
+});
+
+mcp.prompt("explainConcept", {
+  description: "Generate an educational explanation for any concept",
+  arguments: [
+    { name: "concept", description: "The concept to explain", required: true },
+    { name: "audience", description: "Target audience level", required: false },
+    {
+      name: "includeExamples",
+      description: "Include practical examples",
+      required: false,
+    },
+  ],
+  inputSchema: explainSchema,
+  handler: (args: z.infer<typeof explainSchema>) => {
+    const audienceInstructions = {
+      beginner:
+        "Explain this concept in simple terms, avoiding jargon where possible. Use analogies and step-by-step explanations.",
+      intermediate:
+        "Provide a clear explanation with some technical detail. Assume basic background knowledge.",
+      advanced:
+        "Give a comprehensive explanation with technical depth, including edge cases and advanced considerations.",
+    };
+
+    return {
+      description: `Educational explanation of ${args.concept} for ${args.audience} level`,
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text",
+            text: `Please explain the concept: "${args.concept}"
+
+Target audience: ${args.audience} level
+${audienceInstructions[args.audience]}
+
+${args.includeExamples ? "Please include practical examples and use cases." : "Focus on theoretical explanation without examples."}
+
+Structure your explanation with:
+1. Clear definition
+2. Key principles or components
+3. ${args.includeExamples ? "Practical examples" : "Important considerations"}
+4. Common misconceptions (if applicable)
+5. Further learning resources`,
+          },
+        },
+      ],
+    };
+  },
+});
+
+// Documentation generation prompt
+const docSchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  style: z.enum(["api", "tutorial", "reference", "readme"]).default("api"),
+  includeExamples: z.boolean().default(true),
+});
+
+mcp.prompt("generateDocumentation", {
+  description: "Generate documentation from code",
+  arguments: [
+    { name: "code", description: "Source code to document", required: true },
+    { name: "style", description: "Documentation style", required: false },
+    {
+      name: "includeExamples",
+      description: "Include usage examples",
+      required: false,
+    },
+  ],
+  inputSchema: docSchema,
+  handler: (args: z.infer<typeof docSchema>) => {
+    const styleInstructions = {
+      api: "Generate API documentation with clear method signatures, parameters, return values, and usage notes.",
+      tutorial:
+        "Create tutorial-style documentation that guides users through using this code step by step.",
+      reference:
+        "Produce comprehensive reference documentation with all details, edge cases, and technical specifications.",
+      readme:
+        "Write README-style documentation that introduces the code and explains how to get started.",
+    };
+
+    return {
+      description: `${args.style} documentation generation`,
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text",
+            text: `Please generate ${args.style} documentation for the following code:
+
+\`\`\`
+${args.code}
+\`\`\`
+
+Style: ${args.style}
+${styleInstructions[args.style]}
+
+${args.includeExamples ? "Include practical usage examples and code snippets." : "Focus on describing functionality without examples."}
+
+Please use clear markdown formatting and organize the documentation logically.`,
+          },
+        },
+      ],
+    };
+  },
+});
+
+// Content summarization prompt with embedded resources
+const summarySchema = z.object({
+  content: z.string().min(1, "Content is required"),
+  length: z.enum(["brief", "medium", "detailed"]).default("medium"),
+  focus: z.string().optional(),
+});
+
+mcp.prompt("summarizeContent", {
+  description: "Summarize content with configurable length and focus",
+  arguments: [
+    { name: "content", description: "Content to summarize", required: true },
+    { name: "length", description: "Summary length", required: false },
+    { name: "focus", description: "Specific focus area", required: false },
+  ],
+  inputSchema: summarySchema,
+  handler: (args: z.infer<typeof summarySchema>) => {
+    const lengthInstructions = {
+      brief:
+        "Provide a concise summary in 1-2 sentences focusing on the main point.",
+      medium:
+        "Create a balanced summary in 2-3 paragraphs covering key points and important details.",
+      detailed:
+        "Generate a comprehensive summary that covers all major topics, supporting details, and implications.",
+    };
+
+    const messages: Array<{
+      role: "user" | "assistant" | "system";
+      content: {
+        type: "text" | "image" | "resource";
+        text?: string;
+        data?: string;
+        mimeType?: string;
+      };
+    }> = [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Please summarize the following content:
+
+Length: ${args.length}
+${lengthInstructions[args.length]}
+
+${args.focus ? `Special focus: Pay particular attention to aspects related to "${args.focus}".` : ""}
+
+Content to summarize:
+---
+${args.content}
+---
+
+Please structure your summary clearly and highlight the most important insights.`,
+        },
+      },
+    ];
+
+    // Add embedded resource reference if available
+    messages.push({
+      role: "user",
+      content: {
+        type: "resource",
+        text: "file://config.json",
+      },
+    });
+
+    return {
+      description: `${args.length} summary${args.focus ? ` focused on ${args.focus}` : ""}`,
+      messages,
+    };
+  },
+});
+
+// ===== ERROR HANDLER =====
+
+mcp.onError((error, ctx) => {
+  console.error(`Error in ${ctx.request.method}:`, error);
+
+  // Custom error responses based on error type
+  if (error instanceof z.ZodError) {
+    return {
+      code: -32602, // Invalid params
+      message: "Input validation failed",
+      data: {
+        issues: error.issues,
+        requestId: ctx.requestId,
+      },
+    };
+  }
+
+  if (error instanceof Error && error.message.includes("Rate limit")) {
+    return {
+      code: -32000, // Custom application error
+      message: "Rate limit exceeded",
+      data: {
+        retryAfter: 60,
+        requestId: ctx.requestId,
+      },
+    };
+  }
+
+  // Return undefined to use default error handling for other errors
+  return undefined;
+});
+
+// ===== HTTP TRANSPORT SETUP =====
+
+// Create HTTP transport
+const transport = new StreamableHttpTransport();
+const httpHandler = transport.bind(mcp);
+
+// Create Hono app
+const app = new Hono();
+
+// Add CORS headers for development
+app.use("*", async (c, next) => {
+  await next();
+  c.header("Access-Control-Allow-Origin", "*");
+  c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+});
+
+// Add MCP endpoint
+app.all("/mcp", async (c) => {
+  const response = await httpHandler(c.req.raw);
+  return response;
+});
+
+// Add comprehensive health check
+app.get("/health", (c) => {
+  return c.json({
+    status: "healthy",
+    server: "comprehensive-mcp-demo",
+    version: "2.0.0",
+    timestamp: new Date().toISOString(),
+    capabilities: {
+      tools: true,
+      resources: true,
+      prompts: true,
+      middleware: true,
+    },
+    endpoints: {
+      mcp: "/mcp",
+      health: "/health",
+      info: "/info",
+    },
+  });
+});
+
+// Add server info endpoint
+app.get("/info", (c) => {
+  return c.json({
+    name: "comprehensive-mcp-demo",
+    version: "2.0.0",
+    description:
+      "A comprehensive MCP server demonstrating all protocol features",
+    features: {
+      tools: [
+        "echo",
+        "add",
+        "multiply",
+        "longRunningOperation",
+        "getWeather",
+        "getTinyImage",
+        "annotatedMessage",
+        "listFiles",
+        "generateId",
+      ],
+      resources: [
+        "file://config.json",
+        "file://readme.md",
+        "file://sample.txt",
+        "file://{path}",
+        "data://{type}/{id}",
+      ],
+      prompts: [
+        "codeReview",
+        "explainConcept",
+        "generateDocumentation",
+        "summarizeContent",
+      ],
+      middleware: [
+        "logging",
+        "error-handling",
+        "rate-limiting",
+        "authentication",
+      ],
+    },
+    documentation: "See file://readme.md resource for detailed information",
+  });
+});
+
+const port = 3002;
+
+export default app;
+
+// Start server if running directly
+if (import.meta.main) {
+  console.log("🚀 Starting Comprehensive MCP Demo Server...");
+  console.log(`📍 Port: ${port}`);
+  console.log(`🔗 Health check: http://localhost:${port}/health`);
+  console.log(`📊 Server info: http://localhost:${port}/info`);
+  console.log(`🔌 MCP endpoint: http://localhost:${port}/mcp`);
+  console.log("");
+  console.log("📚 Available Tools:");
+  console.log("  • echo - Message echoing with repetition");
+  console.log("  • add - Mathematical addition");
+  console.log("  • multiply - Mathematical multiplication");
+  console.log("  • longRunningOperation - Progress demonstration");
+  console.log("  • getWeather - Weather information (mocked)");
+  console.log("  • getTinyImage - Base64 image generation");
+  console.log("  • annotatedMessage - Rich content responses");
+  console.log("  • listFiles - File system simulation");
+  console.log("  • generateId - ID generation utilities");
+  console.log("");
+  console.log("📄 Available Resources:");
+  console.log("  • file://config.json - Application configuration");
+  console.log("  • file://readme.md - Documentation");
+  console.log("  • file://sample.txt - Sample text content");
+  console.log("  • file://{path} - Dynamic file templates");
+  console.log("  • data://{type}/{id} - Data resource templates");
+  console.log("");
+  console.log("💬 Available Prompts:");
+  console.log("  • codeReview - Code review generation");
+  console.log("  • explainConcept - Educational explanations");
+  console.log("  • generateDocumentation - Documentation generation");
+  console.log("  • summarizeContent - Content summarization");
+  console.log("");
+
+  Bun.serve({
+    port,
+    fetch: app.fetch,
+  });
+}
