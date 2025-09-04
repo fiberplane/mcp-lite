@@ -265,6 +265,12 @@ describe("Prompt Registration and Handling", () => {
           {
             name: "validated",
             description: "Prompt with runtime validation",
+            arguments: [
+              {
+                name: "message",
+                required: true,
+              },
+            ],
           },
         ],
       });

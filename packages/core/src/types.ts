@@ -47,7 +47,6 @@ export interface JsonRpcError {
   data?: unknown;
 }
 
-// Error handling callback type (Hono-inspired pattern)
 export type OnError = (
   err: unknown,
   ctx: MCPServerContext,
@@ -93,7 +92,6 @@ export type Middleware = (
   next: () => Promise<void>,
 ) => Promise<void> | void;
 
-// Generic handler type for JSON-RPC method implementations
 export type MethodHandler = (
   params: unknown,
   ctx: MCPServerContext,
@@ -108,17 +106,13 @@ export function isJsonRpcNotification(
 
   const candidate = obj as Record<string, unknown>;
 
-  // Check jsonrpc field
   if (candidate.jsonrpc !== "2.0") {
     return false;
   }
 
-  // Check method field
   if (typeof candidate.method !== "string") {
     return false;
   }
-
-  // Notification must NOT have an id field
   if ("id" in candidate) {
     return false;
   }
@@ -133,17 +127,13 @@ export function isJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
 
   const candidate = obj as Record<string, unknown>;
 
-  // Check jsonrpc field
   if (candidate.jsonrpc !== "2.0") {
     return false;
   }
 
-  // Check method field
   if (typeof candidate.method !== "string") {
     return false;
   }
-
-  // Request must have an id field
   if (!("id" in candidate)) {
     return false;
   }
@@ -188,7 +178,6 @@ export function isInitializeParams(obj: unknown): obj is InitializeParams {
 
   const candidate = obj as Record<string, unknown>;
 
-  // Check required protocolVersion field
   if (
     !("protocolVersion" in candidate) ||
     typeof candidate.protocolVersion !== "string"
@@ -196,7 +185,6 @@ export function isInitializeParams(obj: unknown): obj is InitializeParams {
     return false;
   }
 
-  // Optional capabilities field validation
   if ("capabilities" in candidate && candidate.capabilities !== undefined) {
     if (
       typeof candidate.capabilities !== "object" ||
@@ -206,7 +194,6 @@ export function isInitializeParams(obj: unknown): obj is InitializeParams {
     }
   }
 
-  // Optional clientInfo field validation
   if ("clientInfo" in candidate && candidate.clientInfo !== undefined) {
     const clientInfo = candidate.clientInfo;
     if (typeof clientInfo !== "object" || clientInfo === null) {
@@ -229,8 +216,6 @@ export function isInitializeParams(obj: unknown): obj is InitializeParams {
 export function isString(value: unknown): value is string {
   return typeof value === "string";
 }
-
-// MCP spec types for tools, prompts, and resources
 
 export interface Tool {
   name: string;
@@ -275,7 +260,6 @@ export interface Resource {
   mimeType?: string;
 }
 
-// Registry/Provider types for consolidated server registries
 export interface ResourceProvider {
   list?: (ctx: MCPServerContext) => unknown;
   read?: (uri: string, ctx: MCPServerContext) => unknown;
@@ -293,14 +277,13 @@ export interface ToolEntry {
 }
 
 export interface ResourceEntry {
-  metadata: Resource | ResourceTemplate; // Depending on type
+  metadata: Resource | ResourceTemplate;
   handler: ResourceHandler;
   validators?: ResourceVarValidators;
-  matcher?: UriMatcher; // Pre-compiled matcher for templates
+  matcher?: UriMatcher;
   type: "resource" | "resource_template";
 }
 
-// Standard Schema V1 interface for supporting schema validators like Zod, Valibot, etc.
 export interface StandardSchemaV1<Input = unknown, Output = Input> {
   readonly "~standard": {
     readonly version: 1;
@@ -321,8 +304,6 @@ export type StandardSchemaResult<Output> =
       }>;
     };
 
-// Helper to detect standard schema validators
-// Converter types for Standard Schema support
 export type Converter = (schema: StandardSchemaV1) => JsonSchema;
 export type JsonSchema = unknown;
 
@@ -399,7 +380,6 @@ export interface ResourceTemplate {
   mimeType?: string;
 }
 
-// New resource system types
 export type ResourceVars = Record<string, string>;
 
 export interface ResourceMeta {
@@ -408,7 +388,7 @@ export interface ResourceMeta {
   mimeType?: string;
 }
 
-export type ResourceVarValidators = Record<string, unknown>; // StandardSchema-compatible
+export type ResourceVarValidators = Record<string, unknown>;
 
 export type ResourceHandler = (
   uri: URL,

@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
 import type { Converter, StandardSchemaV1 } from "../../src/types.js";
 
-// Mock Zod-like Standard Schema
 const createMockZodSchema = (jsonSchema: unknown): StandardSchemaV1 => {
   const schema: StandardSchemaV1 & { _mockJsonSchema: unknown } = {
     "~standard": {
@@ -10,12 +9,11 @@ const createMockZodSchema = (jsonSchema: unknown): StandardSchemaV1 => {
       vendor: "zod",
       validate: (value: unknown) => ({ value }),
     },
-    _mockJsonSchema: jsonSchema, // For converter to extract
+    _mockJsonSchema: jsonSchema,
   };
   return schema;
 };
 
-// Mock converter
 const mockConverter: Converter = (schema: StandardSchemaV1) => {
   return (
     (schema as unknown as { _mockJsonSchema: unknown })._mockJsonSchema || {
@@ -25,7 +23,7 @@ const mockConverter: Converter = (schema: StandardSchemaV1) => {
 };
 
 describe("Converter Support", () => {
-  it("should convert Standard Schema to JSON Schema for wire protocol", async () => {
+  it("should convert Standard Schema to JSON Schema for tool wire protocol", async () => {
     const mcp = new McpServer({
       name: "converter-test",
       version: "1.0.0",
@@ -46,7 +44,6 @@ describe("Converter Support", () => {
       }),
     });
 
-    // Test that tools/list returns proper JSON Schema
     const transport = new StreamableHttpTransport();
     const handler = transport.bind(mcp);
 
@@ -73,7 +70,61 @@ describe("Converter Support", () => {
     });
   });
 
-  it("should throw clear error when Standard Schema used without converter", () => {
+  it("should convert Standard Schema to extract prompt arguments correctly", async () => {
+    const mcp = new McpServer({
+      name: "prompt-converter-test",
+      version: "1.0.0",
+      converter: mockConverter,
+    });
+
+    const zodSchema = createMockZodSchema({
+      type: "object",
+      properties: {
+        code: { type: "string", description: "The code to review" },
+        language: { type: "string", description: "Programming language" },
+        strictness: { type: "string", description: "Review strictness" },
+      },
+      required: ["code"],
+    });
+
+    mcp.prompt("codeReview", {
+      description: "Generate code review",
+      inputSchema: zodSchema,
+      handler: () => ({ description: "Review", messages: [] }),
+    });
+
+    const transport = new StreamableHttpTransport();
+    const handler = transport.bind(mcp);
+
+    const request = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "prompts/list",
+      }),
+    });
+
+    const response = await handler(request);
+    const data = await response.json();
+
+    const codeReviewPrompt = data.result.prompts.find(
+      (p: { name: string }) => p.name === "codeReview",
+    );
+    expect(codeReviewPrompt.arguments).toHaveLength(3);
+    expect(codeReviewPrompt.arguments).toEqual([
+      { name: "code", description: "The code to review", required: true },
+      {
+        name: "language",
+        description: "Programming language",
+        required: false,
+      },
+      { name: "strictness", description: "Review strictness", required: false },
+    ]);
+  });
+
+  it("should throw clear error when Standard Schema used without converter for tools", () => {
     const mcp = new McpServer({
       name: "no-converter",
       version: "1.0.0",
@@ -89,13 +140,28 @@ describe("Converter Support", () => {
     }).toThrow(/Cannot use Standard Schema.*vendor: "zod"/);
   });
 
+  it("should throw clear error when Standard Schema used without converter for prompts", () => {
+    const mcp = new McpServer({
+      name: "no-converter",
+      version: "1.0.0",
+    });
+
+    const zodSchema = createMockZodSchema({ type: "object" });
+
+    expect(() => {
+      mcp.prompt("test", {
+        inputSchema: zodSchema,
+        handler: () => ({ messages: [] }),
+      });
+    }).toThrow(/Cannot use Standard Schema.*vendor: "zod"/);
+  });
+
   it("should work with JSON Schema when no converter provided", async () => {
     const mcp = new McpServer({
       name: "json-only",
       version: "1.0.0",
     });
 
-    // This should work fine
     mcp.tool("add", {
       inputSchema: {
         type: "object",
@@ -110,10 +176,21 @@ describe("Converter Support", () => {
       }),
     });
 
+    mcp.prompt("simplePrompt", {
+      inputSchema: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Input text" },
+        },
+        required: ["text"],
+      },
+      handler: () => ({ messages: [] }),
+    });
+
     const transport = new StreamableHttpTransport();
     const handler = transport.bind(mcp);
 
-    const request = new Request("http://localhost/mcp", {
+    const toolsRequest = new Request("http://localhost/mcp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -123,10 +200,31 @@ describe("Converter Support", () => {
       }),
     });
 
-    const response = await handler(request);
-    const data = await response.json();
+    const toolsResponse = await handler(toolsRequest);
+    const toolsData = await toolsResponse.json();
+    expect(toolsData.result.tools).toHaveLength(1);
 
-    expect(data.result.tools).toHaveLength(1);
+    const promptsRequest = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "prompts/list",
+      }),
+    });
+
+    const promptsResponse = await handler(promptsRequest);
+    const promptsData = await promptsResponse.json();
+    expect(promptsData.result.prompts).toHaveLength(1);
+
+    const prompt = promptsData.result.prompts[0];
+    expect(prompt.arguments).toHaveLength(1);
+    expect(prompt.arguments[0]).toEqual({
+      name: "text",
+      description: "Input text",
+      required: true,
+    });
   });
 
   it("should maintain backward compatibility with existing inputSchema", async () => {
@@ -135,13 +233,11 @@ describe("Converter Support", () => {
       version: "1.0.0",
     });
 
-    // Test with no inputSchema (should use default)
     mcp.tool("noSchema", {
       description: "Tool without schema",
       handler: () => ({ content: [{ type: "text", text: "ok" }] }),
     });
 
-    // Test with JSON Schema
     mcp.tool("jsonSchema", {
       inputSchema: {
         type: "object",
