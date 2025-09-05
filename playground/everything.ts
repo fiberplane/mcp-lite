@@ -78,7 +78,7 @@ const addSchema = z.object({
 mcp.tool("add", {
   description: "Adds two numbers together",
   inputSchema: addSchema,
-  handler: (args: z.infer<typeof addSchema>) => ({
+  handler: (args) => ({
     content: [
       {
         type: "text",
@@ -96,16 +96,16 @@ const multiplySchema = z.object({
 mcp.tool("multiply", {
   description: "Multiplies multiple numbers with optional precision",
   inputSchema: multiplySchema,
-  handler: (args: z.infer<typeof multiplySchema>) => {
-    const result = args.numbers.reduce((acc, num) => acc * num, 1);
+  handler: ({precision = 0, numbers}) => {
+    const result = numbers.reduce((acc, num) => acc * num, 1);
     const formatted =
-      args.precision > 0 ? result.toFixed(args.precision) : result.toString();
+      precision > 0 ? result.toFixed(precision) : result.toString();
 
     return {
       content: [
         {
           type: "text",
-          text: `${args.numbers.join(" × ")} = ${formatted}`,
+          text: `${numbers.join(" × ")} = ${formatted}`,
         },
       ],
     };
@@ -121,7 +121,7 @@ const weatherSchema = z.object({
 mcp.tool("getWeather", {
   description: "Gets weather information for a location",
   inputSchema: weatherSchema,
-  handler: (args: z.infer<typeof weatherSchema>) => {
+  handler: (args) => {
     const baseTemp = Math.floor(Math.random() * 30) + 10;
     let temp = baseTemp;
     let unit = "°C";
@@ -163,7 +163,7 @@ const imageSchema = z.object({
 mcp.tool("getTinyImage", {
   description: "Returns a tiny base64 encoded image",
   inputSchema: imageSchema,
-  handler: (args: z.infer<typeof imageSchema>) => {
+  handler: (args) => {
     const tinyPng =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
@@ -192,7 +192,7 @@ const annotatedSchema = z.object({
 mcp.tool("annotatedMessage", {
   description: "Returns a rich message with multiple content types",
   inputSchema: annotatedSchema,
-  handler: (args: z.infer<typeof annotatedSchema>) => {
+  handler: (args) => {
     const content: Array<{
       type: "text" | "image" | "resource";
       text?: string;
@@ -233,7 +233,7 @@ const listFilesSchema = z.object({
 mcp.tool("listFiles", {
   description: "Lists files in a directory (simulated)",
   inputSchema: listFilesSchema,
-  handler: (args: z.infer<typeof listFilesSchema>) => {
+  handler: (args) => {
     const files = [
       "package.json",
       "README.md",
@@ -269,10 +269,12 @@ const idSchema = z.object({
 mcp.tool("generateId", {
   description: "Generates various types of IDs",
   inputSchema: idSchema,
-  handler: (args: z.infer<typeof idSchema>) => {
+  handler: (args) => {
     const ids: string[] = [];
 
-    for (let i = 0; i < args.count; i++) {
+    const count = args.count ?? 0;
+
+    for (let i = 0; i < count; i++) {
       switch (args.type) {
         case "uuid":
           ids.push(crypto.randomUUID());
