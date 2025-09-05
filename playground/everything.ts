@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
-
 
 const mcp = new McpServer({
   name: "comprehensive-mcp-demo",

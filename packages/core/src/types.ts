@@ -1,6 +1,6 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { JSON_RPC_VERSION } from "./constants.js";
 import type { UriMatcher } from "./uri-template.js";
-import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 export const JSON_RPC_ERROR_CODES = {
   PARSE_ERROR: -32700,

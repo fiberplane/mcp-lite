@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
 
 const mcp = new McpServer({
   name: "example-server",

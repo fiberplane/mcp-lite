@@ -10,18 +10,18 @@ A small, simple, web-first framework for building MCP servers.
 ## Installation
 
 ```bash
-npm install mcp-mcp-mcp
+npm install mcp-lite
 # or
-bun add mcp-mcp-mcp
+bun add mcp-lite
 # or
-pnpm add mcp-mcp-mcp
+pnpm add mcp-lite
 ```
 
 ## Quick Start
 
 ```typescript
 import { Hono } from "hono";
-import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
 
 // Create MCP server
 const mcp = new McpServer({
@@ -63,7 +63,7 @@ app.all("/mcp", async (c) => {
 Main server class for managing tools, prompts, and resources:
 
 ```typescript
-import { McpServer } from "mcp-mcp-mcp";
+import { McpServer } from "mcp-lite";
 
 const server = new McpServer({
   name: "my-server",
@@ -76,7 +76,7 @@ const server = new McpServer({
 HTTP transport layer that handles JSON-RPC 2.0 communication:
 
 ```typescript
-import { StreamableHttpTransport } from "mcp-mcp-mcp";
+import { StreamableHttpTransport } from "mcp-lite";
 
 const transport = new StreamableHttpTransport();
 const httpHandler = transport.bind(server);
@@ -153,7 +153,7 @@ mcp.use(async (ctx, next) => {
 ### Using RpcError
 
 ```typescript
-import { RpcError } from "mcp-mcp-mcp";
+import { RpcError } from "mcp-lite";
 
 mcp.tool("divide", {
   description: "Divides two numbers",
@@ -182,7 +182,7 @@ mcp.tool("divide", {
 Standard JSON-RPC 2.0 error codes are available:
 
 ```typescript
-import { JSON_RPC_ERROR_CODES } from "mcp-mcp-mcp";
+import { JSON_RPC_ERROR_CODES } from "mcp-lite";
 
 // Use predefined error codes
 throw new RpcError("Invalid params", JSON_RPC_ERROR_CODES.INVALID_PARAMS);
@@ -205,7 +205,7 @@ Works with any HTTP framework that provides standard `Request`/`Response` object
 ```typescript
 // Hono
 import { Hono } from "hono";
-import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
 
 // Create MCP server
 const mcp = new McpServer({
