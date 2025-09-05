@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.1.2
+
+### Patch Changes
+
+- 47dec3c: This patch renames converter to schema adapter.
+
 ## 0.1.1
 
 ### Patch Changes
