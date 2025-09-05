@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.1.1
+
+### Patch Changes
+
+- 5a56391: Fixes type inference in tool definitions
+
 ## 0.1.0
 
 ### Minor Changes
