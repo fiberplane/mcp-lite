@@ -1,6 +1,6 @@
 import { RpcError } from "./errors.js";
 import type {
-  Converter,
+  SchemaConverter,
   JsonRpcId,
   JsonRpcMessage,
   MCPServerContext,
@@ -10,7 +10,7 @@ import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
 export function resolveToolSchema(
   inputSchema?: unknown,
-  converter?: Converter,
+  schemaConverter?: SchemaConverter,
 ): {
   mcpInputSchema: unknown;
   validator?: unknown;
@@ -18,7 +18,7 @@ export function resolveToolSchema(
   if (!inputSchema) return { mcpInputSchema: { type: "object" } };
 
   if (isStandardSchema(inputSchema)) {
-    if (!converter) {
+    if (!schemaConverter) {
       const vendor = inputSchema["~standard"].vendor;
       throw new Error(
         `Cannot use Standard Schema (vendor: "${vendor}") without a converter. ` +
@@ -26,7 +26,7 @@ export function resolveToolSchema(
       );
     }
 
-    const jsonSchema = converter(inputSchema);
+    const jsonSchema = schemaConverter(inputSchema);
     return { mcpInputSchema: jsonSchema, validator: inputSchema };
   }
 

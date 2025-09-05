@@ -286,7 +286,7 @@ export type InferInput<T> = T extends StandardSchemaV1<unknown, unknown>
   ? StandardSchemaV1.InferInput<T>
   : unknown;
 
-export type Converter = (schema: StandardSchemaV1) => JsonSchema;
+export type SchemaConverter = (schema: StandardSchemaV1) => JsonSchema;
 export type JsonSchema = unknown;
 
 export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
