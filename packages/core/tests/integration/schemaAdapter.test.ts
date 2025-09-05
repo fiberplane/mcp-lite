@@ -1,100 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { Converter } from "../../src/types.js";
 
-// Practical Zod to JSON Schema converter for testing
-// In a real implementation, you'd use a library like zod-to-json-schema
-const zodToJsonSchema: Converter = (zodSchema: any) => {
-  // Handle Zod object schemas
-  if (zodSchema.def?.type === "object" && zodSchema.def.shape) {
-    const properties: Record<string, any> = {};
-    const required: string[] = [];
-
-    // Static mapping for test schemas - in practice you'd parse the actual schema
-    const descriptions: Record<string, Record<string, string>> = {
-      search: {
-        query: "Search query",
-        limit: "Maximum results",
-        category: "Search category",
-      },
-      codeReview: {
-        code: "Code to review",
-        language: "Programming language",
-        severity: "Review severity",
-      },
-      fileSearch: {
-        pattern: "File name pattern or regex",
-        directory: "Directory to search in",
-        maxDepth: "Maximum search depth",
-        fileType: "Type of files to find",
-        caseSensitive: "Case sensitive search",
-      },
-    };
-
-    // Try to determine which schema we're converting by checking the field names
-    let schemaType = "";
-    const fieldNames = Object.keys(zodSchema.def.shape);
-    if (fieldNames.includes("query") && fieldNames.includes("category")) {
-      schemaType = "search";
-    } else if (fieldNames.includes("code") && fieldNames.includes("severity")) {
-      schemaType = "codeReview";
-    }
-
-    for (const [key, field] of Object.entries(zodSchema.def.shape)) {
-      const fieldSchema = field as any;
-      const desc = descriptions[schemaType]?.[key];
-
-      if (fieldSchema.def?.type === "string") {
-        properties[key] = { type: "string" };
-        if (desc) properties[key].description = desc;
-        required.push(key);
-      } else if (fieldSchema.def?.type === "number") {
-        properties[key] = { type: "number" };
-        if (desc) properties[key].description = desc;
-        required.push(key);
-      } else if (fieldSchema.def?.type === "enum") {
-        properties[key] = {
-          type: "string",
-          enum:
-            fieldSchema.options || Object.values(fieldSchema.def.entries || {}),
-        };
-        if (desc) properties[key].description = desc;
-        required.push(key);
-      } else if (fieldSchema.def?.type === "optional") {
-        const innerType = fieldSchema.def.innerType;
-        if (innerType?.def?.type === "string") {
-          properties[key] = { type: "string" };
-        } else if (innerType?.def?.type === "number") {
-          properties[key] = { type: "number" };
-        } else if (innerType?.def?.type === "enum") {
-          properties[key] = {
-            type: "string",
-            enum:
-              innerType.options || Object.values(innerType.def.entries || {}),
-          };
-        }
-        if (desc) properties[key].description = desc;
-        // Optional fields are not added to required
-      }
-    }
-
-    return {
-      type: "object",
-      properties,
-      ...(required.length > 0 && { required }),
-    };
-  }
-
-  return { type: "object" };
-};
-
-describe("End-to-End Converter Integration", () => {
+describe("End-to-End Schema Adapter Integration", () => {
   it("registers tool with Zod schema → tools/list returns proper JSON Schema to client", async () => {
     const server = new McpServer({
       name: "test-server",
       version: "1.0.0",
-      converter: zodToJsonSchema,
+      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
     });
 
     // Register tool with realistic Zod schema
@@ -156,7 +69,7 @@ describe("End-to-End Converter Integration", () => {
     const server = new McpServer({
       name: "prompt-server",
       version: "1.0.0",
-      converter: zodToJsonSchema,
+      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
     });
 
     // Register prompt with Zod schema
@@ -225,7 +138,7 @@ describe("End-to-End Converter Integration", () => {
     const server = new McpServer({
       name: "file-server",
       version: "1.0.0",
-      converter: zodToJsonSchema,
+      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
     });
 
     // More complex realistic schema showing the value proposition
@@ -280,9 +193,9 @@ describe("End-to-End Converter Integration", () => {
     expect(fileSearchTool.inputSchema.required).not.toContain("directory");
   });
 
-  it("fails clearly when Zod schema used without converter", () => {
+  it("fails clearly when Zod schema used without schema adapter", () => {
     const server = new McpServer({
-      name: "no-converter-server",
+      name: "no-schema-adapter-server",
       version: "1.0.0",
       // No converter provided
     });
@@ -294,10 +207,10 @@ describe("End-to-End Converter Integration", () => {
         inputSchema: schema,
         handler: () => ({ content: [] }),
       });
-    }).toThrow(/Cannot use Standard Schema.*without a converter/);
+    }).toThrow(/Cannot use Standard Schema.*without a schema adapter/);
   });
 
-  it("works normally with JSON Schema when no converter needed", async () => {
+  it("works normally with JSON Schema when no schema adapter needed", async () => {
     const server = new McpServer({
       name: "json-server",
       version: "1.0.0",
