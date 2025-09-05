@@ -1,5 +1,6 @@
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type {
   Converter,
   InitializeResult,
@@ -27,7 +28,6 @@ import type {
   ResourceReadResult,
   ResourceTemplate,
   ResourceVarValidators,
-  StandardSchemaV1,
   Tool,
   ToolCallResult,
   ToolEntry,

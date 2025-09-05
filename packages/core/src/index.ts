@@ -15,7 +15,6 @@ export type {
   JsonSchema,
   MCPServerContext as Ctx,
   Middleware,
-  StandardSchemaV1,
 } from "./types.js";
 
 export {
