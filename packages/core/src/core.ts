@@ -3,6 +3,7 @@ import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
   Converter,
+  InferInput,
   InitializeResult,
   JsonRpcId,
   JsonRpcMessage,
@@ -380,6 +381,33 @@ export class McpServer {
    * });
    * ```
    */
+  // Overload for StandardSchemaV1 with automatic type inference
+  tool<S extends StandardSchemaV1<unknown, unknown>>(
+    name: string,
+    def: {
+      description?: string;
+      inputSchema: S;
+      handler: (
+        args: InferInput<S>,
+        ctx: MCPServerContext,
+      ) => Promise<ToolCallResult> | ToolCallResult;
+    },
+  ): this;
+
+  // Overload for JSON Schema or no schema (requires manual typing)
+  tool<TArgs = unknown>(
+    name: string,
+    def: {
+      description?: string;
+      inputSchema?: unknown;
+      handler: (
+        args: TArgs,
+        ctx: MCPServerContext,
+      ) => Promise<ToolCallResult> | ToolCallResult;
+    },
+  ): this;
+
+  // Implementation
   tool<TArgs = unknown>(
     name: string,
     def: {
