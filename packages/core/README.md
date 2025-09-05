@@ -1,11 +1,17 @@
+# `mcp-lite`
 
 A small, simple, web-first framework for building MCP servers.
 
+> [!TIP]
+>
+> The Model Context Protocol (MCP) is an open standard that enables secure connections between host applications and external data sources and tools, allowing AI assistants to reason over information and execute functions with user permission.
+
 ## Features
 - Lightweight and zero dependencies
-- Supports Streamable HTTP
-- Composable middleware
-- Plug your own validation (uses Standard Schema interface)
+- Supports Streamable HTTP transport
+- Composable middleware system
+- Standard Schema validation (Zod, Valibot, etc.)
+- Type-safe tool, resource, and prompt registration
 
 ## Installation
 
@@ -22,24 +28,26 @@ pnpm add mcp-lite
 ```typescript
 import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
+import { z } from "zod";
 
-// Create MCP server
+// Create MCP server with Zod converter
 const mcp = new McpServer({
   name: "example-server",
   version: "1.0.0",
+  converter: (schema) => z.toJSONSchema(schema as z.ZodType),
+});
+
+// Define schema
+const EchoSchema = z.object({
+  message: z.string(),
 });
 
 // Add a tool
 mcp.tool("echo", {
   description: "Echoes the input message",
-  inputSchema: {
-    type: "object",
-    properties: {
-      message: { type: "string" },
-    },
-    required: ["message"],
-  },
-  handler: (args: { message: string }) => ({
+  inputSchema: EchoSchema,
+  handler: (args) => ({
+    // args is automatically typed as { message: string }
     content: [{ type: "text", text: args.message }],
   }),
 });
@@ -56,11 +64,9 @@ app.all("/mcp", async (c) => {
 });
 ```
 
-## Core Components
+## Creating an MCP Server
 
-### McpServer
-
-Main server class for managing tools, prompts, and resources:
+Basic constructor usage:
 
 ```typescript
 import { McpServer } from "mcp-lite";
@@ -71,20 +77,51 @@ const server = new McpServer({
 });
 ```
 
-### StreamableHttpTransport
+### Using a Converter
 
-HTTP transport layer that handles JSON-RPC 2.0 communication:
+Converters are needed when using Standard Schema validators (like Zod or Valibot) to convert them to JSON Schema format that MCP clients can understand.
 
+#### With Zod converter:
 ```typescript
-import { StreamableHttpTransport } from "mcp-lite";
+import { z } from "zod";
 
-const transport = new StreamableHttpTransport();
-const httpHandler = transport.bind(server);
+const server = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  converter: (schema) => z.toJSONSchema(schema as z.ZodType),
+});
 ```
 
-## Tool Registration
+#### Without converter (JSON Schema only):
+```typescript
+const server = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  // No converter - use JSON Schema directly
+});
+```
 
-### Basic Tool
+## Connecting with Hono
+
+```typescript
+import { Hono } from "hono";
+import { StreamableHttpTransport } from "mcp-lite";
+
+// Create transport and bind server
+const transport = new StreamableHttpTransport();
+const httpHandler = transport.bind(mcp);
+
+// Setup Hono app with MCP endpoint
+const app = new Hono();
+app.all("/mcp", async (c) => {
+  const response = await httpHandler(c.req.raw);
+  return response;
+});
+```
+
+## Tools
+
+### Basic Tool with JSON Schema
 
 ```typescript
 mcp.tool("add", {
@@ -103,9 +140,7 @@ mcp.tool("add", {
 });
 ```
 
-### Tool with Standard Schema Validation
-
-Supports schema validators like Zod, Valibot, etc.:
+### Tool with Standard Schema (Zod)
 
 ```typescript
 import { z } from "zod";
@@ -118,14 +153,13 @@ const AddSchema = z.object({
 mcp.tool("add", {
   description: "Adds two numbers",
   inputSchema: AddSchema,
-  handler: (args) => ({
-    // args is now typed as { a: number; b: number }
+  handler: (args: z.infer<typeof AddSchema>) => ({
     content: [{ type: "text", text: String(args.a + args.b) }],
   }),
 });
 ```
 
-### Tool Without Input Schema
+### Tool without Schema
 
 ```typescript
 mcp.tool("status", {
@@ -136,24 +170,110 @@ mcp.tool("status", {
 });
 ```
 
-## Middleware Usage
+## Resources
 
-Add middleware to intercept and process requests:
+### Static Resource
+
+```typescript
+mcp.resource(
+  "file://config.json",
+  {
+    name: "App Configuration",
+    description: "Application configuration file",
+    mimeType: "application/json",
+  },
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      type: "text",
+      text: JSON.stringify({ name: "my-app" }),
+      mimeType: "application/json",
+    }],
+  })
+);
+```
+
+### Templated Resource with URI Patterns
+
+```typescript
+mcp.resource(
+  "github://repos/{owner}/{repo}",
+  { description: "GitHub repository" },
+  async (uri, { owner, repo }) => ({
+    contents: [{
+      uri: uri.href,
+      type: "text", 
+      text: `Repository: ${owner}/${repo}`,
+    }],
+  })
+);
+```
+
+## Prompts
+
+### Basic Prompt
+
+```typescript
+mcp.prompt("greet", {
+  description: "Generate a greeting message",
+  handler: () => ({
+    messages: [{
+      role: "user",
+      content: { type: "text", text: "Hello, how are you?" }
+    }]
+  }),
+});
+```
+
+### Prompt with Arguments and Schema
+
+```typescript
+import { z } from "zod";
+
+const SummarySchema = z.object({
+  text: z.string(),
+  length: z.enum(["short", "medium", "long"]).optional(),
+});
+
+mcp.prompt("summarize", {
+  description: "Create a summary prompt",
+  arguments: SummarySchema,
+  handler: (args: z.infer<typeof SummarySchema>) => ({
+    description: "Summarization prompt",
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `Please summarize: ${args.text}`
+      }
+    }]
+  }),
+});
+```
+
+## Middleware
+
+Basic middleware pattern for logging, authentication, or request processing:
 
 ```typescript
 // Logging middleware
 mcp.use(async (ctx, next) => {
-  console.log("Request:", ctx.request.method);
+  console.log(`Request: ${ctx.request.method}`);
+  await next();
+});
+
+// Authentication middleware
+mcp.use(async (ctx, next) => {
+  // Access request context
+  ctx.state.user = "authenticated-user";
   await next();
 });
 ```
 
 ## Error Handling
 
-### Using RpcError
-
 ```typescript
-import { RpcError } from "mcp-lite";
+import { RpcError, JSON_RPC_ERROR_CODES } from "mcp-lite";
 
 mcp.tool("divide", {
   description: "Divides two numbers",
@@ -167,9 +287,8 @@ mcp.tool("divide", {
   },
   handler: (args: { a: number; b: number }) => {
     if (args.b === 0) {
-      throw new RpcError("Division by zero", -32000);
+      throw new RpcError(JSON_RPC_ERROR_CODES.INVALID_PARAMS, "Division by zero");
     }
-    
     return {
       content: [{ type: "text", text: String(args.a / args.b) }],
     };
@@ -177,78 +296,10 @@ mcp.tool("divide", {
 });
 ```
 
-### Error Codes
+## Protocol Information
 
-Standard JSON-RPC 2.0 error codes are available:
-
-```typescript
-import { JSON_RPC_ERROR_CODES } from "mcp-lite";
-
-// Use predefined error codes
-throw new RpcError("Invalid params", JSON_RPC_ERROR_CODES.INVALID_PARAMS);
-```
-
-## Protocol Support
-
-### MCP Protocol Version
-
-The framework supports MCP protocol version `2025-06-18`.
-
-### JSON-RPC 2.0
-
-All communication follows JSON-RPC 2.0 specification with proper request/response handling and error codes.
-
-### HTTP Integration
-
-Works with any HTTP framework that provides standard `Request`/`Response` objects:
-
-```typescript
-// Hono
-import { Hono } from "hono";
-import { McpServer, StreamableHttpTransport } from "mcp-lite";
-
-// Create MCP server
-const mcp = new McpServer({
-  name: "my-server",
-  version: "1.0.0",
-});
-
-// Add some tools
-mcp.tool("echo", {
-  description: "Echoes the input message",
-  inputSchema: {
-    type: "object",
-    properties: {
-      message: { type: "string" },
-    },
-    required: ["message"],
-  },
-  handler: (args: { message: string }) => ({
-    content: [{ type: "text", text: args.message }],
-  }),
-});
-
-// Create HTTP transport and bind server
-const transport = new StreamableHttpTransport();
-const httpHandler = transport.bind(mcp);
-
-// Setup Hono app
-const app = new Hono();
-
-// Basic MCP endpoint
-app.all("/mcp", async (c) => {
-  const response = await httpHandler(c.req.raw);
-  return response;
-});
-
-export default app;
-```
+This framework supports MCP protocol version `2025-06-18` with full JSON-RPC 2.0 compliance.
 
 ## Examples
 
-See the `playground/` directory for complete working examples including:
-- Hono integration
-- Tool registration
-- Middleware usage
-- Error handling
-- Schema validation
+See the `playground/` directory for complete working examples demonstrating all features.
