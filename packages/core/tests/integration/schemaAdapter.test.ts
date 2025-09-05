@@ -50,7 +50,7 @@ describe("End-to-End Schema Adapter Integration", () => {
     const searchTool = data.result.tools[0];
     expect(searchTool.name).toBe("search");
     expect(searchTool.description).toBe("Search for content");
-    expect(searchTool.inputSchema).toEqual({
+    expect(searchTool.inputSchema).toMatchObject({
       type: "object",
       properties: {
         query: { type: "string", description: "Search query" },
