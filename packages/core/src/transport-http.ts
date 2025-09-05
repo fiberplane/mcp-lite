@@ -33,7 +33,6 @@ export class StreamableHttpTransport {
       throw new Error("Transport not bound to a server");
     }
 
-    // Only allow POST requests
     if (request.method !== "POST") {
       const errorResponse = createJsonRpcError(
         null,
@@ -51,11 +50,9 @@ export class StreamableHttpTransport {
     }
 
     try {
-      // Parse request body first
       const body = await request.text();
       const jsonRpcRequest = parseJsonRpc(body);
 
-      // Check if this is a valid JSON-RPC message (request or notification)
       if (!isValidJsonRpcMessage(jsonRpcRequest)) {
         const errorResponse = createJsonRpcError(
           null,
@@ -72,7 +69,6 @@ export class StreamableHttpTransport {
         });
       }
 
-      // Determine if this is a notification or request
       const isNotification = isJsonRpcNotification(jsonRpcRequest);
 
       // Protocol header enforcement: Be lenient on initialize, strict after

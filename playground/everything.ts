@@ -2,15 +2,14 @@ import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
 import { z } from "zod";
 
-// Create comprehensive MCP server showcasing all features
+
 const mcp = new McpServer({
   name: "comprehensive-mcp-demo",
   version: "2.0.0",
+  converter: (s) => z.toJSONSchema(s as z.ZodType),
 });
 
 // ===== MIDDLEWARE =====
-
-// Request logging middleware with timing
 mcp.use(async (ctx, next) => {
   const startTime = Date.now();
   console.log(
@@ -26,7 +25,6 @@ mcp.use(async (ctx, next) => {
   );
 });
 
-// Error handling middleware
 mcp.use(async (_ctx, next) => {
   try {
     await next();
@@ -36,10 +34,9 @@ mcp.use(async (_ctx, next) => {
   }
 });
 
-// Rate limiting simulation middleware
 mcp.use(async (ctx, next) => {
   ctx.state.rateLimited = false;
-  // Simulate rate limiting check
+
   const requestCount = (ctx.state.requestCount as number) || 0;
   if (requestCount > 100) {
     ctx.state.rateLimited = true;
@@ -49,17 +46,13 @@ mcp.use(async (ctx, next) => {
   await next();
 });
 
-// Authentication demo middleware
 mcp.use(async (ctx, next) => {
-  // Extract hypothetical auth from request params
   const params = (ctx.request.params as Record<string, unknown>) || {};
-  ctx.state.authenticated = params.apiKey === "demo-key" || true; // Always pass for demo
+  ctx.state.authenticated = params.apiKey === "demo-key" || true;
   await next();
 });
 
 // ===== TOOLS =====
-
-// Simple echo tool with Zod validation
 const echoSchema = z.object({
   message: z.string().min(1, "Message cannot be empty"),
   repeat: z.number().min(1).max(10).optional().default(1),
@@ -78,7 +71,6 @@ mcp.tool("echo", {
   }),
 });
 
-// Math operations with number validation
 const addSchema = z.object({
   a: z.number(),
   b: z.number(),
@@ -121,7 +113,6 @@ mcp.tool("multiply", {
   },
 });
 
-// Weather API with structured input/output and enum validation
 const weatherSchema = z.object({
   location: z.string().min(1, "Location is required"),
   unit: z.enum(["celsius", "fahrenheit", "kelvin"]).default("celsius"),
@@ -132,8 +123,7 @@ mcp.tool("getWeather", {
   description: "Gets weather information for a location",
   inputSchema: weatherSchema,
   handler: (args: z.infer<typeof weatherSchema>) => {
-    // Mock weather data
-    const baseTemp = Math.floor(Math.random() * 30) + 10; // 10-40°C
+    const baseTemp = Math.floor(Math.random() * 30) + 10;
     let temp = baseTemp;
     let unit = "°C";
 
@@ -166,7 +156,6 @@ mcp.tool("getWeather", {
   },
 });
 
-// Base64 encoded tiny image tool
 const imageSchema = z.object({
   color: z.enum(["red", "green", "blue", "yellow"]).default("blue"),
   size: z.enum(["small", "medium", "large"]).default("small"),
@@ -176,7 +165,6 @@ mcp.tool("getTinyImage", {
   description: "Returns a tiny base64 encoded image",
   inputSchema: imageSchema,
   handler: (args: z.infer<typeof imageSchema>) => {
-    // Create a minimal 1x1 pixel PNG (this is a real base64 encoded PNG)
     const tinyPng =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
@@ -196,7 +184,6 @@ mcp.tool("getTinyImage", {
   },
 });
 
-// Rich message with different content types
 const annotatedSchema = z.object({
   title: z.string(),
   includeImage: z.boolean().default(true),
@@ -238,7 +225,6 @@ mcp.tool("annotatedMessage", {
   },
 });
 
-// File system operations simulation
 const listFilesSchema = z.object({
   path: z.string().default("/"),
   includeHidden: z.boolean().default(false),
@@ -249,7 +235,6 @@ mcp.tool("listFiles", {
   description: "Lists files in a directory (simulated)",
   inputSchema: listFilesSchema,
   handler: (args: z.infer<typeof listFilesSchema>) => {
-    // Mock file listing
     const files = [
       "package.json",
       "README.md",
@@ -277,7 +262,6 @@ mcp.tool("listFiles", {
   },
 });
 
-// UUID generation
 const idSchema = z.object({
   type: z.enum(["uuid", "short", "numeric"]).default("uuid"),
   count: z.number().min(1).max(10).default(1),
@@ -292,7 +276,6 @@ mcp.tool("generateId", {
     for (let i = 0; i < args.count; i++) {
       switch (args.type) {
         case "uuid":
-          // Simple UUID v4 generation
           ids.push(crypto.randomUUID());
           break;
         case "short":
@@ -316,8 +299,6 @@ mcp.tool("generateId", {
 });
 
 // ===== RESOURCES =====
-
-// Static resources
 mcp.resource(
   "file://config.json",
   {
@@ -424,7 +405,6 @@ You can use this resource in prompts or reference it from tools.`,
   }),
 );
 
-// Resource templates with parameter validation
 mcp.resource(
   "file://{path}",
   {
@@ -434,7 +414,6 @@ mcp.resource(
   },
   { path: z.string().regex(/^[a-zA-Z0-9/_.-]+$/) },
   async (uri, { path }) => {
-    // Simulate file content based on path
     const extension = path?.split(".").pop() || "";
     let mimeType = "text/plain";
     let content = `Content of file: ${path}`;
@@ -486,7 +465,6 @@ mcp.resource(
     id: z.string().regex(/^\d+$/),
   },
   async (uri, { type, id }) => {
-    // Generate mock data based on type and ID
     let data: Record<string, unknown> = {};
 
     switch (type) {
@@ -543,8 +521,6 @@ mcp.resource(
 );
 
 // ===== PROMPTS =====
-
-// Code review prompt
 const codeReviewSchema = z.object({
   code: z.string().min(1, "Code is required"),
   language: z.string().default("typescript"),
@@ -599,7 +575,6 @@ Please structure your review with:
   },
 });
 
-// Educational explanation prompt
 const explainSchema = z.object({
   concept: z.string().min(1, "Concept is required"),
   audience: z
@@ -657,7 +632,6 @@ Structure your explanation with:
   },
 });
 
-// Documentation generation prompt
 const docSchema = z.object({
   code: z.string().min(1, "Code is required"),
   style: z.enum(["api", "tutorial", "reference", "readme"]).default("api"),
@@ -713,7 +687,6 @@ Please use clear markdown formatting and organize the documentation logically.`,
   },
 });
 
-// Content summarization prompt with embedded resources
 const summarySchema = z.object({
   content: z.string().min(1, "Content is required"),
   length: z.enum(["brief", "medium", "detailed"]).default("medium"),
@@ -768,7 +741,6 @@ Please structure your summary clearly and highlight the most important insights.
       },
     ];
 
-    // Add embedded resource reference if available
     messages.push({
       role: "user",
       content: {
@@ -788,8 +760,6 @@ Please structure your summary clearly and highlight the most important insights.
 
 mcp.onError((error, ctx) => {
   console.error(`Error in ${ctx.request.method}:`, error);
-
-  // Custom error responses based on error type
   if (error instanceof z.ZodError) {
     return {
       code: -32602, // Invalid params
@@ -812,20 +782,15 @@ mcp.onError((error, ctx) => {
     };
   }
 
-  // Return undefined to use default error handling for other errors
   return undefined;
 });
 
 // ===== HTTP TRANSPORT SETUP =====
-
-// Create HTTP transport
 const transport = new StreamableHttpTransport();
 const httpHandler = transport.bind(mcp);
 
-// Create Hono app
 const app = new Hono();
 
-// Add CORS headers for development
 app.use("*", async (c, next) => {
   await next();
   c.header("Access-Control-Allow-Origin", "*");
@@ -833,13 +798,11 @@ app.use("*", async (c, next) => {
   c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 });
 
-// Add MCP endpoint
 app.all("/mcp", async (c) => {
   const response = await httpHandler(c.req.raw);
   return response;
 });
 
-// Add comprehensive health check
 app.get("/health", (c) => {
   return c.json({
     status: "healthy",
@@ -860,7 +823,6 @@ app.get("/health", (c) => {
   });
 });
 
-// Add server info endpoint
 app.get("/info", (c) => {
   return c.json({
     name: "comprehensive-mcp-demo",
@@ -907,7 +869,6 @@ const port = 3002;
 
 export default app;
 
-// Start server if running directly
 if (import.meta.main) {
   console.log("🚀 Starting Comprehensive MCP Demo Server...");
   console.log(`📍 Port: ${port}`);
