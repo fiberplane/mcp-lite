@@ -60,7 +60,7 @@ const echoSchema = z.object({
 mcp.tool("echo", {
   description: "Echoes a message with optional repetition",
   inputSchema: echoSchema,
-  handler: (args: z.infer<typeof echoSchema>) => ({
+  handler: (args) => ({
     content: [
       {
         type: "text",

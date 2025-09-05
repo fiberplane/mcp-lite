@@ -280,6 +280,10 @@ export interface ResourceEntry {
   type: "resource" | "resource_template";
 }
 
+export type InferInput<T> = T extends StandardSchemaV1<unknown, unknown>
+  ? StandardSchemaV1.InferInput<T>
+  : unknown;
+
 export type Converter = (schema: StandardSchemaV1) => JsonSchema;
 export type JsonSchema = unknown;
 
