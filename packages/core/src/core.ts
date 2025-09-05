@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
-  Converter,
+  SchemaAdapter,
   InferInput,
   InitializeResult,
   JsonRpcId,
@@ -92,7 +92,7 @@ function errorToResponse(
 export interface McpServerOptions {
   name: string;
   version: string;
-  converter?: Converter;
+  schemaAdapter?: SchemaAdapter;
 }
 
 /**
@@ -214,7 +214,7 @@ export class McpServer {
   private middlewares: Middleware[] = [];
   private capabilities: InitializeResult["capabilities"] = {};
   private onErrorHandler?: OnError;
-  private converter?: Converter;
+  private schemaAdapter?: SchemaAdapter;
 
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
@@ -240,7 +240,7 @@ export class McpServer {
       name: options.name,
       version: options.version,
     };
-    this.converter = options.converter;
+    this.schemaAdapter = options.schemaAdapter;
 
     this.methods = {
       initialize: this.handleInitialize.bind(this),
@@ -425,7 +425,7 @@ export class McpServer {
 
     const { mcpInputSchema, validator } = resolveToolSchema(
       def.inputSchema,
-      this.converter,
+      this.schemaAdapter,
     );
 
     const metadata: Tool = {
@@ -621,14 +621,14 @@ export class McpServer {
         argumentDefs = def.arguments as PromptArgumentDef[];
       } else {
         const { mcpInputSchema, validator: schemaValidator } =
-          resolveToolSchema(def.arguments, this.converter);
+          resolveToolSchema(def.arguments, this.schemaAdapter);
         validator = schemaValidator;
         argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
       }
     } else if (def.inputSchema) {
       const { mcpInputSchema, validator: schemaValidator } = resolveToolSchema(
         def.inputSchema,
-        this.converter,
+        this.schemaAdapter,
       );
       validator = schemaValidator;
       argumentDefs = extractArgumentsFromSchema(mcpInputSchema);

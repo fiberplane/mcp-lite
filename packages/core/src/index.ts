@@ -3,7 +3,7 @@ export { RpcError } from "./errors.js";
 export { StreamableHttpTransport } from "./transport-http.js";
 
 export type {
-  Converter,
+  SchemaAdapter,
   InitializeParams,
   InitializeResult,
   JsonRpcError,

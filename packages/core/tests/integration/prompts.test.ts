@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { Converter } from "../../src/types.js";
+import type { SchemaAdapter } from "../../src/types.js";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 // Type for JSON-RPC response
 interface JsonRpcResponse {
@@ -40,8 +41,8 @@ const mockStandardSchema: StandardSchemaV1 & { _mockJsonSchema: unknown } = {
   },
 };
 
-// Mock converter for tests
-const mockConverter: Converter = (schema: StandardSchemaV1) => {
+// Mock SchemaAdapter for tests
+const mockSchemaAdapter: SchemaAdapter = (schema: StandardSchemaV1) => {
   return (
     (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
       type: "object",
@@ -54,7 +55,7 @@ function createTestHandler() {
   const mcp = new McpServer({
     name: "test-server",
     version: "1.0.0",
-    converter: mockConverter,
+    schemaAdapter: mockSchemaAdapter,
   });
 
   // Add a simple prompt without arguments

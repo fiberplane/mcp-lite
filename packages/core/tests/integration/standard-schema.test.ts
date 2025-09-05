@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { Converter, JsonRpcRes } from "../../src/types.js";
+import type { SchemaAdapter, JsonRpcRes } from "../../src/types.js";
 
 // Mock Standard Schema validator
 const createMockValidator = <T>(
@@ -33,8 +33,8 @@ const createMockValidator = <T>(
   };
 };
 
-// Mock converter for tests
-const mockConverter: Converter = (schema: StandardSchemaV1 | unknown) => {
+// Mock SchemaAdapter for tests
+const mockSchemaAdapter: SchemaAdapter = (schema: StandardSchemaV1 | unknown) => {
   return (
     (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
       type: "object",
@@ -49,7 +49,7 @@ describe("Standard Schema Support", () => {
     const mcp = new McpServer({
       name: "schema-test-server",
       version: "1.0.0",
-      converter: mockConverter,
+      schemaAdapter: mockSchemaAdapter,
     });
 
     // Tool with Standard Schema validation
@@ -191,7 +191,7 @@ describe("Standard Schema Support", () => {
               value: { type: "number" },
             },
             required: ["value"],
-          }, // Converted by mock converter
+          }, // Converted by mock SchemaAdapter
         },
         {
           name: "concat",

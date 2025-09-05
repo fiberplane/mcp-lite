@@ -254,6 +254,8 @@ export interface Resource {
   name?: string;
   description?: string;
   mimeType?: string;
+  _meta?: { [key: string]: unknown };
+  annotations?: Annotations;
 }
 
 export interface ResourceProvider {
@@ -284,7 +286,7 @@ export type InferInput<T> = T extends StandardSchemaV1<unknown, unknown>
   ? StandardSchemaV1.InferInput<T>
   : unknown;
 
-export type Converter = (schema: StandardSchemaV1) => JsonSchema;
+export type SchemaAdapter = (schema: StandardSchemaV1) => JsonSchema;
 export type JsonSchema = unknown;
 
 export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
@@ -297,13 +299,69 @@ export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
   );
 }
 
-export interface Content {
-  type: "text" | "image" | "resource";
-  uri?: string;
-  text?: string;
-  data?: string;
-  mimeType?: string;
+export type Role = "user" | "assistant" | "system";
+
+export interface Annotations {
+  audience?: Role[];
+  lastModified?: string;
+  priority?: number;
 }
+
+export type TextResourceContents = {
+  _meta?: { [key: string]: unknown };
+  uri: string;
+  type: "text";
+  text: string;
+  mimeType?: string;
+};
+
+export type BlobResourceContents = {
+  _meta?: { [key: string]: unknown };
+  uri: string;
+  blob: string;
+  mimeType?: string;
+};
+
+export type ResourceContents = TextResourceContents | BlobResourceContents;
+
+interface MetaAnnotated {
+  _meta?: { [key: string]: unknown };
+  annotations?: Annotations;
+}
+
+interface TextContent extends MetaAnnotated {
+  type: "text";
+  text: string;
+}
+
+interface ImageContent extends MetaAnnotated {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
+interface AudioContent extends MetaAnnotated {
+  type: "audio";
+  data: string;
+  mimeType: string;
+}
+
+interface ResourceLink extends MetaAnnotated {
+  type: "resource";
+  uri: string;
+}
+
+interface EmbeddedResource extends MetaAnnotated {
+  type: "resource";
+  resource: ResourceContents;
+}
+
+export type Content =
+  | TextContent
+  | ImageContent
+  | AudioContent
+  | ResourceLink
+  | EmbeddedResource;
 
 export interface ToolCallParams {
   name: string;
@@ -334,7 +392,8 @@ export interface PromptGetResult {
 }
 
 export interface ResourceReadResult {
-  contents: Content[];
+  contents: ResourceContents[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ListToolsResult {
@@ -347,10 +406,12 @@ export interface ListPromptsResult {
 
 export interface ListResourcesResult {
   resources: Resource[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ListResourceTemplatesResult {
   resourceTemplates: ResourceTemplate[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ResourceTemplate {
@@ -358,6 +419,8 @@ export interface ResourceTemplate {
   name?: string;
   description?: string;
   mimeType?: string;
+  _meta?: { [key: string]: unknown };
+  annotations?: Annotations;
 }
 
 export type ResourceVars = Record<string, string>;
@@ -366,6 +429,8 @@ export interface ResourceMeta {
   name?: string;
   description?: string;
   mimeType?: string;
+  _meta?: { [key: string]: unknown };
+  annotations?: Annotations;
 }
 
 export type ResourceVarValidators = Record<string, unknown>;

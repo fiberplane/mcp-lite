@@ -30,11 +30,11 @@ import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
 
-// Create MCP server with Zod converter
+// Create MCP server with Zod schema adapter
 const mcp = new McpServer({
   name: "example-server",
   version: "1.0.0",
-  converter: (schema) => z.toJSONSchema(schema as z.ZodType),
+  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
 });
 
 // Define schema
@@ -77,27 +77,26 @@ const server = new McpServer({
 });
 ```
 
-### Using a Converter
+### Using a Schema Adapter
 
-Converters are needed when using Standard Schema validators (like Zod or Valibot) to convert them to JSON Schema format that MCP clients can understand.
+Schema adapters are needed when using Standard Schema validators (like Zod or Valibot) to convert them to JSON Schema format that MCP clients can understand.
 
-#### With Zod converter:
+#### With Zod schema adapter:
 ```typescript
 import { z } from "zod";
 
 const server = new McpServer({
   name: "my-server",
   version: "1.0.0",
-  converter: (schema) => z.toJSONSchema(schema as z.ZodType),
+  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
 });
 ```
 
-#### Without converter (JSON Schema only):
+#### Without schema adapter (JSON Schema only):
 ```typescript
 const server = new McpServer({
   name: "my-server",
   version: "1.0.0",
-  // No converter - use JSON Schema directly
 });
 ```
 
