@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { JSON_RPC_VERSION } from "./constants.js";
 import type { UriMatcher } from "./uri-template.js";
 
@@ -278,26 +279,6 @@ export interface ResourceEntry {
   matcher?: UriMatcher;
   type: "resource" | "resource_template";
 }
-
-export interface StandardSchemaV1<Input = unknown, Output = Input> {
-  readonly "~standard": {
-    readonly version: 1;
-    readonly vendor: string;
-    readonly validate: (
-      value: unknown,
-    ) => StandardSchemaResult<Output> | Promise<StandardSchemaResult<Output>>;
-    readonly types?: { readonly input: Input; readonly output: Output };
-  };
-}
-
-export type StandardSchemaResult<Output> =
-  | { readonly value: Output; readonly issues?: undefined }
-  | {
-      readonly issues: ReadonlyArray<{
-        readonly message: string;
-        readonly path?: ReadonlyArray<PropertyKey>;
-      }>;
-    };
 
 export type Converter = (schema: StandardSchemaV1) => JsonSchema;
 export type JsonSchema = unknown;

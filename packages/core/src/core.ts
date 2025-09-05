@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
@@ -27,7 +28,6 @@ import type {
   ResourceReadResult,
   ResourceTemplate,
   ResourceVarValidators,
-  StandardSchemaV1,
   Tool,
   ToolCallResult,
   ToolEntry,
@@ -103,7 +103,7 @@ export interface McpServerOptions {
  *
  * @example Basic server setup
  * ```typescript
- * import { McpServer, StreamableHttpTransport } from "mcp-mcp-mcp";
+ * import { McpServer, StreamableHttpTransport } from "mcp-lite";
  *
  * // Create server instance
  * const server = new McpServer({
