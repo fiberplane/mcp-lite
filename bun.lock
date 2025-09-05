@@ -10,10 +10,12 @@
       },
     },
     "packages/core": {
-      "name": "mcp-mcp-mcp",
-      "version": "0.2.0",
-      "devDependencies": {
+      "name": "mcp-lite",
+      "version": "0.0.0",
+      "dependencies": {
         "@standard-schema/spec": "^1.0.0",
+      },
+      "devDependencies": {
         "typescript": "^5.7.3",
         "zod": "^4.1.5",
       },
@@ -22,7 +24,7 @@
       "name": "playground",
       "dependencies": {
         "hono": "^4.9.5",
-        "mcp-mcp-mcp": "workspace:*",
+        "mcp-lite": "workspace:*",
         "zod": "^4.1.5",
       },
       "devDependencies": {
@@ -184,7 +186,7 @@
 
     "lodash.startcase": ["lodash.startcase@4.4.0", "", {}, "sha512-+WKqsK294HMSc2jEbNgpHpd0JfIBhp7rEV4aqXWqFr6AlXov+SlcgB1Fv01y2kGe3Gc8nMW7VA0SrGuSkRfIEg=="],
 
-    "mcp-mcp-mcp": ["mcp-mcp-mcp@workspace:packages/core"],
+    "mcp-lite": ["mcp-lite@workspace:packages/core"],
 
     "merge2": ["merge2@1.4.1", "", {}, "sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg=="],
 
