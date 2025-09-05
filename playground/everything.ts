@@ -96,7 +96,7 @@ const multiplySchema = z.object({
 mcp.tool("multiply", {
   description: "Multiplies multiple numbers with optional precision",
   inputSchema: multiplySchema,
-  handler: ({precision = 0, numbers}) => {
+  handler: ({ precision = 0, numbers }) => {
     const result = numbers.reduce((acc, num) => acc * num, 1);
     const formatted =
       precision > 0 ? result.toFixed(precision) : result.toString();
@@ -193,34 +193,26 @@ mcp.tool("annotatedMessage", {
   description: "Returns a rich message with multiple content types",
   inputSchema: annotatedSchema,
   handler: (args) => {
-    const content: Array<{
-      type: "text" | "image" | "resource";
-      text?: string;
-      data?: string;
-      mimeType?: string;
-    }> = [
-      {
-        type: "text",
-        text: `# ${args.title}\n\nThis is a comprehensive response demonstrating multiple content types.`,
-      },
-    ];
-
-    if (args.includeImage) {
-      content.push({
-        type: "image",
-        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-        mimeType: "image/png",
-      });
-    }
-
-    if (args.includeResource) {
-      content.push({
-        type: "resource",
-        text: "file://config.json",
-      });
-    }
-
-    return { content };
+    return {
+      content: [
+        {
+          type: "text",
+          text: `# ${args.title}\n\nThis is a comprehensive response demonstrating multiple content types.`,
+        },
+        ...(args.includeImage
+          ? [
+              {
+                type: "image",
+                data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+                mimeType: "image/png",
+              } as const,
+            ]
+          : []),
+        ...(args.includeResource
+          ? ([{ type: "resource", uri: "file://config.json" }] as const)
+          : []),
+      ],
+    };
   },
 });
 
@@ -272,7 +264,7 @@ mcp.tool("generateId", {
   handler: (args) => {
     const ids: string[] = [];
 
-    const count = args.count ?? 0;
+    const count = args.count ?? 1;
 
     for (let i = 0; i < count; i++) {
       switch (args.type) {
@@ -292,7 +284,7 @@ mcp.tool("generateId", {
       content: [
         {
           type: "text",
-          text: args.count === 1 ? ids[0] : ids.join("\n"),
+          text: ids.join("\n"),
         },
       ],
     };
