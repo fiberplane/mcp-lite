@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
@@ -37,3 +41,12 @@
 ## Architecture Notes
 - Core exports live in `packages/core/src`; HTTP entry is `StreamableHttpTransport` bound to an `McpServer`.
 - Protocol version and header are defined in `packages/core/src/constants.ts` and enforced for non-initialize requests.
+- Main exports from `packages/core/src/index.ts`: `McpServer`, `StreamableHttpTransport`, `RpcError`, type exports for JSON-RPC and MCP protocol.
+- Middleware system allows request/response interception (see `Middleware` type in types.ts).
+- Schema validation is pluggable via `SchemaAdapter` interface - supports Zod, Valibot, or raw JSON Schema.
+
+## Key Files
+- `packages/core/src/core.ts`: Main McpServer implementation with tool/resource/prompt registration
+- `packages/core/src/transport-http.ts`: HTTP transport layer for streaming responses
+- `packages/core/src/types.ts`: Complete TypeScript type definitions for MCP protocol
+- `playground/minimal-server.ts`: Example Hono server implementation with sample tools
