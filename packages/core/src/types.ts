@@ -73,6 +73,14 @@ export interface InitializeResult {
   };
 }
 
+export type ProgressToken = string | number;
+
+export interface ProgressUpdate {
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
 export interface MCPServerContext {
   request: JsonRpcMessage;
   requestId: JsonRpcId | undefined;
@@ -80,7 +88,9 @@ export interface MCPServerContext {
   env: Record<string, unknown>;
   state: Record<string, unknown>;
   session?: { id: string; protocolVersion: string };
+  progressToken?: ProgressToken;
   validate<T>(validator: unknown, input: unknown): T;
+  progress?(update: ProgressUpdate): Promise<void> | void;
 }
 
 export type Middleware = (

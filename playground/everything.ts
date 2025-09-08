@@ -183,10 +183,51 @@ mcp.tool("getTinyImage", {
   },
 });
 
+const longRunningOperationSchema = z.object({
+  duration: z
+    .number()
+    .default(10)
+    .describe("Duration of the operation in seconds"),
+  steps: z.number().default(5).describe("Number of steps in the operation"),
+});
+
 const annotatedSchema = z.object({
   title: z.string(),
   includeImage: z.boolean().default(true),
   includeResource: z.boolean().default(true),
+});
+
+mcp.tool("longRunningOperation", {
+  description: "Demonstrates a long running operation with progress updates",
+  inputSchema: longRunningOperationSchema,
+  handler: async (args, ctx) => {
+    const duration = args.duration ?? 10;
+    const steps = args.steps ?? 5;
+    const stepDuration = duration / steps;
+
+    for (let i = 1; i < steps + 1; i++) {
+      // Simulate work
+      await new Promise((resolve) => setTimeout(resolve, stepDuration * 1000));
+
+      // Report progress using ctx.progress()
+      if (ctx.progressToken && ctx.progress) {
+        ctx.progress({
+          progress: i,
+          total: steps,
+          message: `Step ${i} of ${steps} completed`,
+        });
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Long running operation completed. Duration: ${duration} seconds, Steps: ${steps}.`,
+        },
+      ],
+    };
+  },
 });
 
 mcp.tool("annotatedMessage", {
@@ -347,7 +388,7 @@ This server demonstrates all MCP (Model Context Protocol) features including:
 - \`echo\` - Message echoing with repetition
 - \`add\` / \`multiply\` - Mathematical operations
 - \`getWeather\` - Weather information (mocked)
-- \`longRunningOperation\` - Progress demonstration
+- \`longRunningOperation\` - Progress demonstration with ctx.progress()
 - \`getTinyImage\` - Base64 image generation
 - \`annotatedMessage\` - Rich content responses
 - \`listFiles\` - File system simulation
@@ -873,7 +914,9 @@ if (import.meta.main) {
   console.log("  • echo - Message echoing with repetition");
   console.log("  • add - Mathematical addition");
   console.log("  • multiply - Mathematical multiplication");
-  console.log("  • longRunningOperation - Progress demonstration");
+  console.log(
+    "  • longRunningOperation - Progress demonstration with ctx.progress()",
+  );
   console.log("  • getWeather - Weather information (mocked)");
   console.log("  • getTinyImage - Base64 image generation");
   console.log("  • annotatedMessage - Rich content responses");

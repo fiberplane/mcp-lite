@@ -3,6 +3,8 @@ import type {
   JsonRpcId,
   JsonRpcMessage,
   MCPServerContext,
+  ProgressToken,
+  ProgressUpdate,
   PromptArgumentDef,
   SchemaAdapter,
 } from "./types.js";
@@ -102,17 +104,54 @@ export function extractArgumentsFromSchema(
   return [];
 }
 
+export interface CreateContextOptions {
+  sessionId?: string;
+  progressToken?: ProgressToken;
+  progressSender?: (update: ProgressUpdate) => Promise<void> | void;
+}
+
 export function createContext(
   message: JsonRpcMessage,
   requestId: JsonRpcId | undefined,
+  options: CreateContextOptions = {},
 ): MCPServerContext {
-  return {
+  // Extract progress token from params._meta if not provided in options
+  let progressToken = options.progressToken;
+  if (!progressToken && message.params && typeof message.params === "object") {
+    const params = message.params as Record<string, unknown>;
+    if (params._meta && typeof params._meta === "object") {
+      const meta = params._meta as Record<string, unknown>;
+      if (meta.progressToken) {
+        progressToken = meta.progressToken as ProgressToken;
+      }
+    }
+  }
+
+  const context: MCPServerContext = {
     request: message,
     requestId,
     response: null,
     env: {},
     state: {},
+    progressToken,
     validate: <T>(validator: unknown, input: unknown): T =>
       createValidationFunction<T>(validator, input),
   };
+
+  // Add progress function if we have a progress token and sender
+  if (progressToken && options.progressSender) {
+    context.progress = async (update: ProgressUpdate): Promise<void> => {
+      await options.progressSender?.(update);
+    };
+  }
+
+  // Add session info if available
+  if (options.sessionId) {
+    context.session = {
+      id: options.sessionId,
+      protocolVersion: "2025-06-18", // TODO: Get from session meta
+    };
+  }
+
+  return context;
 }

@@ -1,5 +1,14 @@
+import {
+  JSON_RPC_VERSION,
+  MCP_PROTOCOL_HEADER,
+  MCP_SESSION_ID_HEADER,
+  SSE_ACCEPT_HEADER,
+  SUPPORTED_MCP_PROTOCOL_VERSION,
+} from "./constants.js";
 import type { McpServer } from "./core.js";
 import { RpcError } from "./errors.js";
+import { createSSEStream, type StreamWriter } from "./sse-writer.js";
+import type { SessionId, SessionMeta, SessionStore } from "./store.js";
 import {
   createJsonRpcError,
   isJsonRpcNotification,
@@ -7,9 +16,6 @@ import {
   JSON_RPC_ERROR_CODES,
   type JsonRpcReq,
 } from "./types.js";
-
-const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
-const DEFAULT_PROTOCOL_HEADER = "MCP-Protocol-Version";
 
 function parseJsonRpc(body: string): unknown {
   try {
@@ -20,11 +26,71 @@ function parseJsonRpc(body: string): unknown {
   }
 }
 
+interface SessionState {
+  meta: SessionMeta;
+  writer?: StreamWriter;
+}
+
+export interface StreamableHttpTransportOptions {
+  generateSessionId?: () => string;
+  sessionStore?: SessionStore;
+  allowedHosts?: string[];
+}
+
 export class StreamableHttpTransport {
   private server?: McpServer;
+  private generateSessionId: () => string;
+  private store?: SessionStore;
+  private allowedHosts?: string[];
+  private sessions = new Map<SessionId, SessionState>();
+  private streamWriters = new Map<SessionId, StreamWriter>();
+
+  constructor(options: StreamableHttpTransportOptions = {}) {
+    this.generateSessionId =
+      options.generateSessionId ?? (() => crypto.randomUUID());
+    this.store = options.sessionStore;
+    this.allowedHosts = options.allowedHosts;
+  }
 
   bind(server: McpServer): (request: Request) => Promise<Response> {
     this.server = server;
+
+    // Set up notification sender
+    server._setNotificationSender(async (sessionId, notification) => {
+      const jsonRpcNotification = {
+        jsonrpc: JSON_RPC_VERSION,
+        method: notification.method,
+        params: notification.params,
+      };
+
+      if (sessionId && this.store) {
+        // Store the notification for persistence
+        const eventId = await this.store.send(sessionId, jsonRpcNotification);
+
+        // Send to live writer if connected
+        const writer = this.streamWriters.get(sessionId);
+        if (writer) {
+          writer.write(eventId, jsonRpcNotification);
+        }
+      } else if (sessionId) {
+        // Send to live writer only
+        const writer = this.streamWriters.get(sessionId);
+        if (writer) {
+          writer.write("0", jsonRpcNotification); // Use dummy event ID when no store
+        }
+      } else {
+        // Broadcast to all sessions
+        for (const [id, writer] of this.streamWriters) {
+          if (this.store) {
+            const eventId = await this.store.send(id, jsonRpcNotification);
+            writer.write(eventId, jsonRpcNotification);
+          } else {
+            writer.write("0", jsonRpcNotification);
+          }
+        }
+      }
+    });
+
     return this.handleRequest.bind(this);
   }
 
@@ -33,22 +99,40 @@ export class StreamableHttpTransport {
       throw new Error("Transport not bound to a server");
     }
 
-    if (request.method !== "POST") {
-      const errorResponse = createJsonRpcError(
-        null,
-        new RpcError(
-          JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-          "Only POST method is supported",
-        ).toJson(),
-      );
-      return new Response(JSON.stringify(errorResponse), {
-        status: 405,
-        headers: {
-          Allow: "POST",
-        },
-      });
+    // DNS rebinding protection
+    if (this.allowedHosts) {
+      const host = request.headers.get("Host");
+      if (host && !this.allowedHosts.includes(host)) {
+        return new Response("Forbidden", { status: 403 });
+      }
     }
 
+    switch (request.method) {
+      case "POST":
+        return this.handlePost(request);
+      case "GET":
+        return this.handleGet(request);
+      case "DELETE":
+        return this.handleDelete(request);
+      default: {
+        const errorResponse = createJsonRpcError(
+          null,
+          new RpcError(
+            JSON_RPC_ERROR_CODES.INVALID_REQUEST,
+            "Method not supported",
+          ).toJson(),
+        );
+        return new Response(JSON.stringify(errorResponse), {
+          status: 405,
+          headers: {
+            Allow: "POST, GET, DELETE",
+          },
+        });
+      }
+    }
+  }
+
+  private async handlePost(request: Request): Promise<Response> {
     try {
       const body = await request.text();
       const jsonRpcRequest = parseJsonRpc(body);
@@ -70,38 +154,16 @@ export class StreamableHttpTransport {
       }
 
       const isNotification = isJsonRpcNotification(jsonRpcRequest);
-
-      // Protocol header enforcement: Be lenient on initialize, strict after
-      const protocolHeader = request.headers.get(DEFAULT_PROTOCOL_HEADER);
       const isInitializeRequest = jsonRpcRequest.method === "initialize";
 
-      if (!isInitializeRequest) {
-        // Post-initialization: require exact protocol version match
-        // Commented out: assume default protocol version when header is missing
-        // if (!protocolHeader) {
-        //   const responseId = isNotification
-        //     ? null
-        //     : (jsonRpcRequest as JsonRpcReq).id;
-        //   const errorResponse = createJsonRpcError(
-        //     responseId,
-        //     new RpcError(
-        //       JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-        //       "Missing required MCP protocol version header",
-        //       {
-        //         expectedHeader: DEFAULT_PROTOCOL_HEADER,
-        //         expectedVersion: DEFAULT_PROTOCOL_VERSION,
-        //       },
-        //     ).toJson(),
-        //   );
-        //   return new Response(JSON.stringify(errorResponse), {
-        //     status: 400,
-        //     headers: {
-        //       "Content-Type": "application/json",
-        //     },
-        //   });
-        // }
+      // Protocol header enforcement
+      const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
 
-        if (protocolHeader && protocolHeader !== DEFAULT_PROTOCOL_VERSION) {
+      if (!isInitializeRequest) {
+        if (
+          protocolHeader &&
+          protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION
+        ) {
           const responseId = isNotification
             ? null
             : (jsonRpcRequest as JsonRpcReq).id;
@@ -111,7 +173,7 @@ export class StreamableHttpTransport {
               JSON_RPC_ERROR_CODES.INVALID_PARAMS,
               "Protocol version mismatch",
               {
-                expectedVersion: DEFAULT_PROTOCOL_VERSION,
+                expectedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
                 receivedVersion: protocolHeader,
               },
             ).toJson(),
@@ -125,25 +187,76 @@ export class StreamableHttpTransport {
         }
       }
 
-      // Dispatch to server using unified dispatch method
-      const response = await this.server._dispatch(jsonRpcRequest);
+      // Session validation for non-initialize requests
+      if (!isInitializeRequest && this.store) {
+        const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+        if (!sessionId || !this.store.has(sessionId)) {
+          const responseId = isNotification
+            ? null
+            : (jsonRpcRequest as JsonRpcReq).id;
+          const errorResponse = createJsonRpcError(
+            responseId,
+            new RpcError(
+              JSON_RPC_ERROR_CODES.INVALID_REQUEST,
+              "Invalid or missing session ID",
+            ).toJson(),
+          );
+          return new Response(JSON.stringify(errorResponse), {
+            status: 401,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        }
+      }
 
-      if (response === null) {
-        // This was a notification, return HTTP 204 No Content
-        return new Response(null, {
-          status: 204,
-        });
-      } else {
-        // This was a request, return JSON-RPC response
+      // Dispatch to server
+      const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+      const response = await this.server?._dispatch(jsonRpcRequest, {
+        sessionId: sessionId || undefined,
+      });
+
+      // Handle initialize response - create session
+      if (isInitializeRequest && response && this.store) {
+        const sessionId = this.generateSessionId();
+        const sessionMeta: SessionMeta = {
+          protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
+          clientInfo: (jsonRpcRequest as JsonRpcReq).params,
+        };
+
+        this.store.create(sessionId, sessionMeta);
+        this.sessions.set(sessionId, { meta: sessionMeta });
+
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: {
             "Content-Type": "application/json",
+            [MCP_SESSION_ID_HEADER]: sessionId,
           },
         });
       }
+
+      if (response === null) {
+        return new Response(null, { status: 204 });
+      } else {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+
+        // Add session header for non-initialize responses when sessions enabled
+        if (!isInitializeRequest && this.store) {
+          const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+          if (sessionId) {
+            headers[MCP_SESSION_ID_HEADER] = sessionId;
+          }
+        }
+
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers,
+        });
+      }
     } catch (error) {
-      // Handle parsing errors
       const errorResponse = createJsonRpcError(
         null,
         new RpcError(
@@ -160,5 +273,117 @@ export class StreamableHttpTransport {
         },
       });
     }
+  }
+
+  private async handleGet(request: Request): Promise<Response> {
+    // Validate Accept header
+    const accept = request.headers.get("Accept");
+    if (accept !== SSE_ACCEPT_HEADER) {
+      return new Response(
+        "Bad Request: Accept header must be text/event-stream",
+        {
+          status: 400,
+        },
+      );
+    }
+
+    // Validate protocol header
+    const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
+    if (protocolHeader && protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION) {
+      return new Response("Bad Request: Protocol version mismatch", {
+        status: 400,
+      });
+    }
+
+    // Validate session ID
+    const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+    if (!sessionId || !this.store?.has(sessionId)) {
+      return new Response("Unauthorized: Invalid or missing session ID", {
+        status: 401,
+      });
+    }
+
+    // Check for existing stream
+    if (this.streamWriters.has(sessionId)) {
+      return new Response("Conflict: Stream already exists for session", {
+        status: 409,
+      });
+    }
+
+    // Create SSE stream
+    const { stream, writer } = createSSEStream();
+    this.streamWriters.set(sessionId, writer);
+
+    // Handle stream cleanup on disconnect
+    stream
+      .pipeTo(
+        new WritableStream({
+          close: () => {
+            this.streamWriters.delete(sessionId);
+            writer.end();
+          },
+          abort: () => {
+            this.streamWriters.delete(sessionId);
+            writer.end();
+          },
+        }),
+      )
+      .catch(() => {
+        // Handle pipe errors silently
+        this.streamWriters.delete(sessionId);
+        writer.end();
+      });
+
+    // Handle resumability if Last-Event-ID is provided
+    const lastEventId = request.headers.get("Last-Event-ID");
+    if (lastEventId && this.store) {
+      try {
+        await this.store.replay(sessionId, lastEventId, (eventId, message) => {
+          writer.write(eventId, message);
+        });
+      } catch (_error) {
+        writer.end();
+        this.streamWriters.delete(sessionId);
+        return new Response("Internal Server Error: Replay failed", {
+          status: 500,
+        });
+      }
+    }
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "Content-Type": SSE_ACCEPT_HEADER,
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        [MCP_SESSION_ID_HEADER]: sessionId,
+      },
+    });
+  }
+
+  private async handleDelete(request: Request): Promise<Response> {
+    const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+    if (!sessionId) {
+      return new Response("Bad Request: Missing session ID", {
+        status: 400,
+      });
+    }
+
+    // Close stream if exists
+    const writer = this.streamWriters.get(sessionId);
+    if (writer) {
+      writer.end();
+      this.streamWriters.delete(sessionId);
+    }
+
+    // Delete from store
+    if (this.store) {
+      this.store.delete(sessionId);
+    }
+
+    // Delete from sessions
+    this.sessions.delete(sessionId);
+
+    return new Response(null, { status: 200 });
   }
 }

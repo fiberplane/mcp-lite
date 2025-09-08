@@ -16,6 +16,7 @@ import type {
   MethodHandler,
   Middleware,
   OnError,
+  ProgressToken,
   PromptArgumentDef,
   PromptEntry,
   PromptGetResult,
@@ -43,6 +44,7 @@ import {
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
 import {
+  type CreateContextOptions,
   createContext,
   extractArgumentsFromSchema,
   resolveToolSchema,
@@ -87,6 +89,20 @@ function errorToResponse(
       errorData,
     ).toJson(),
   );
+}
+
+/**
+ * Extract progress token from a JSON-RPC message.
+ */
+function getProgressToken(message: JsonRpcMessage): ProgressToken | undefined {
+  if (message.params && typeof message.params === "object") {
+    const params = message.params as Record<string, unknown>;
+    const meta = params._meta as Record<string, unknown> | undefined;
+    if (meta && typeof meta === "object" && "progressToken" in meta) {
+      return meta.progressToken as ProgressToken;
+    }
+  }
+  return undefined;
 }
 
 export interface McpServerOptions {
@@ -219,6 +235,11 @@ export class McpServer {
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
   private resources = new Map<string, ResourceEntry>();
+
+  private notificationSender?: (
+    sessionId: string | undefined,
+    notification: { method: string; params?: unknown },
+  ) => Promise<void> | void;
 
   /**
    * Create a new MCP server instance.
@@ -655,7 +676,23 @@ export class McpServer {
     return this;
   }
 
-  async _dispatch(message: unknown): Promise<JsonRpcRes | null> {
+  /**
+   * Set the notification sender for streaming notifications.
+   * This is called by the transport to wire up notification delivery.
+   */
+  _setNotificationSender(
+    sender: (
+      sessionId: string | undefined,
+      notification: { method: string; params?: unknown },
+    ) => Promise<void> | void,
+  ): void {
+    this.notificationSender = sender;
+  }
+
+  async _dispatch(
+    message: unknown,
+    contextOptions: CreateContextOptions = {},
+  ): Promise<JsonRpcRes | null> {
     if (!isValidJsonRpcMessage(message)) {
       return createJsonRpcError(
         null,
@@ -668,7 +705,27 @@ export class McpServer {
 
     const isNotification = isJsonRpcNotification(message);
     const requestId = isNotification ? undefined : (message as JsonRpcReq).id;
-    const ctx = createContext(message, requestId);
+
+    // Extract progress token from message before creating context
+    const progressToken = getProgressToken(message as JsonRpcMessage);
+
+    // Build progress sender eagerly if we have session, sender, and token
+    const sessionId = contextOptions.sessionId;
+    const progressSender =
+      sessionId && this.notificationSender && progressToken
+        ? (update: unknown) =>
+            this.notificationSender?.(sessionId, {
+              method: "notifications/progress",
+              params: { progressToken, ...(update as Record<string, unknown>) },
+            })
+        : undefined;
+
+    // Create context once with precomputed token and sender
+    const ctx = createContext(message as JsonRpcMessage, requestId, {
+      sessionId,
+      progressToken,
+      progressSender,
+    });
 
     const method = (message as JsonRpcMessage).method;
     const handler = this.methods[method];
