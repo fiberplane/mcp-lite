@@ -52,37 +52,44 @@ export async function actionWindsurf(context: Context) {
       writeFileSync(agentsPath, AGENTS_MD);
     }
 
-    const home = homedir();
-    const primaryDir = join(home, ".codeium", "windsurf");
-    const primaryPath = join(primaryDir, "mcp_config.json");
-
-    const altDir = join(home, ".config", "Codeium", "Windsurf");
-    const altPath = join(altDir, "mcp_config.json");
-
     const createdOrUpdated: string[] = [];
 
-    const primaryResult = upsertMcpConfig(primaryDir, primaryPath);
-    createdOrUpdated.push(
-      `~/.codeium/windsurf/mcp_config.json (${primaryResult})`,
-    );
+    // Only configure MCP if enabled
+    if (context.fpMcpServerEnabled) {
+      const home = homedir();
+      const primaryDir = join(home, ".codeium", "windsurf");
+      const primaryPath = join(primaryDir, "mcp_config.json");
 
-    // If the alternative location already exists, mirror the configuration there as well.
-    if (existsSync(altDir) || existsSync(altPath)) {
-      const altResult = upsertMcpConfig(altDir, altPath);
+      const altDir = join(home, ".config", "Codeium", "Windsurf");
+      const altPath = join(altDir, "mcp_config.json");
+
+      const primaryResult = upsertMcpConfig(primaryDir, primaryPath);
       createdOrUpdated.push(
-        `~/.config/Codeium/Windsurf/mcp_config.json (${altResult})`,
+        `~/.codeium/windsurf/mcp_config.json (${primaryResult})`,
       );
+
+      // If the alternative location already exists, mirror the configuration there as well.
+      if (existsSync(altDir) || existsSync(altPath)) {
+        const altResult = upsertMcpConfig(altDir, altPath);
+        createdOrUpdated.push(
+          `~/.config/Codeium/Windsurf/mcp_config.json (${altResult})`,
+        );
+      }
     }
 
     s.stop(`${pico.green("✓")} Windsurf MCP configured`);
 
+    const allFiles = ["AGENTS.md"];
+    if (context.fpMcpServerEnabled) {
+      allFiles.push(...createdOrUpdated);
+    }
+
     note(`${pico.cyan("Windsurf setup complete!")}
     
 ${pico.dim("Created/Updated:")}
-• AGENTS.md
-• ${createdOrUpdated.join("\n• ")}
+• ${allFiles.join("\n• ")}
 
-Windsurf will now connect to the Fiberplane MCP server.`);
+${context.fpMcpServerEnabled ? "Windsurf will now connect to the Fiberplane MCP server." : "Windsurf setup complete."}`);
   } catch (error) {
     s.stop(`${pico.red("✗")} Failed to set up Windsurf configuration`);
     throw error;

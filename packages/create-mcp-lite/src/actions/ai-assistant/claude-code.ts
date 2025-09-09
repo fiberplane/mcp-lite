@@ -31,8 +31,8 @@ export async function actionClaudeCode(context: Context) {
     const mcpJsonPath = join(context.path, ".mcp.json");
     const claudePath = join(context.path, "CLAUDE.md");
 
-    // Create .mcp.json if it doesn't exist
-    if (!existsSync(mcpJsonPath)) {
+    // Create .mcp.json if it doesn't exist - but only if MCP server is enabled
+    if (!existsSync(mcpJsonPath) && context.fpMcpServerEnabled) {
       const mcpConfig = CLAUDE_CODE_FIBERPLANE_MCP_CONFIG;
 
       writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2));
@@ -47,13 +47,17 @@ export async function actionClaudeCode(context: Context) {
 
     s.stop(`${pico.green("✓")} Claude Code configuration created`);
 
+    const createdFiles = ["CLAUDE.md"];
+    if (context.fpMcpServerEnabled) {
+      createdFiles.push(".mcp.json with Fiberplane MCP server");
+    }
+
     note(`${pico.cyan("Claude Code setup complete!")}
     
 ${pico.dim("Created:")}
-• CLAUDE.md
-• .mcp.json with Fiberplane MCP server
+• ${createdFiles.join("\n• ")}
 
-Claude Code is ready to use Fiberplane.
+${context.fpMcpServerEnabled ? "Claude Code is ready to use Fiberplane." : "Claude Code setup complete."}
 `);
   } catch (error) {
     s.stop(`${pico.red("✗")} Failed to set up Claude Code configuration`);

@@ -28,8 +28,8 @@ export async function actionCursor(context: Context) {
       mkdirSync(cursorDir, { recursive: true });
     }
 
-    // Create mcp.json if it doesn't exist
-    if (!existsSync(mcpJsonPath)) {
+    // Create mcp.json if it doesn't exist - but only if MCP server is enabled
+    if (!existsSync(mcpJsonPath) && context.fpMcpServerEnabled) {
       const mcpConfig = FIBERPLANE_MCP_CONFIG;
 
       writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2));
@@ -44,13 +44,17 @@ export async function actionCursor(context: Context) {
 
     s.stop(`${pico.green("✓")} Cursor configuration created`);
 
+    const createdFiles = ["AGENTS.md"];
+    if (context.fpMcpServerEnabled) {
+      createdFiles.push(".cursor/mcp.json");
+    }
+
     note(`${pico.cyan("Cursor setup complete!")}
     
 ${pico.dim("Created:")}
-• AGENTS.md
-• .cursor/mcp.json
+• ${createdFiles.join("\n• ")}
 
-Cursor is ready to use Fiberplane.
+${context.fpMcpServerEnabled ? "Cursor is ready to use Fiberplane." : "Cursor setup complete."}
 `);
   } catch (error) {
     s.stop(`${pico.red("✗")} Failed to set up Cursor configuration`);

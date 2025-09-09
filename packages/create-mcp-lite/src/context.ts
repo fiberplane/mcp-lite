@@ -10,6 +10,7 @@ export interface Context {
   description?: string;
   aiAssistant?: AIAssistant;
   flags: Flags;
+  fpMcpServerEnabled: boolean;
 }
 
 /**
@@ -25,6 +26,7 @@ export function initContext(): Context {
     name: projectName ?? PROJECT_NAME,
     packageManager: getPackageManager() ?? "npm",
     flags: [],
+    fpMcpServerEnabled: false, // Temporarily disabled - Fiberplane MCP server is not yet ready
   };
 }
 

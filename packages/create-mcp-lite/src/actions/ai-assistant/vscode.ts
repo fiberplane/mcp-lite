@@ -28,8 +28,8 @@ export async function actionVSCode(context: Context) {
       mkdirSync(vscodeDir, { recursive: true });
     }
 
-    // Create .vscode/mcp.json if it doesn't exist
-    if (!existsSync(mcpJsonPath)) {
+    // Create .vscode/mcp.json if it doesn't exist - but only if MCP server is enabled
+    if (!existsSync(mcpJsonPath) && context.fpMcpServerEnabled) {
       const mcpConfig = {
         servers: {
           [FIBERPLANE_MCP_NAME]: {
@@ -57,13 +57,17 @@ export async function actionVSCode(context: Context) {
 
     s.stop(`${pico.green("✓")} VSCode configuration created`);
 
+    const createdFiles = [".github/copilot-instructions.md"];
+    if (context.fpMcpServerEnabled) {
+      createdFiles.push(".vscode/mcp.json");
+    }
+
     note(`${pico.cyan("VSCode setup complete!")}
     
 ${pico.dim("Created:")}
-• .github/copilot-instructions.md
-• .vscode/mcp.json
+• ${createdFiles.join("\n• ")}
 
-VSCode is ready to use Fiberplane.
+${context.fpMcpServerEnabled ? "VSCode is ready to use Fiberplane." : "VSCode setup complete."}
 `);
   } catch (error) {
     s.stop(`${pico.red("✗")} Failed to set up VSCode configuration`);
