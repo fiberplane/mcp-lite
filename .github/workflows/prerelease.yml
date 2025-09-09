@@ -16,24 +16,41 @@ jobs:
             - name: Setup Bun
               uses: oven-sh/setup-bun@v1
 
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  registry-url: 'https://registry.npmjs.org'
+                  always-auth: true
+
             - name: Install
               run: bun install --frozen-lockfile
 
             # Use changeset's built-in JSON output to detect which packages have pending changes
-            # This is much cleaner than parsing YAML frontmatter manually
             - name: Check for changesets
               id: changesets
               run: |
                 # Generate JSON status of all pending changesets
-                if bunx changeset status --output changeset-status.json 2>/dev/null; then
+                if bun changeset status --output changeset-status.json 2>changeset-status.err; then
                   # Parse JSON using our dedicated script
                   node .github/scripts/check-changesets.js changeset-status.json >> $GITHUB_OUTPUT
+                  echo "statusError=false" >> $GITHUB_OUTPUT
                 else
                   # changeset status failed - assume no changesets
                   echo "hasChangesets=false" >> $GITHUB_OUTPUT
                   echo "hasCoreChangesets=false" >> $GITHUB_OUTPUT
                   echo "hasCliChangesets=false" >> $GITHUB_OUTPUT
+                  echo "statusError=true" >> $GITHUB_OUTPUT
+                  echo "### Changesets status failed\nA failure occurred while running 'changeset status'. See the uploaded artifact 'changeset-diagnostics' for stderr output." >> $GITHUB_STEP_SUMMARY
                 fi
+
+            - name: Upload changeset diagnostics
+              if: steps.changesets.outputs.statusError == 'true'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: changeset-diagnostics
+                  path: |
+                      changeset-status.err
 
             # Generate canary versions for all packages that have changesets
             # This step runs regardless of which packages changed since changeset handles it
@@ -49,13 +66,15 @@ jobs:
             - name: Publish core package (mcp-lite)
               if: steps.changesets.outputs.hasCoreChangesets == 'true'
               run: |
-                cd packages/core && bun publish --tag canary
+                cd packages/core && npm publish --tag canary --provenance
               env:
-                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NPM_CONFIG_PROVENANCE: true
 
             - name: Publish CLI package (create-mcp-lite)
               if: steps.changesets.outputs.hasCliChangesets == 'true'
               run: |
-                cd packages/create-mcp-lite && bun publish --tag canary
+                cd packages/create-mcp-lite && npm publish --tag canary --provenance
               env:
-                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NPM_CONFIG_PROVENANCE: true
