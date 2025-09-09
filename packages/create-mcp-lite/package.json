@@ -7,6 +7,7 @@
     "build": "bun run scripts/build.ts",
     "build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
     "dev": "bun run scripts/build.ts && node dist/index.js",
+    "dev:local": "bun run scripts/build.ts && FIBERPLANE_API_URL=http://localhost:7676 node dist/index.js",
     "dev:target": "bun run scripts/build.ts && node dist/index.js test-name",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
