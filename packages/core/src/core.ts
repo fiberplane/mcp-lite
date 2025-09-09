@@ -16,7 +16,6 @@ import type {
   MethodHandler,
   Middleware,
   OnError,
-  ProgressToken,
   PromptArgumentDef,
   PromptEntry,
   PromptGetResult,
@@ -43,12 +42,12 @@ import {
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
+import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
 import {
   type CreateContextOptions,
   createContext,
-  extractArgumentsFromSchema,
-  resolveToolSchema,
-} from "./validation.js";
+  getProgressToken,
+} from "./context.js";
 
 async function runMiddlewares(
   middlewares: Middleware[],
@@ -91,19 +90,6 @@ function errorToResponse(
   );
 }
 
-/**
- * Extract progress token from a JSON-RPC message.
- */
-function getProgressToken(message: JsonRpcMessage): ProgressToken | undefined {
-  if (message.params && typeof message.params === "object") {
-    const params = message.params as Record<string, unknown>;
-    const meta = params._meta as Record<string, unknown> | undefined;
-    if (meta && typeof meta === "object" && "progressToken" in meta) {
-      return meta.progressToken as ProgressToken;
-    }
-  }
-  return undefined;
-}
 
 export interface McpServerOptions {
   name: string;
@@ -706,10 +692,8 @@ export class McpServer {
     const isNotification = isJsonRpcNotification(message);
     const requestId = isNotification ? undefined : (message as JsonRpcReq).id;
 
-    // Extract progress token from message before creating context
     const progressToken = getProgressToken(message as JsonRpcMessage);
 
-    // Build progress sender eagerly if we have session, sender, and token
     const sessionId = contextOptions.sessionId;
     const progressSender =
       sessionId && this.notificationSender && progressToken
@@ -720,7 +704,6 @@ export class McpServer {
             })
         : undefined;
 
-    // Create context once with precomputed token and sender
     const ctx = createContext(message as JsonRpcMessage, requestId, {
       sessionId,
       progressToken,

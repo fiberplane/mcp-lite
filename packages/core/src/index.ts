@@ -45,5 +45,3 @@ export {
   isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
-
-export type { CreateContextOptions } from "./validation.js";
