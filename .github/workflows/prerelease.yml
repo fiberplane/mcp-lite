@@ -16,13 +16,6 @@ jobs:
             - name: Setup Bun
               uses: oven-sh/setup-bun@v1
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 22
-                  registry-url: 'https://registry.npmjs.org'
-                  always-auth: true
-
             - name: Install
               run: bun install --frozen-lockfile
 
@@ -55,15 +48,13 @@ jobs:
             - name: Publish core package (mcp-lite)
               if: steps.changesets.outputs.hasCoreChangesets == 'true'
               run: |
-                cd packages/core && npm publish --tag canary --provenance
+                cd packages/core && bun publish --tag canary
               env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-                  NPM_CONFIG_PROVENANCE: true
+                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
             - name: Publish CLI package (create-mcp-lite)
               if: steps.changesets.outputs.hasCliChangesets == 'true'
               run: |
-                cd packages/create-mcp-lite && npm publish --tag canary --provenance
+                cd packages/create-mcp-lite && bun publish --tag canary
               env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-                  NPM_CONFIG_PROVENANCE: true
+                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
