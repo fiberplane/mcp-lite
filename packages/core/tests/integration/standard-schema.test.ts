@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { SchemaAdapter, JsonRpcRes } from "../../src/types.js";
+import type { JsonRpcRes, SchemaAdapter } from "../../src/types.js";
 
 // Mock Standard Schema validator
 const createMockValidator = <T>(
@@ -34,7 +34,9 @@ const createMockValidator = <T>(
 };
 
 // Mock SchemaAdapter for tests
-const mockSchemaAdapter: SchemaAdapter = (schema: StandardSchemaV1 | unknown) => {
+const mockSchemaAdapter: SchemaAdapter = (
+  schema: StandardSchemaV1 | unknown,
+) => {
   return (
     (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
       type: "object",

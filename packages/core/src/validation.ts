@@ -1,10 +1,10 @@
 import { RpcError } from "./errors.js";
 import type {
-  SchemaAdapter,
   JsonRpcId,
   JsonRpcMessage,
   MCPServerContext,
   PromptArgumentDef,
+  SchemaAdapter,
 } from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
