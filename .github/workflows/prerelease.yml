@@ -33,7 +33,7 @@ jobs:
                 # Generate JSON status of all pending changesets
                 if bun changeset status --output changeset-status.json 2>/dev/null; then
                   # Parse JSON using our dedicated script
-                  node .github/scripts/check-changesets.js changeset-status.json >> $GITHUB_OUTPUT
+                  bun .github/scripts/check-changesets.js changeset-status.json >> $GITHUB_OUTPUT
                 else
                   # changeset status failed - assume no changesets
                   echo "hasChangesets=false" >> $GITHUB_OUTPUT
