@@ -1,5 +1,11 @@
 # create-mcp-lite
 
+## 0.0.3
+
+### Patch Changes
+
+- 7fb03e6: Use create-mcp-lite for log files (and in console logs + readme)
+
 ## 0.0.2
 
 ### Patch Changes

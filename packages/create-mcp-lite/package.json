@@ -1,7 +1,7 @@
 {
   "name": "create-mcp-lite",
   "type": "module",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "An interactive CLI to create MCP (Model Context Protocol) projects with Fiberplane",
   "scripts": {
     "build": "bun run scripts/build.ts",
