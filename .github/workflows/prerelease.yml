@@ -31,26 +31,15 @@ jobs:
               id: changesets
               run: |
                 # Generate JSON status of all pending changesets
-                if bun changeset status --output changeset-status.json 2>changeset-status.err; then
+                if bun changeset status --output changeset-status.json 2>/dev/null; then
                   # Parse JSON using our dedicated script
                   node .github/scripts/check-changesets.js changeset-status.json >> $GITHUB_OUTPUT
-                  echo "statusError=false" >> $GITHUB_OUTPUT
                 else
                   # changeset status failed - assume no changesets
                   echo "hasChangesets=false" >> $GITHUB_OUTPUT
                   echo "hasCoreChangesets=false" >> $GITHUB_OUTPUT
                   echo "hasCliChangesets=false" >> $GITHUB_OUTPUT
-                  echo "statusError=true" >> $GITHUB_OUTPUT
-                  echo "### Changesets status failed\nA failure occurred while running 'changeset status'. See the uploaded artifact 'changeset-diagnostics' for stderr output." >> $GITHUB_STEP_SUMMARY
                 fi
-
-            - name: Upload changeset diagnostics
-              if: steps.changesets.outputs.statusError == 'true'
-              uses: actions/upload-artifact@v4
-              with:
-                  name: changeset-diagnostics
-                  path: |
-                      changeset-status.err
 
             # Generate canary versions for all packages that have changesets
             # This step runs regardless of which packages changed since changeset handles it
