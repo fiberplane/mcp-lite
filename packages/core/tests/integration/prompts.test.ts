@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
 import type { SchemaAdapter } from "../../src/types.js";
-import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 // Type for JSON-RPC response
 interface JsonRpcResponse {

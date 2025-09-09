@@ -1,11 +1,13 @@
-# create-fiberplane
+# create-mcp-lite
 
-An interactive CLI to create MCP (Model Context Protocol) projects with Fiberplane.
+An interactive CLI to create MCP (Model Context Protocol) projects with mcp-lite.
+
+Optionally deploys straight to Fiberplane.
 
 ## Usage
 
 ```bash
-npm create fiberplane@latest [project-name]
+npm create mcp-lite@latest [project-name]
 ```
 
 ## Features
@@ -29,9 +31,9 @@ npm create fiberplane@latest [project-name]
 
 The CLI includes comprehensive logging to help debug issues. Logs are automatically saved to:
 
-- **macOS**: `~/Library/Logs/create-fiberplane/`
-- **Linux**: `~/.local/state/create-fiberplane/logs/`
-- **Windows**: `%LOCALAPPDATA%\create-fiberplane\Logs\`
+- **macOS**: `~/Library/Logs/create-mcp-lite/`
+- **Linux**: `~/.local/state/create-mcp-lite/logs/`
+- **Windows**: `%LOCALAPPDATA%\create-mcp-lite\Logs\`
 
 ### View Debug Logs
 
@@ -39,10 +41,10 @@ All CLI operations are automatically logged to files for debugging:
 
 ```bash
 # Check the logs (macOS example)
-tail -f ~/Library/Logs/create-fiberplane/create-fiberplane-*.log
+tail -f ~/Library/Logs/create-mcp-lite/create-mcp-lite-*.log
 
 # Or view the latest log file
-ls -t ~/Library/Logs/create-fiberplane/ | head -1 | xargs -I {} cat ~/Library/Logs/create-fiberplane/{}
+ls -t ~/Library/Logs/create-mcp-lite/ | head -1 | xargs -I {} cat ~/Library/Logs/create-mcp-lite/{}
 ```
 
 ### Environment Variables

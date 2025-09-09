@@ -82,7 +82,7 @@ export async function actionGit(context: Context) {
       "Git add completed successfully",
     );
 
-    const commitMessage = "Initial commit: 🤖 create-fiberplane";
+    const commitMessage = "Initial commit: 🤖 create-mcp-lite";
     debugGit.debug(
       { command: `git commit -m "${commitMessage}"`, cwd: context.path },
       "Executing git commit",

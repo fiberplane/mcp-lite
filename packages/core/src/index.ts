@@ -3,7 +3,6 @@ export { RpcError } from "./errors.js";
 export { StreamableHttpTransport } from "./transport-http.js";
 
 export type {
-  SchemaAdapter,
   InitializeParams,
   InitializeResult,
   JsonRpcError,
@@ -15,6 +14,7 @@ export type {
   JsonSchema,
   MCPServerContext as Ctx,
   Middleware,
+  SchemaAdapter,
 } from "./types.js";
 
 export {

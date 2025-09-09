@@ -20,7 +20,7 @@ async function main() {
   console.log(pico.cyan(FIBERPLANE_TITLE));
   console.log("");
 
-  intro("🚀 create-fiberplane");
+  intro("🚀 create-mcp-lite");
 
   const context = initContext();
 

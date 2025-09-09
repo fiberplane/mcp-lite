@@ -2,7 +2,6 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
-  SchemaAdapter,
   InferInput,
   InitializeResult,
   JsonRpcId,
@@ -29,6 +28,7 @@ import type {
   ResourceReadResult,
   ResourceTemplate,
   ResourceVarValidators,
+  SchemaAdapter,
   Tool,
   ToolCallResult,
   ToolEntry,

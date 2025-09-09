@@ -7,6 +7,6 @@ export const FIBERPLANE_TITLE = `
                                                  
 `;
 
-export const CANCEL_MESSAGE = "create-fiberplane cancelled! 🙈";
+export const CANCEL_MESSAGE = "create-mcp-lite cancelled! 🙈";
 
 export const PROJECT_NAME = "echo-mcp";
