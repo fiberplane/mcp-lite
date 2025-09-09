@@ -42,7 +42,7 @@ export async function actionTemplate(context: Context) {
           packageJsonPath,
           `${JSON.stringify(packageJson, null, 2)}\n`,
         );
-      } catch (error) {
+      } catch (_error) {
         // If package.json parsing fails, continue without updating
         console.warn(
           `${pico.yellow("⚠")} Could not update package.json name field`,

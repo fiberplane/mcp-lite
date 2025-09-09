@@ -22,13 +22,8 @@ await Bun.build({
   ],
 });
 
-// Add shebang to the built CLI file for executable
+// Make the built CLI file executable
 const distIndexPath = "dist/index.js";
-const content = await Bun.file(distIndexPath).text();
-const contentWithShebang = `#!/usr/bin/env node\n${content}`;
-await Bun.write(distIndexPath, contentWithShebang);
-
-// Make the file executable
 await $`chmod +x ${distIndexPath}`;
 
 await $`bun run build:types`;

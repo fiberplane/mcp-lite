@@ -12,6 +12,11 @@ export interface Context {
   flags: Flags;
 }
 
+/**
+ * Creates the context object passed to all CLI actions.
+ * Parses first arg passed to the CLI as the directory
+ * @TODO - Accept flags for various arguments (e.g. --path, --ai-assistant, --template, --deploy)
+ */
 export function initContext(): Context {
   const projectName = parseProjectName(process.argv);
 
