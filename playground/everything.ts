@@ -6,6 +6,7 @@ const mcp = new McpServer({
   name: "comprehensive-mcp-demo",
   version: "2.0.0",
   schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
+
 });
 
 // ===== MIDDLEWARE =====
@@ -211,7 +212,7 @@ mcp.tool("longRunningOperation", {
 
       // Report progress using ctx.progress()
       if (ctx.progressToken && ctx.progress) {
-        ctx.progress({
+        await ctx.progress({
           progress: i,
           total: steps,
           message: `Step ${i} of ${steps} completed`,
@@ -820,7 +821,7 @@ mcp.onError((error, ctx) => {
 });
 
 // ===== HTTP TRANSPORT SETUP =====
-const transport = new StreamableHttpTransport();
+const transport = new StreamableHttpTransport({});
 const httpHandler = transport.bind(mcp);
 
 const app = new Hono();

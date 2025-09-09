@@ -90,6 +90,7 @@ function errorToResponse(
   );
 }
 
+// progress token extraction now lives in context.ts
 
 export interface McpServerOptions {
   name: string;
