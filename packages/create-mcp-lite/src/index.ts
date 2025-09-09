@@ -82,7 +82,11 @@ open https://docs.fiberplane.com
 
 ${
   context.flags.includes("deploy-fiberplane")
-    ? `\n${pico.green("✓")} Fiberplane deployment is configured and ready!`
+    ? `\n${pico.green("✓")} Fiberplane deployment is configured and ready!${
+        context.deploymentUrl
+          ? `\n${pico.cyan("🔗")} Your deployment: ${pico.bold(pico.cyan(context.deploymentUrl))}`
+          : ""
+      }`
     : ""
 }
 `);

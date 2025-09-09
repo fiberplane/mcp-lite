@@ -11,6 +11,7 @@ export interface Context {
   aiAssistant?: AIAssistant;
   flags: Flags;
   fpMcpServerEnabled: boolean;
+  deploymentUrl?: string;
 }
 
 /**
