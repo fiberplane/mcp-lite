@@ -25,7 +25,10 @@
   },
   "overrides": [
     {
-      "includes": ["packages/core/**/*.test.ts"],
+      "includes": [
+        "packages/core/**/*.test.ts",
+        "packages/create-mcp-lite/**/*.test.ts"
+      ],
       "linter": {
         "rules": { "suspicious": { "noExplicitAny": "warn" } }
       }
