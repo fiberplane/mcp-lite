@@ -53,7 +53,7 @@ export class StreamableHttpTransport {
   constructor(options: StreamableHttpTransportOptions = {}) {
     this.generateSessionId =
       options.generateSessionId ?? (() => crypto.randomUUID());
-    this.store = options.sessionStore ?? new InMemoryStore();
+    this.store = options.sessionStore;
     this.allowedHosts = options.allowedHosts;
   }
 

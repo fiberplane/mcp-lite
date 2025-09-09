@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { McpServer, StreamableHttpTransport } from "mcp-lite";
+import { InMemoryStore, McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
 
 const mcp = new McpServer({
@@ -821,7 +821,9 @@ mcp.onError((error, ctx) => {
 });
 
 // ===== HTTP TRANSPORT SETUP =====
-const transport = new StreamableHttpTransport({});
+const transport = new StreamableHttpTransport({
+  sessionStore: new InMemoryStore(),
+});
 const httpHandler = transport.bind(mcp);
 
 const app = new Hono();
