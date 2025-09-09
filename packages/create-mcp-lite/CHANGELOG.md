@@ -1,5 +1,11 @@
 # create-mcp-lite
 
+## 0.0.2
+
+### Patch Changes
+
+- 1c3520a: Try to print a deploy url to the mcp server after deploying
+
 ## 0.0.1
 
 ### Patch Changes
