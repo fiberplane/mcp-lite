@@ -151,6 +151,33 @@ export function isJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
   return true;
 }
 
+export function isJsonRpcResponse(obj: unknown): obj is JsonRpcRes {
+  if (typeof obj !== "object" || obj === null) {
+    return false;
+  }
+
+  const candidate = obj as Record<string, unknown>;
+
+  if (candidate.jsonrpc !== "2.0") {
+    return false;
+  }
+
+  if (!("id" in candidate)) {
+    return false;
+  }
+  const id = candidate.id;
+  if (typeof id !== "string" && typeof id !== "number" && id !== null) {
+    return false;
+  }
+
+  // Must have either result or error
+  if (!("result" in candidate) && !("error" in candidate)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function isValidJsonRpcMessage(obj: unknown): obj is JsonRpcMessage {
   return isJsonRpcRequest(obj) || isJsonRpcNotification(obj);
 }
@@ -450,3 +477,13 @@ export type ResourceHandler = (
   vars: ResourceVars,
   ctx: MCPServerContext,
 ) => Promise<ResourceReadResult>;
+
+export interface NotificationSenderOptions {
+  relatedRequestId?: string | number;
+}
+
+export type NotificationSender = (
+  sessionId: string | undefined,
+  notification: { method: string; params?: unknown },
+  options?: NotificationSenderOptions,
+) => Promise<void> | void;

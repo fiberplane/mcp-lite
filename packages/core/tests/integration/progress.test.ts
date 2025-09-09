@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import {
-  InMemoryStore,
+  InMemoryEventStore,
   MCP_PROTOCOL_HEADER,
   MCP_SESSION_ID_HEADER,
   McpServer,
@@ -16,7 +16,7 @@ function createMockTransport(
   server: McpServer,
 ): (req: Request) => Promise<Response> {
   const transport = new StreamableHttpTransport({
-    sessionStore: new InMemoryStore(),
+    eventStore: new InMemoryEventStore(),
   });
 
   const handler = transport.bind(server);

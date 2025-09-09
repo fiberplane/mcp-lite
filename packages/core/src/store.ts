@@ -6,12 +6,7 @@ export interface SessionMeta {
   clientInfo?: unknown;
 }
 
-export interface SessionStore {
-  // session CRUD
-  create(id: SessionId, meta: SessionMeta): void;
-  has(id: SessionId): boolean;
-  delete(id: SessionId): void;
-
+export interface EventStore {
   // persist outbound message and return assigned event id (monotonic per session)
   send(id: SessionId, message: unknown): Promise<EventId> | EventId;
 
@@ -24,33 +19,16 @@ export interface SessionStore {
 }
 
 interface SessionData {
-  meta: SessionMeta;
   nextEventId: number;
   buffer: Array<{ id: EventId; message: unknown }>;
 }
 
-export class InMemoryStore implements SessionStore {
+export class InMemoryEventStore implements EventStore {
   private sessions = new Map<SessionId, SessionData>();
   private maxBufferSize: number;
 
   constructor(options: { maxBufferSize?: number } = {}) {
     this.maxBufferSize = options.maxBufferSize ?? 1000;
-  }
-
-  create(id: SessionId, meta: SessionMeta): void {
-    this.sessions.set(id, {
-      meta,
-      nextEventId: 1,
-      buffer: [],
-    });
-  }
-
-  has(id: SessionId): boolean {
-    return this.sessions.has(id);
-  }
-
-  delete(id: SessionId): void {
-    this.sessions.delete(id);
   }
 
   send(id: SessionId, message: unknown): EventId {

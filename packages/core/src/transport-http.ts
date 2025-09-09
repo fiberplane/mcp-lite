@@ -8,17 +8,14 @@ import {
 import type { McpServer } from "./core.js";
 import { RpcError } from "./errors.js";
 import { createSSEStream, type StreamWriter } from "./sse-writer.js";
-import {
-  InMemoryStore,
-  type SessionId,
-  type SessionMeta,
-  type SessionStore,
-} from "./store.js";
+import type { EventStore, SessionId, SessionMeta } from "./store.js";
 import {
   createJsonRpcError,
   isJsonRpcNotification,
+  isJsonRpcResponse,
   isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
+  type JsonRpcMessage,
   type JsonRpcReq,
 } from "./types.js";
 
@@ -27,66 +24,89 @@ function parseJsonRpc(body: string): unknown {
     const parsed = JSON.parse(body);
     return parsed;
   } catch (_error) {
-    throw new Error("Invalid JSON");
+    throw new RpcError(JSON_RPC_ERROR_CODES.PARSE_ERROR, "Invalid JSON");
   }
 }
 
-interface SessionState {
+function keyForSession(sessionId: string): string {
+  return `session:${sessionId}`;
+}
+
+function keyForRequest(sessionId: string, requestId: string | number): string {
+  return `session:${sessionId}:request:${requestId}`;
+}
+
+interface SessionData {
   meta: SessionMeta;
-  writer?: StreamWriter;
 }
 
 export interface StreamableHttpTransportOptions {
+  eventStore?: EventStore;
   generateSessionId?: () => string;
-  sessionStore?: SessionStore;
+  /** Allowed Origin headers for CORS validation  */
+  allowedOrigins?: string[];
+  /** Allowed Host headers for preventing Host header attacks */
   allowedHosts?: string[];
 }
 
 export class StreamableHttpTransport {
   private server?: McpServer;
   private generateSessionId: () => string;
-  private store?: SessionStore;
+  private eventStore?: EventStore;
+  private allowedOrigins?: string[];
   private allowedHosts?: string[];
-  private sessions = new Map<SessionId, SessionState>();
-  private streamWriters = new Map<SessionId, StreamWriter>();
+  private sessions = new Map<SessionId, SessionData>();
+  private writers = new Map<string, StreamWriter>();
 
   constructor(options: StreamableHttpTransportOptions = {}) {
     this.generateSessionId =
       options.generateSessionId ?? (() => crypto.randomUUID());
-    this.store = options.sessionStore;
+    this.eventStore = options.eventStore;
+    this.allowedOrigins = options.allowedOrigins;
     this.allowedHosts = options.allowedHosts;
   }
 
   bind(server: McpServer): (request: Request) => Promise<Response> {
     this.server = server;
 
-    server._setNotificationSender(async (sessionId, notification) => {
+    server._setNotificationSender(async (sessionId, notification, options) => {
       const jsonRpcNotification = {
         jsonrpc: JSON_RPC_VERSION,
         method: notification.method,
         params: notification.params,
       };
 
-      if (sessionId && this.store) {
-        const eventId = await this.store.send(sessionId, jsonRpcNotification);
-        const writer = this.streamWriters.get(sessionId);
-        if (writer) {
-          writer.write(eventId, jsonRpcNotification);
+      if (sessionId) {
+        const relatedRequestId = options?.relatedRequestId;
+
+        // Route to specific request stream if relatedRequestId is provided
+        if (relatedRequestId) {
+          const requestKey = keyForRequest(sessionId, relatedRequestId);
+          const writer = this.writers.get(requestKey);
+          if (writer) {
+            // CRITICAL FIX: Use "0" event ID for request streams, don't persist to eventStore
+            writer.write("0", jsonRpcNotification);
+            return;
+          }
         }
-      } else if (sessionId) {
-        const writer = this.streamWriters.get(sessionId);
+
+        // Fallback to session stream
+        const sessionKey = keyForSession(sessionId);
+        const writer = this.writers.get(sessionKey);
         if (writer) {
-          writer.write("0", jsonRpcNotification);
-        }
-      } else {
-        for (const [id, writer] of this.streamWriters) {
-          if (this.store) {
-            const eventId = await this.store.send(id, jsonRpcNotification);
+          if (this.eventStore) {
+            const eventId = await this.eventStore.send(
+              sessionId,
+              jsonRpcNotification,
+            );
             writer.write(eventId, jsonRpcNotification);
           } else {
             writer.write("0", jsonRpcNotification);
           }
         }
+      } else {
+        // CRITICAL FIX: Don't broadcast when no sessionId - just return/discard
+        return;
       }
     });
 
@@ -101,6 +121,13 @@ export class StreamableHttpTransport {
     if (this.allowedHosts) {
       const host = request.headers.get("Host");
       if (host && !this.allowedHosts.includes(host)) {
+        return new Response("Forbidden", { status: 403 });
+      }
+    }
+
+    if (this.allowedOrigins) {
+      const origin = request.headers.get("Origin");
+      if (origin && !this.allowedOrigins.includes(origin)) {
         return new Response("Forbidden", { status: 403 });
       }
     }
@@ -135,6 +162,12 @@ export class StreamableHttpTransport {
       const body = await request.text();
       const jsonRpcRequest = parseJsonRpc(body);
 
+      // Check if it's a JSON-RPC response first
+      if (isJsonRpcResponse(jsonRpcRequest)) {
+        // Accept responses but don't process them, just return 202
+        return new Response(null, { status: 202 });
+      }
+
       if (!isValidJsonRpcMessage(jsonRpcRequest)) {
         const errorResponse = createJsonRpcError(
           null,
@@ -152,9 +185,9 @@ export class StreamableHttpTransport {
       }
 
       const isNotification = isJsonRpcNotification(jsonRpcRequest);
-      const isInitializeRequest = jsonRpcRequest.method === "initialize";
+      const isInitializeRequest =
+        (jsonRpcRequest as JsonRpcMessage).method === "initialize";
       const acceptHeader = request.headers.get("Accept");
-
       const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
 
       if (!isInitializeRequest) {
@@ -184,10 +217,11 @@ export class StreamableHttpTransport {
           });
         }
       }
+      const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
 
-      if (!isInitializeRequest && this.store) {
-        const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
-        if (!sessionId || !this.store.has(sessionId)) {
+      // CRITICAL FIX: Always validate session for non-initialize requests when eventStore is present
+      if (!isInitializeRequest && this.eventStore) {
+        if (!sessionId || !this.sessions.has(sessionId)) {
           const responseId = isNotification
             ? null
             : (jsonRpcRequest as JsonRpcReq).id;
@@ -199,7 +233,7 @@ export class StreamableHttpTransport {
             ).toJson(),
           );
           return new Response(JSON.stringify(errorResponse), {
-            status: 401,
+            status: 400,
             headers: {
               "Content-Type": "application/json",
             },
@@ -207,72 +241,64 @@ export class StreamableHttpTransport {
         }
       }
 
-      const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
-
       if (!isInitializeRequest && acceptHeader?.endsWith(SSE_ACCEPT_HEADER)) {
-        if (!sessionId || !this.store?.has(sessionId)) {
-          const responseId = isNotification
-            ? null
-            : (jsonRpcRequest as JsonRpcReq).id;
-          const errorResponse = createJsonRpcError(
-            responseId,
-            new RpcError(
-              JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-              "Invalid or missing session ID",
-            ).toJson(),
-          );
-          return new Response(JSON.stringify(errorResponse), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          });
+        // sessionId is guaranteed to be valid here due to validation above
+        if (!sessionId) {
+          throw new Error("sessionId should be validated before this point");
         }
 
-        if (this.streamWriters.has(sessionId)) {
-          return new Response("Conflict: Stream already exists for session", {
+        // For POST with SSE, support per-request streams
+        // Use the JSON-RPC request ID, not a URL parameter
+        if (isNotification) {
+          return new Response(
+            "Bad Request: POST SSE requires a request with 'id' (notifications not supported)",
+            {
+              status: 400,
+            },
+          );
+        }
+
+        const requestId = (jsonRpcRequest as JsonRpcReq).id;
+        if (requestId === null || requestId === undefined) {
+          return new Response(
+            "Bad Request: POST SSE requires a request with 'id'",
+            {
+              status: 400,
+            },
+          );
+        }
+
+        const streamKey = keyForRequest(sessionId, String(requestId));
+
+        if (this.writers.has(streamKey)) {
+          return new Response("Conflict: Stream already exists for request", {
             status: 409,
           });
         }
 
         const { stream, writer } = createSSEStream();
-        this.streamWriters.set(sessionId, writer);
+        this.writers.set(streamKey, writer);
 
         const [responseStream, monitorStream] = stream.tee();
         monitorStream
           .pipeTo(
             new WritableStream({
               close: () => {
-                this.streamWriters.delete(sessionId);
+                this.writers.delete(streamKey);
                 writer.end();
               },
               abort: () => {
-                this.streamWriters.delete(sessionId);
+                this.writers.delete(streamKey);
                 writer.end();
               },
             }),
           )
           .catch(() => {
-            this.streamWriters.delete(sessionId);
+            this.writers.delete(streamKey);
             writer.end();
           });
 
-        const lastEventId = request.headers.get("Last-Event-ID");
-        if (lastEventId && this.store) {
-          try {
-            await this.store.replay(
-              sessionId,
-              lastEventId,
-              (eventId, message) => {
-                writer.write(eventId, message);
-              },
-            );
-          } catch (_error) {
-            writer.end();
-            this.streamWriters.delete(sessionId);
-            return new Response("Internal Server Error: Replay failed", {
-              status: 500,
-            });
-          }
-        }
+        // No replay support for request streams - only for session streams
 
         Promise.resolve(
           this.server?._dispatch(jsonRpcRequest, {
@@ -281,12 +307,8 @@ export class StreamableHttpTransport {
         )
           .then(async (rpcResponse) => {
             if (rpcResponse !== null) {
-              if (this.store) {
-                const eventId = await this.store.send(sessionId, rpcResponse);
-                writer.write(eventId, rpcResponse);
-              } else {
-                writer.write("0", rpcResponse);
-              }
+              // CRITICAL FIX: Never persist to eventStore for request streams
+              writer.write("0", rpcResponse);
             }
           })
           .catch((err) => {
@@ -304,10 +326,9 @@ export class StreamableHttpTransport {
                     err instanceof Error ? { message: err.message } : err,
                   ).toJson(),
                 );
-                if (this.store) {
-                  Promise.resolve(
-                    this.store.send(sessionId, errorResponse),
-                  ).then((eventId) => writer.write(eventId, errorResponse));
+                if (this.eventStore) {
+                  // CRITICAL FIX: Never persist to eventStore for request streams
+                  writer.write("0", errorResponse);
                 } else {
                   writer.write("0", errorResponse);
                 }
@@ -316,7 +337,7 @@ export class StreamableHttpTransport {
           })
           .finally(() => {
             writer.end();
-            this.streamWriters.delete(sessionId);
+            this.writers.delete(streamKey);
           });
 
         return new Response(responseStream, {
@@ -334,14 +355,13 @@ export class StreamableHttpTransport {
         sessionId: sessionId || undefined,
       });
 
-      if (isInitializeRequest && response && this.store) {
+      if (isInitializeRequest && response) {
         const sessionId = this.generateSessionId();
         const sessionMeta: SessionMeta = {
           protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
           clientInfo: (jsonRpcRequest as JsonRpcReq).params,
         };
 
-        this.store.create(sessionId, sessionMeta);
         this.sessions.set(sessionId, { meta: sessionMeta });
 
         return new Response(JSON.stringify(response), {
@@ -354,13 +374,13 @@ export class StreamableHttpTransport {
       }
 
       if (response === null) {
-        return new Response(null, { status: 204 });
+        return new Response(null, { status: 202 });
       } else {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
         };
 
-        if (!isInitializeRequest && this.store) {
+        if (!isInitializeRequest) {
           const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
           if (sessionId) {
             headers[MCP_SESSION_ID_HEADER] = sessionId;
@@ -410,49 +430,56 @@ export class StreamableHttpTransport {
     }
 
     const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
-    if (!sessionId || !this.store?.has(sessionId)) {
-      return new Response("Unauthorized: Invalid or missing session ID", {
-        status: 401,
+    if (!sessionId || !this.sessions.has(sessionId)) {
+      return new Response("Bad Request: Invalid or missing session ID", {
+        status: 400,
       });
     }
 
-    if (this.streamWriters.has(sessionId)) {
+    const sessionKey = keyForSession(sessionId);
+
+    if (this.writers.has(sessionKey)) {
       return new Response("Conflict: Stream already exists for session", {
         status: 409,
       });
     }
 
     const { stream, writer } = createSSEStream();
-    this.streamWriters.set(sessionId, writer);
+    this.writers.set(sessionKey, writer);
 
     const [responseStream, monitorStream] = stream.tee();
     monitorStream
       .pipeTo(
         new WritableStream({
           close: () => {
-            this.streamWriters.delete(sessionId);
+            this.writers.delete(sessionKey);
             writer.end();
           },
           abort: () => {
-            this.streamWriters.delete(sessionId);
+            this.writers.delete(sessionKey);
             writer.end();
           },
         }),
       )
       .catch(() => {
-        this.streamWriters.delete(sessionId);
+        this.writers.delete(sessionKey);
         writer.end();
       });
 
+    // Only provide replay for standalone GET streams when eventStore is available
     const lastEventId = request.headers.get("Last-Event-ID");
-    if (lastEventId && this.store) {
+    if (lastEventId && this.eventStore) {
       try {
-        await this.store.replay(sessionId, lastEventId, (eventId, message) => {
-          writer.write(eventId, message);
-        });
+        await this.eventStore.replay(
+          sessionId,
+          lastEventId,
+          (eventId: string, message: unknown) => {
+            writer.write(eventId, message);
+          },
+        );
       } catch (_error) {
         writer.end();
-        this.streamWriters.delete(sessionId);
+        this.writers.delete(sessionKey);
         return new Response("Internal Server Error: Replay failed", {
           status: 500,
         });
@@ -478,14 +505,28 @@ export class StreamableHttpTransport {
       });
     }
 
-    const writer = this.streamWriters.get(sessionId);
-    if (writer) {
-      writer.end();
-      this.streamWriters.delete(sessionId);
+    // Close session stream
+    const sessionKey = keyForSession(sessionId);
+    const sessionWriter = this.writers.get(sessionKey);
+    if (sessionWriter) {
+      sessionWriter.end();
+      this.writers.delete(sessionKey);
     }
 
-    if (this.store) {
-      this.store.delete(sessionId);
+    // Close all request streams for this session
+    const requestKeysToDelete: string[] = [];
+    for (const [key] of this.writers) {
+      if (key.startsWith(`req:${sessionId}:`)) {
+        requestKeysToDelete.push(key);
+      }
+    }
+
+    for (const key of requestKeysToDelete) {
+      const writer = this.writers.get(key);
+      if (writer) {
+        writer.end();
+        this.writers.delete(key);
+      }
     }
 
     this.sessions.delete(sessionId);

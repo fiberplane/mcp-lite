@@ -12,10 +12,10 @@ export {
 } from "./sse-writer.js";
 export {
   type EventId,
-  InMemoryStore,
+  type EventStore,
+  InMemoryEventStore,
   type SessionId,
   type SessionMeta,
-  type SessionStore as Store,
 } from "./store.js";
 export {
   StreamableHttpTransport,

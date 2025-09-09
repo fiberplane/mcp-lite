@@ -1,12 +1,11 @@
 import { Hono } from "hono";
-import { InMemoryStore, McpServer, StreamableHttpTransport } from "mcp-lite";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
 
 const mcp = new McpServer({
   name: "comprehensive-mcp-demo",
   version: "2.0.0",
   schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-
 });
 
 // ===== MIDDLEWARE =====
@@ -821,9 +820,7 @@ mcp.onError((error, ctx) => {
 });
 
 // ===== HTTP TRANSPORT SETUP =====
-const transport = new StreamableHttpTransport({
-  sessionStore: new InMemoryStore(),
-});
+const transport = new StreamableHttpTransport();
 const httpHandler = transport.bind(mcp);
 
 const app = new Hono();

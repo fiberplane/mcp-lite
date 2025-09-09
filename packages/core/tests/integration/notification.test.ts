@@ -28,7 +28,7 @@ describe("JSON-RPC Notification Handling", () => {
 
     const response = await httpHandler(notificationRequest);
 
-    expect(response.status).toBe(204);
+    expect(response.status).toBe(202);
     expect(response.body).toBeNull();
 
     const text = await response.text();
@@ -81,7 +81,7 @@ describe("JSON-RPC Notification Handling", () => {
 
     const response = await httpHandler(notificationRequest);
 
-    expect(response.status).toBe(204);
+    expect(response.status).toBe(202);
     expect(response.body).toBeNull();
   });
 
@@ -104,7 +104,7 @@ describe("JSON-RPC Notification Handling", () => {
     const response = await httpHandler(notificationRequest);
 
     // Should still return 204 even for unknown notification methods
-    expect(response.status).toBe(204);
+    expect(response.status).toBe(202);
     expect(response.body).toBeNull();
   });
 
@@ -144,7 +144,7 @@ describe("JSON-RPC Notification Handling", () => {
     });
 
     const notificationResponse = await httpHandler(notificationRequest);
-    expect(notificationResponse.status).toBe(204);
+    expect(notificationResponse.status).toBe(202);
     expect(notificationResponse.body).toBeNull();
   });
 });

@@ -1,5 +1,10 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
+import {
+  type CreateContextOptions,
+  createContext,
+  getProgressToken,
+} from "./context.js";
 import { RpcError } from "./errors.js";
 import type {
   InferInput,
@@ -43,11 +48,6 @@ import {
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
 import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
-import {
-  type CreateContextOptions,
-  createContext,
-  getProgressToken,
-} from "./context.js";
 
 async function runMiddlewares(
   middlewares: Middleware[],
@@ -226,6 +226,7 @@ export class McpServer {
   private notificationSender?: (
     sessionId: string | undefined,
     notification: { method: string; params?: unknown },
+    options?: { relatedRequestId?: string | number },
   ) => Promise<void> | void;
 
   /**
@@ -671,6 +672,7 @@ export class McpServer {
     sender: (
       sessionId: string | undefined,
       notification: { method: string; params?: unknown },
+      options?: { relatedRequestId?: string | number },
     ) => Promise<void> | void,
   ): void {
     this.notificationSender = sender;
@@ -699,10 +701,17 @@ export class McpServer {
     const progressSender =
       sessionId && this.notificationSender && progressToken
         ? (update: unknown) =>
-            this.notificationSender?.(sessionId, {
-              method: "notifications/progress",
-              params: { progressToken, ...(update as Record<string, unknown>) },
-            })
+            this.notificationSender?.(
+              sessionId,
+              {
+                method: "notifications/progress",
+                params: {
+                  progressToken,
+                  ...(update as Record<string, unknown>),
+                },
+              },
+              { relatedRequestId: requestId ?? undefined },
+            )
         : undefined;
 
     const ctx = createContext(message as JsonRpcMessage, requestId, {
