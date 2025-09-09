@@ -2,8 +2,8 @@ import { note, select } from "@clack/prompts";
 import pico from "picocolors";
 import type { Context } from "../../context";
 import type { AIAssistant } from "../../types";
-import { actionCursor } from "./cursor";
 import { actionClaudeCode } from "./claude-code";
+import { actionCursor } from "./cursor";
 import { actionVSCode } from "./vscode";
 import { actionWindsurf } from "./windsurf";
 

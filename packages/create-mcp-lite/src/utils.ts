@@ -1,7 +1,7 @@
-import { cancel } from "@clack/prompts";
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { cancel } from "@clack/prompts";
 import pico from "picocolors";
 import { CANCEL_MESSAGE } from "./const";
 

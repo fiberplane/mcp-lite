@@ -1,7 +1,7 @@
-import { spinner } from "@clack/prompts";
-import { downloadTemplate } from "giget";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { spinner } from "@clack/prompts";
+import { downloadTemplate } from "giget";
 import pico from "picocolors";
 import type { Context } from "../context";
 

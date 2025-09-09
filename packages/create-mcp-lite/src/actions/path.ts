@@ -1,6 +1,6 @@
-import { text } from "@clack/prompts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { text } from "@clack/prompts";
 import pico from "picocolors";
 import type { Context } from "../context";
 

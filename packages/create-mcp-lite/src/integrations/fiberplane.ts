@@ -1,8 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { randomBytes } from "node:crypto";
-import open from "open";
 import { TokenRequestResult } from "@oslojs/oauth2";
+import open from "open";
 
 // const AUTH_HOST = "https://auth.fiberplane.com";
 // const FP_API_HOST = "https://fiberplane.com";

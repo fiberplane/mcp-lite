@@ -1,5 +1,5 @@
-import { spinner } from "@clack/prompts";
 import { execSync } from "node:child_process";
+import { spinner } from "@clack/prompts";
 import pico from "picocolors";
 import type { Context } from "../context";
 

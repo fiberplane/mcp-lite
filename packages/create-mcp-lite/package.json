@@ -1,27 +1,35 @@
 {
-  "name": "create-fiberplane",
+  "name": "create-mcp-lite",
   "type": "module",
   "version": "0.0.1",
   "description": "An interactive CLI to create MCP (Model Context Protocol) projects with Fiberplane",
   "scripts": {
-    "build": "pnpm clean && tsup",
-    "dev": "tsup --watch --onSuccess 'node dist/index.js'",
-    "dev:target": "tsup --watch --onSuccess 'node dist/index.js test-name'",
-    "test:auth": "tsx test-auth.ts",
-    "format": "biome format . --write",
+    "build": "bun run scripts/build.ts",
+    "build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
+    "dev": "bun run scripts/build.ts && node dist/index.js",
+    "dev:target": "bun run scripts/build.ts && node dist/index.js test-name",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "clean": "rimraf dist",
-    "clean:test-apps": "rimraf test-apps/* && touch test-apps/.gitkeep"
+    "lint": "biome check --write .",
+    "clean:test-apps": "rm -rf test-apps/* && touch test-apps/.gitkeep",
+    "prepublishOnly": "bun run build && bun run build:types"
   },
-  "exports": "./dist/index.js",
-  "files": ["dist", "README.md", "LICENSE", ".gitignore"],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    ".gitignore"
+  ],
   "bin": {
-    "create-fiberplane": "dist/index.js"
+    "create-mcp-lite": "dist/index.js"
   },
   "author": "Fiberplane<info@fiberplane.com>",
   "license": "MIT",
   "repository": {
-    "url": "https://github.com/fiberplane/create-honc-app",
+    "url": "https://github.com/fiberplane/mcp/",
     "type": "git"
   },
   "dependencies": {
@@ -36,14 +44,18 @@
   },
   "devDependencies": {
     "@types/node": "^22.2.0",
-    "rimraf": "^6.0.1",
-    "tsup": "^8.2.3",
-    "tsx": "^4.19.2"
+    "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=18.17.0"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/types/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
-import { note, spinner } from "@clack/prompts";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { note, spinner } from "@clack/prompts";
 import pico from "picocolors";
 import type { Context } from "../../context";
 import { AGENTS_MD, FIBERPLANE_MCP_CONFIG } from "./constants";
