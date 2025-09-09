@@ -19,19 +19,43 @@ jobs:
             - name: Install
               run: bun install --frozen-lockfile
 
+            # Use changeset's built-in JSON output to detect which packages have pending changes
+            # This is much cleaner than parsing YAML frontmatter manually
             - name: Check for changesets
               id: changesets
               run: |
-                if ls .changeset/*.md 2>/dev/null | grep -v README > /dev/null; then
-                  echo "hasChangesets=true" >> $GITHUB_OUTPUT
+                # Generate JSON status of all pending changesets
+                if bunx changeset status --output changeset-status.json 2>/dev/null; then
+                  # Parse JSON using our dedicated script
+                  node .github/scripts/check-changesets.js changeset-status.json >> $GITHUB_OUTPUT
                 else
+                  # changeset status failed - assume no changesets
                   echo "hasChangesets=false" >> $GITHUB_OUTPUT
+                  echo "hasCoreChangesets=false" >> $GITHUB_OUTPUT
+                  echo "hasCliChangesets=false" >> $GITHUB_OUTPUT
                 fi
 
-            - name: Version and publish snapshot
+            # Generate canary versions for all packages that have changesets
+            # This step runs regardless of which packages changed since changeset handles it
+            - name: Version packages
               if: steps.changesets.outputs.hasChangesets == 'true'
               run: |
+                # Create snapshot versions with git hash suffix (e.g., 1.0.0-canary-abc123)
                 bun changeset version --snapshot canary-$(git rev-parse --short HEAD)
+
+            # Conditional publishing - only publish packages that actually have changes
+            # This prevents unnecessary publishes and keeps the packages independent
+
+            - name: Publish core package (mcp-lite)
+              if: steps.changesets.outputs.hasCoreChangesets == 'true'
+              run: |
                 cd packages/core && bun publish --tag canary
+              env:
+                  NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Publish CLI package (create-mcp-lite)
+              if: steps.changesets.outputs.hasCliChangesets == 'true'
+              run: |
+                cd packages/create-mcp-lite && bun publish --tag canary
               env:
                   NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}

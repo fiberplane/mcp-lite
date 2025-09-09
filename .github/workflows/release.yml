@@ -32,18 +32,25 @@ jobs:
             - name: Test
               run: bun test
 
-            - name: Create Release Pull Request or Version & Publish
+            # The changesets action handles everything:
+            # - If changesets exist: creates a "Version Packages" PR
+            # - If no changesets: publishes packages and provides publishedPackages output
+            - name: Create Release Pull Request or Publish
               id: changesets
               uses: changesets/action@v1
               with:
                   version: bun changeset version
+                  publish: bun changeset publish
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Publish with bun
-              if: steps.changesets.outputs.hasChangesets == 'false'
-              run: |
-                  bun run changeset tag
-                  cd packages/core && bun publish
-              env:
                   NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            # Optional: Log what was published for debugging
+            - name: Log published packages
+              if: steps.changesets.outputs.published == 'true'
+              run: |
+                echo "🎉 Published packages:"
+                node -e "
+                  const packages = JSON.parse(process.argv[1]);
+                  packages.forEach(pkg => console.log(\`  - \${pkg.name}@\${pkg.version}\`));
+                " '${{ steps.changesets.outputs.publishedPackages }}'
