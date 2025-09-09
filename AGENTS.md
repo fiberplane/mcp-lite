@@ -6,6 +6,10 @@
   - Source: `packages/core/src`
   - Tests: `packages/core/tests/integration/*.test.ts`
   - Build scripts: `packages/core/scripts`
+- Create MCP Lite CLI: `packages/create-mcp-lite`
+  - Source: `packages/create-mcp-lite/src`
+  - Tests: `packages/create-mcp-lite/tests/**/*.test.ts`
+  - Build scripts: `packages/create-mcp-lite/scripts`
 - Playground app: `playground/minimal-server.ts` (Hono + MCP HTTP transport)
 
 ## Build, Test, and Development Commands
