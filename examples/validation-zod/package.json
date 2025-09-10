@@ -16,7 +16,7 @@
     "mcp-lite": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
+    "typescript": "^5.9.2",
     "@internal/test-utils": "workspace:*"
   },
   "keywords": [

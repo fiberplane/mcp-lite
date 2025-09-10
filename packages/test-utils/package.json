@@ -17,7 +17,7 @@
     "mcp-lite": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^5.9.2"
   },
   "author": "Fiberplane <info@fiberplane.com>",
   "license": "MIT"

@@ -19,7 +19,7 @@
       },
       "devDependencies": {
         "@internal/test-utils": "workspace:*",
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.2",
       },
     },
     "examples/validation-valibot": {
@@ -33,7 +33,7 @@
       },
       "devDependencies": {
         "@internal/test-utils": "workspace:*",
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.2",
       },
     },
     "examples/validation-zod": {
@@ -46,7 +46,7 @@
       },
       "devDependencies": {
         "@internal/test-utils": "workspace:*",
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.2",
       },
     },
     "packages/core": {
@@ -56,7 +56,7 @@
         "@standard-schema/spec": "^1.0.0",
       },
       "devDependencies": {
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.2",
         "zod": "^4.1.5",
       },
     },
@@ -78,7 +78,7 @@
       },
       "devDependencies": {
         "@types/node": "^22.2.0",
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.2",
       },
     },
     "packages/test-utils": {
@@ -88,7 +88,7 @@
         "mcp-lite": "workspace:*",
       },
       "devDependencies": {
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.2",
       },
     },
     "playground": {
