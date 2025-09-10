@@ -1,5 +1,6 @@
 import {
   JSON_RPC_VERSION,
+  MCP_LAST_EVENT_ID_HEADER,
   MCP_PROTOCOL_HEADER,
   MCP_SESSION_ID_HEADER,
   SSE_ACCEPT_HEADER,
@@ -76,21 +77,28 @@ export class StreamableHttpTransport {
       };
 
       if (this.generateSessionId) {
-        if (sessionId) {
-          const relatedRequestId = options?.relatedRequestId;
-
-          // Route to specific request stream if relatedRequestId is provided
-          if (relatedRequestId !== undefined) {
+        const relatedRequestId = options?.relatedRequestId;
+        // Prefer routing to request streams when a related request is specified
+        if (relatedRequestId !== undefined) {
+          if (sessionId) {
             const requestKey = keyForRequest(sessionId, relatedRequestId);
             const writer = this.writers.get(requestKey);
             if (writer) {
-              // Request streams are never persisted; omit id
               writer.write(jsonRpcNotification);
               return;
             }
           }
+          // Also support request-only streams (created without session header)
+          const requestOnlyKey = `request:${String(relatedRequestId)}`;
+          const requestOnlyWriter = this.writers.get(requestOnlyKey);
+          if (requestOnlyWriter) {
+            requestOnlyWriter.write(jsonRpcNotification);
+            return;
+          }
+        }
 
-          // Fallback to session stream
+        // Fallback to session stream when available
+        if (sessionId) {
           const sessionKey = keyForSession(sessionId);
           const writer = this.writers.get(sessionKey);
           if (writer) {
@@ -105,7 +113,6 @@ export class StreamableHttpTransport {
             }
           }
         }
-        // No sessionId → discard
         return;
       } else {
         // Stateless mode: only deliver when relatedRequestId is present
@@ -231,133 +238,12 @@ export class StreamableHttpTransport {
       }
       const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
 
-      // CRITICAL FIX: Always validate session for non-initialize requests
-      if (!isInitializeRequest) {
-        if (!sessionId || !this.sessions.has(sessionId)) {
-          const responseId = isNotification
-            ? null
-            : (jsonRpcRequest as JsonRpcReq).id;
-          const errorResponse = createJsonRpcError(
-            responseId,
-            new RpcError(
-              JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-              "Invalid or missing session ID",
-            ).toJson(),
-          );
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-        }
-      }
-
       if (!isInitializeRequest && acceptHeader?.endsWith(SSE_ACCEPT_HEADER)) {
-        // sessionId is guaranteed to be valid here due to validation above
-        if (!sessionId) {
-          throw new Error("sessionId should be validated before this point");
-        }
-
-        // For POST with SSE, support per-request streams
-        // Use the JSON-RPC request ID, not a URL parameter
-        if (isNotification) {
-          return new Response(
-            "Bad Request: POST SSE requires a request with 'id' (notifications not supported)",
-            {
-              status: 400,
-            },
-          );
-        }
-
-        const requestId = (jsonRpcRequest as JsonRpcReq).id;
-        if (requestId === null || requestId === undefined) {
-          return new Response(
-            "Bad Request: POST SSE requires a request with 'id'",
-            {
-              status: 400,
-            },
-          );
-        }
-
-        const streamKey = keyForRequest(sessionId, String(requestId));
-
-        if (this.writers.has(streamKey)) {
-          return new Response("Conflict: Stream already exists for request", {
-            status: 409,
-          });
-        }
-
-        const { stream, writer } = createSSEStream();
-        this.writers.set(streamKey, writer);
-
-        const [responseStream, monitorStream] = stream.tee();
-        monitorStream
-          .pipeTo(
-            new WritableStream({
-              close: () => {
-                this.writers.delete(streamKey);
-                writer.end();
-              },
-              abort: () => {
-                this.writers.delete(streamKey);
-                writer.end();
-              },
-            }),
-          )
-          .catch(() => {
-            this.writers.delete(streamKey);
-            writer.end();
-          });
-
-        // No replay support for request streams - only for session streams
-
-        Promise.resolve(
-          this.server?._dispatch(jsonRpcRequest, {
-            sessionId,
-          }),
-        )
-          .then(async (rpcResponse) => {
-            if (rpcResponse !== null) {
-              // Request streams not persisted; omit id
-              writer.write(rpcResponse);
-            }
-          })
-          .catch((err) => {
-            // On unexpected error, send an INTERNAL_ERROR response if possible
-            try {
-              const responseId = isNotification
-                ? null
-                : (jsonRpcRequest as JsonRpcReq).id;
-              if (responseId !== null && responseId !== undefined) {
-                const errorResponse = createJsonRpcError(
-                  responseId,
-                  new RpcError(
-                    JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
-                    "Internal error",
-                    err instanceof Error ? { message: err.message } : err,
-                  ).toJson(),
-                );
-                // Request streams not persisted; omit id
-                writer.write(errorResponse);
-              }
-            } catch (_) {}
-          })
-          .finally(() => {
-            writer.end();
-            this.writers.delete(streamKey);
-          });
-
-        return new Response(responseStream, {
-          status: 200,
-          headers: {
-            "Content-Type": SSE_ACCEPT_HEADER,
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            ...(this.generateSessionId && sessionId
-              ? { [MCP_SESSION_ID_HEADER]: sessionId }
-              : {}),
-          },
+        return this.handlePostSse({
+          request,
+          jsonRpcRequest,
+          sessionId,
+          isNotification,
         });
       }
 
@@ -465,30 +351,10 @@ export class StreamableHttpTransport {
       });
     }
 
-    const { stream, writer } = createSSEStream();
-    this.writers.set(sessionKey, writer);
+    const { responseStream, writer } =
+      this.createAndRegisterSseStream(sessionKey);
 
-    const [responseStream, monitorStream] = stream.tee();
-    monitorStream
-      .pipeTo(
-        new WritableStream({
-          close: () => {
-            this.writers.delete(sessionKey);
-            writer.end();
-          },
-          abort: () => {
-            this.writers.delete(sessionKey);
-            writer.end();
-          },
-        }),
-      )
-      .catch(() => {
-        this.writers.delete(sessionKey);
-        writer.end();
-      });
-
-    // Only provide replay for standalone GET streams when eventStore is available
-    const lastEventId = request.headers.get("Last-Event-ID");
+    const lastEventId = request.headers.get(MCP_LAST_EVENT_ID_HEADER);
     if (lastEventId && this.eventStore) {
       try {
         await this.eventStore.replay(
@@ -511,10 +377,130 @@ export class StreamableHttpTransport {
       status: 200,
       headers: {
         "Content-Type": SSE_ACCEPT_HEADER,
-        "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
         [MCP_SESSION_ID_HEADER]: sessionId,
       },
+    });
+  }
+
+  private createAndRegisterSseStream(streamKey: string): {
+    responseStream: ReadableStream;
+    writer: StreamWriter;
+  } {
+    const { stream, writer } = createSSEStream();
+    this.writers.set(streamKey, writer);
+
+    const [responseStream, monitorStream] = stream.tee();
+    monitorStream
+      .pipeTo(
+        new WritableStream({
+          close: () => {
+            this.writers.delete(streamKey);
+            writer.end();
+          },
+          abort: () => {
+            this.writers.delete(streamKey);
+            writer.end();
+          },
+        }),
+      )
+      .catch(() => {
+        this.writers.delete(streamKey);
+        writer.end();
+      });
+
+    return { responseStream, writer };
+  }
+
+  private async handlePostSse(args: {
+    request: Request;
+    jsonRpcRequest: unknown;
+    sessionId: string | null;
+    isNotification: boolean;
+  }): Promise<Response> {
+    const { request, jsonRpcRequest, sessionId, isNotification } = args;
+
+    if (isNotification) {
+      return new Response(
+        "Bad Request: POST SSE requires a request with 'id' (notifications not supported)",
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const requestId = (jsonRpcRequest as JsonRpcReq).id;
+    if (requestId === null || requestId === undefined) {
+      return new Response(
+        "Bad Request: POST SSE requires a request with 'id'",
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const streamKey = sessionId
+      ? keyForRequest(sessionId, String(requestId))
+      : `request:${String(requestId)}`;
+
+    if (this.writers.has(streamKey)) {
+      return new Response("Conflict: Stream already exists for request", {
+        status: 409,
+      });
+    }
+
+    const { responseStream, writer } =
+      this.createAndRegisterSseStream(streamKey);
+
+    // No replay support for request streams - only for session streams
+    Promise.resolve(
+      this.server?._dispatch(jsonRpcRequest, {
+        sessionId: sessionId || undefined,
+      }),
+    )
+      .then(async (rpcResponse) => {
+        if (rpcResponse !== null) {
+          // Request streams not persisted; omit id
+          writer.write(rpcResponse);
+        }
+      })
+      .catch((err) => {
+        // On unexpected error, send an INTERNAL_ERROR response if possible
+        try {
+          const responseId = isNotification
+            ? null
+            : (jsonRpcRequest as JsonRpcReq).id;
+          if (responseId !== null && responseId !== undefined) {
+            const errorResponse = createJsonRpcError(
+              responseId,
+              new RpcError(
+                JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+                "Internal error",
+                err instanceof Error ? { message: err.message } : err,
+              ).toJson(),
+            );
+            // Request streams not persisted; omit id
+            writer.write(errorResponse);
+          }
+        } catch (_) {}
+      })
+      .finally(() => {
+        writer.end();
+        this.writers.delete(streamKey);
+      });
+
+    const headers: Record<string, string> = {
+      "Content-Type": SSE_ACCEPT_HEADER,
+      Connection: "keep-alive",
+    };
+    if (this.generateSessionId) {
+      const sid = request.headers.get(MCP_SESSION_ID_HEADER);
+      if (sid) headers[MCP_SESSION_ID_HEADER] = sid;
+    }
+
+    return new Response(responseStream, {
+      status: 200,
+      headers,
     });
   }
 

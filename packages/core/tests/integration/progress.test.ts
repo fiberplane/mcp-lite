@@ -16,6 +16,7 @@ function createMockTransport(
   server: McpServer,
 ): (req: Request) => Promise<Response> {
   const transport = new StreamableHttpTransport({
+    generateSessionId: () => crypto.randomUUID(),
     eventStore: new InMemoryEventStore(),
   });
 

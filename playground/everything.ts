@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
 
@@ -820,17 +821,14 @@ mcp.onError((error, ctx) => {
 });
 
 // ===== HTTP TRANSPORT SETUP =====
-const transport = new StreamableHttpTransport();
+const transport = new StreamableHttpTransport({
+  generateSessionId: () => crypto.randomUUID(),
+});
 const httpHandler = transport.bind(mcp);
 
 const app = new Hono();
 
-app.use("*", async (c, next) => {
-  await next();
-  c.header("Access-Control-Allow-Origin", "*");
-  c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-});
+app.use(cors());
 
 app.all("/mcp", async (c) => {
   const response = await httpHandler(c.req.raw);
