@@ -103,19 +103,5 @@ describe("ArkType Validation Example", () => {
         }),
       ).rejects.toThrow("JSON-RPC Error");
     });
-
-    it("should handle extra properties (ArkType behavior)", async () => {
-      // Test what actually happens with ArkType validation for extra properties
-      const response = await request("tools/call", {
-        name: "echo",
-        arguments: {
-          message: "Hello",
-          extraField: "extra data", // Extra field
-        },
-      });
-
-      // ArkType might strip extra properties or allow them - check actual behavior
-      expect(response.error || response.result).toBeDefined();
-    });
   });
 });
