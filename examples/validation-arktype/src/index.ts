@@ -1,17 +1,17 @@
+import { type Type, type } from "arktype";
 import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
-import { z } from "zod";
 
-// Create MCP server with Zod schema adapter
+// Create MCP server with ArkType-to-JSON-schema adapter
 const mcp = new McpServer({
   name: "echo-server",
   version: "1.0.0",
-  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
+  schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
 });
 
 // Define schema
-const EchoSchema = z.object({
-  message: z.string(),
+const EchoSchema = type({
+  message: "string",
 });
 
 // Add a tool
