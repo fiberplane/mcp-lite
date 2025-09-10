@@ -179,7 +179,11 @@ export function isJsonRpcResponse(obj: unknown): obj is JsonRpcRes {
 }
 
 export function isValidJsonRpcMessage(obj: unknown): obj is JsonRpcMessage {
-  return isJsonRpcRequest(obj) || isJsonRpcNotification(obj);
+  return (
+    isJsonRpcRequest(obj) ||
+    isJsonRpcNotification(obj) ||
+    isJsonRpcResponse(obj)
+  );
 }
 
 export function createJsonRpcResponse(

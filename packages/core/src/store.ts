@@ -7,8 +7,8 @@ export interface SessionMeta {
 }
 
 export interface EventStore {
-  // persist outbound message and return assigned event id (monotonic per session)
-  send(id: SessionId, message: unknown): Promise<EventId> | EventId;
+  // persist outbound message and return assigned event id (monotonic per stream)
+  append(id: SessionId, message: unknown): Promise<EventId> | EventId;
 
   // redeliver messages after lastEventId (if provided), in order, using supplied writer
   replay(
@@ -31,10 +31,12 @@ export class InMemoryEventStore implements EventStore {
     this.maxBufferSize = options.maxBufferSize ?? 1000;
   }
 
-  send(id: SessionId, message: unknown): EventId {
-    const session = this.sessions.get(id);
+  append(id: SessionId, message: unknown): EventId {
+    let session = this.sessions.get(id);
     if (!session) {
-      throw new Error(`Session not found: ${id}`);
+      // Lazy create session on first send
+      session = { nextEventId: 1, buffer: [] };
+      this.sessions.set(id, session);
     }
 
     const eventId = String(session.nextEventId++);
@@ -57,7 +59,7 @@ export class InMemoryEventStore implements EventStore {
   ): Promise<void> {
     const session = this.sessions.get(id);
     if (!session) {
-      throw new Error(`Session not found: ${id}`);
+      return; // nothing to replay; don't throw
     }
 
     const lastEventIdNum = lastEventId ? parseInt(lastEventId, 10) : 0;

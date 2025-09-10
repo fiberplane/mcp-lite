@@ -51,7 +51,7 @@ export interface StreamableHttpTransportOptions {
 
 export class StreamableHttpTransport {
   private server?: McpServer;
-  private generateSessionId: () => string;
+  private generateSessionId?: () => string;
   private eventStore?: EventStore;
   private allowedOrigins?: string[];
   private allowedHosts?: string[];
@@ -59,8 +59,7 @@ export class StreamableHttpTransport {
   private writers = new Map<string, StreamWriter>();
 
   constructor(options: StreamableHttpTransportOptions = {}) {
-    this.generateSessionId =
-      options.generateSessionId ?? (() => crypto.randomUUID());
+    this.generateSessionId = options.generateSessionId;
     this.eventStore = options.eventStore;
     this.allowedOrigins = options.allowedOrigins;
     this.allowedHosts = options.allowedHosts;
@@ -76,36 +75,49 @@ export class StreamableHttpTransport {
         params: notification.params,
       };
 
-      if (sessionId) {
-        const relatedRequestId = options?.relatedRequestId;
+      if (this.generateSessionId) {
+        if (sessionId) {
+          const relatedRequestId = options?.relatedRequestId;
 
-        // Route to specific request stream if relatedRequestId is provided
-        if (relatedRequestId) {
-          const requestKey = keyForRequest(sessionId, relatedRequestId);
+          // Route to specific request stream if relatedRequestId is provided
+          if (relatedRequestId !== undefined) {
+            const requestKey = keyForRequest(sessionId, relatedRequestId);
+            const writer = this.writers.get(requestKey);
+            if (writer) {
+              // Request streams are never persisted; omit id
+              writer.write(jsonRpcNotification);
+              return;
+            }
+          }
+
+          // Fallback to session stream
+          const sessionKey = keyForSession(sessionId);
+          const writer = this.writers.get(sessionKey);
+          if (writer) {
+            if (this.eventStore) {
+              const eventId = await this.eventStore.append(
+                sessionId,
+                jsonRpcNotification,
+              );
+              writer.write(jsonRpcNotification, eventId);
+            } else {
+              writer.write(jsonRpcNotification);
+            }
+          }
+        }
+        // No sessionId → discard
+        return;
+      } else {
+        // Stateless mode: only deliver when relatedRequestId is present
+        const relatedRequestId = options?.relatedRequestId;
+        if (relatedRequestId !== undefined) {
+          const requestKey = `request:${String(relatedRequestId)}`;
           const writer = this.writers.get(requestKey);
           if (writer) {
-            // CRITICAL FIX: Use "0" event ID for request streams, don't persist to eventStore
-            writer.write("0", jsonRpcNotification);
-            return;
+            writer.write(jsonRpcNotification);
           }
         }
-
-        // Fallback to session stream
-        const sessionKey = keyForSession(sessionId);
-        const writer = this.writers.get(sessionKey);
-        if (writer) {
-          if (this.eventStore) {
-            const eventId = await this.eventStore.send(
-              sessionId,
-              jsonRpcNotification,
-            );
-            writer.write(eventId, jsonRpcNotification);
-          } else {
-            writer.write("0", jsonRpcNotification);
-          }
-        }
-      } else {
-        // CRITICAL FIX: Don't broadcast when no sessionId - just return/discard
+        // Otherwise discard
         return;
       }
     });
@@ -219,8 +231,8 @@ export class StreamableHttpTransport {
       }
       const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
 
-      // CRITICAL FIX: Always validate session for non-initialize requests when eventStore is present
-      if (!isInitializeRequest && this.eventStore) {
+      // CRITICAL FIX: Always validate session for non-initialize requests
+      if (!isInitializeRequest) {
         if (!sessionId || !this.sessions.has(sessionId)) {
           const responseId = isNotification
             ? null
@@ -307,8 +319,8 @@ export class StreamableHttpTransport {
         )
           .then(async (rpcResponse) => {
             if (rpcResponse !== null) {
-              // CRITICAL FIX: Never persist to eventStore for request streams
-              writer.write("0", rpcResponse);
+              // Request streams not persisted; omit id
+              writer.write(rpcResponse);
             }
           })
           .catch((err) => {
@@ -326,12 +338,8 @@ export class StreamableHttpTransport {
                     err instanceof Error ? { message: err.message } : err,
                   ).toJson(),
                 );
-                if (this.eventStore) {
-                  // CRITICAL FIX: Never persist to eventStore for request streams
-                  writer.write("0", errorResponse);
-                } else {
-                  writer.write("0", errorResponse);
-                }
+                // Request streams not persisted; omit id
+                writer.write(errorResponse);
               }
             } catch (_) {}
           })
@@ -346,7 +354,9 @@ export class StreamableHttpTransport {
             "Content-Type": SSE_ACCEPT_HEADER,
             "Cache-Control": "no-cache, no-transform",
             Connection: "keep-alive",
-            [MCP_SESSION_ID_HEADER]: sessionId,
+            ...(this.generateSessionId && sessionId
+              ? { [MCP_SESSION_ID_HEADER]: sessionId }
+              : {}),
           },
         });
       }
@@ -356,19 +366,25 @@ export class StreamableHttpTransport {
       });
 
       if (isInitializeRequest && response) {
-        const sessionId = this.generateSessionId();
-        const sessionMeta: SessionMeta = {
-          protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
-          clientInfo: (jsonRpcRequest as JsonRpcReq).params,
-        };
-
-        this.sessions.set(sessionId, { meta: sessionMeta });
-
+        if (this.generateSessionId) {
+          const sessionId = this.generateSessionId();
+          const sessionMeta: SessionMeta = {
+            protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
+            clientInfo: (jsonRpcRequest as JsonRpcReq).params,
+          };
+          this.sessions.set(sessionId, { meta: sessionMeta });
+          return new Response(JSON.stringify(response), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              [MCP_SESSION_ID_HEADER]: sessionId,
+            },
+          });
+        }
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: {
             "Content-Type": "application/json",
-            [MCP_SESSION_ID_HEADER]: sessionId,
           },
         });
       }
@@ -380,7 +396,7 @@ export class StreamableHttpTransport {
           "Content-Type": "application/json",
         };
 
-        if (!isInitializeRequest) {
+        if (this.generateSessionId && !isInitializeRequest) {
           const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
           if (sessionId) {
             headers[MCP_SESSION_ID_HEADER] = sessionId;
@@ -429,6 +445,11 @@ export class StreamableHttpTransport {
       });
     }
 
+    if (!this.generateSessionId) {
+      // Stateless mode does not provide a standalone GET stream
+      return new Response("Method Not Allowed", { status: 405 });
+    }
+
     const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
     if (!sessionId || !this.sessions.has(sessionId)) {
       return new Response("Bad Request: Invalid or missing session ID", {
@@ -474,7 +495,7 @@ export class StreamableHttpTransport {
           sessionId,
           lastEventId,
           (eventId: string, message: unknown) => {
-            writer.write(eventId, message);
+            writer.write(message, eventId);
           },
         );
       } catch (_error) {
@@ -499,6 +520,9 @@ export class StreamableHttpTransport {
 
   private async handleDelete(request: Request): Promise<Response> {
     const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+    if (!this.generateSessionId) {
+      return new Response("Method Not Allowed", { status: 405 });
+    }
     if (!sessionId) {
       return new Response("Bad Request: Missing session ID", {
         status: 400,
@@ -516,7 +540,7 @@ export class StreamableHttpTransport {
     // Close all request streams for this session
     const requestKeysToDelete: string[] = [];
     for (const [key] of this.writers) {
-      if (key.startsWith(`req:${sessionId}:`)) {
+      if (key.startsWith(`session:${sessionId}:request:`)) {
         requestKeysToDelete.push(key);
       }
     }

@@ -1,7 +1,7 @@
 import type { EventId } from "./store.js";
 
 export interface StreamWriter {
-  write(eventId: EventId, message: unknown): Promise<void> | void;
+  write(message: unknown, eventId?: EventId): Promise<void> | void;
   end(): void;
 }
 
@@ -14,14 +14,18 @@ export class SSEStreamWriter implements StreamWriter {
     this.controller = controller;
   }
 
-  write(eventId: EventId, message: unknown): void {
+  write(message: unknown, eventId?: EventId): void {
     if (this.closed) {
       return;
     }
 
     try {
       const data = JSON.stringify(message);
-      const sseEvent = `id: ${eventId}\ndata: ${data}\n\n`;
+      let sseEvent = "";
+      if (eventId) {
+        sseEvent += `id: ${eventId}\n`;
+      }
+      sseEvent += `data: ${data}\n\n`;
       const encoded = this.encoder.encode(sseEvent);
       this.controller.enqueue(encoded);
     } catch (error) {
