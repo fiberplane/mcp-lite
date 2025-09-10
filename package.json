@@ -13,7 +13,6 @@
     "lint": "biome check --write .",
     "test": "bun run --filter=* test",
     "test:watch": "bun run --filter=* test:watch",
-    "test-examples": "bun run --filter=@mcp-lite-examples/* test",
     "changeset": "changeset"
   },
   "devDependencies": {
