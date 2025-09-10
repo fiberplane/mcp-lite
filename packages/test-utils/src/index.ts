@@ -29,8 +29,12 @@ export async function createExampleServer(
   const entry = await entryResolver();
 
   // Handle both Hono app exports and server creation functions
-  const app = typeof entry === "function" ? entry() : 
-    (entry && typeof entry === "object" && "default" in entry ? entry.default : entry);
+  const app =
+    typeof entry === "function"
+      ? entry()
+      : entry && typeof entry === "object" && "default" in entry
+        ? entry.default
+        : entry;
 
   if (!app || typeof app.fetch !== "function") {
     throw new Error(
