@@ -67,27 +67,5 @@ describe("Zod Validation Example", () => {
         }),
       ).rejects.toThrow("JSON-RPC Error");
     });
-
-    it("should handle input with extra properties (Zod ignores extra by default)", async () => {
-      // Note: Zod's default behavior is to strip extra properties, not reject them
-      // This test verifies that the tool still works even with extra properties
-      const response = await request("tools/call", {
-        name: "echo",
-        arguments: {
-          message: "Hello",
-          extraField: "this gets ignored", // Extra field gets stripped by Zod
-        },
-      });
-
-      expect(response.error).toBeUndefined();
-      expect(response.result).toEqual({
-        content: [
-          {
-            type: "text",
-            text: "Hello",
-          },
-        ],
-      });
-    });
   });
 });

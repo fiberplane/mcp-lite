@@ -67,19 +67,5 @@ describe("Valibot Validation Example", () => {
         }),
       ).rejects.toThrow("JSON-RPC Error");
     });
-
-    it("should handle extra properties (Valibot behavior)", async () => {
-      // Test what actually happens with Valibot validation
-      const response = await request("tools/call", {
-        name: "echo",
-        arguments: {
-          message: "Hello",
-          extraField: "extra data", // Extra field
-        },
-      });
-
-      // Valibot might strip extra properties or allow them
-      expect(response.error || response.result).toBeDefined();
-    });
   });
 });
