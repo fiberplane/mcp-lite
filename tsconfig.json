@@ -5,6 +5,9 @@
     },
     {
       "path": "./playground"
+    },
+    {
+      "path": "./examples/zod"
     }
   ],
   "files": []

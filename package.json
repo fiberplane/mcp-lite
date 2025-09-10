@@ -4,7 +4,8 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "playground"
+    "playground",
+    "examples/*"
   ],
   "scripts": {
     "build": "bun run --filter=* build",
