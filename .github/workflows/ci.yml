@@ -46,3 +46,6 @@ jobs:
 
             - name: Test
               run: bun test
+
+            - name: Test Examples
+              run: bun run test-examples

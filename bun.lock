@@ -4,9 +4,9 @@
     "": {
       "name": "mcp-monorepo",
       "devDependencies": {
-        "@biomejs/biome": "^2.2.2",
-        "@changesets/cli": "^2.29.6",
-        "typescript": "^5.7.3",
+        "@biomejs/biome": "^2.2.4",
+        "@changesets/cli": "^2.29.7",
+        "typescript": "^5.9.2",
       },
     },
     "examples/validation-arktype": {
@@ -43,6 +43,7 @@
         "zod": "^4.1.5",
       },
       "devDependencies": {
+        "@internal/test-utils": "workspace:*",
         "typescript": "^5.7.3",
       },
     },
@@ -75,6 +76,16 @@
       },
       "devDependencies": {
         "@types/node": "^22.2.0",
+        "typescript": "^5.7.3",
+      },
+    },
+    "packages/test-utils": {
+      "name": "@internal/test-utils",
+      "version": "1.0.0",
+      "dependencies": {
+        "mcp-lite": "workspace:*",
+      },
+      "devDependencies": {
         "typescript": "^5.7.3",
       },
     },
@@ -157,6 +168,8 @@
     "@clack/prompts": ["@clack/prompts@0.7.0", "", { "dependencies": { "@clack/core": "^0.3.3", "is-unicode-supported": "*", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-0MhX9/B4iL6Re04jPrttDm+BsP8y6mS7byuv0BvXgdXhbV5PdlsHt55dvNsuBCPZ7xq1oTAOOuotR9NFbQyMSA=="],
 
     "@inquirer/external-editor": ["@inquirer/external-editor@1.0.1", "", { "dependencies": { "chardet": "^2.1.0", "iconv-lite": "^0.6.3" }, "peerDependencies": { "@types/node": ">=18" }, "optionalPeers": ["@types/node"] }, "sha512-Oau4yL24d2B5IL4ma4UpbQigkVhzPDXLoqy1ggK4gnHg/stmkffJE4oOXHXF3uz0UEpywG68KcyXsyYpA1Re/Q=="],
+
+    "@internal/test-utils": ["@internal/test-utils@workspace:packages/test-utils"],
 
     "@manypkg/find-root": ["@manypkg/find-root@1.1.0", "", { "dependencies": { "@babel/runtime": "^7.5.5", "@types/node": "^12.7.1", "find-up": "^4.1.0", "fs-extra": "^8.1.0" } }, "sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA=="],
 

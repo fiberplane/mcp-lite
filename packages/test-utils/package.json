@@ -1,0 +1,24 @@
+{
+  "name": "@internal/test-utils",
+  "version": "1.0.0",
+  "description": "Internal test utilities for mcp-lite examples",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-lite": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "author": "Fiberplane <info@fiberplane.com>",
+  "license": "MIT"
+}

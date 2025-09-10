@@ -4,6 +4,12 @@
       "path": "./packages/core"
     },
     {
+      "path": "./packages/create-mcp-lite"
+    },
+    {
+      "path": "./packages/test-utils"
+    },
+    {
       "path": "./playground"
     },
     {
