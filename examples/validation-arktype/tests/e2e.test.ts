@@ -28,6 +28,30 @@ describe("ArkType Validation Example", () => {
     await server?.stop();
   });
 
+  describe("ArkType schema adapter integration", () => {
+    it("should convert ArkType schema to JSON Schema in tools/list", async () => {
+      const response = await request("tools/list");
+
+      expect(response.error).toBeUndefined();
+      // biome-ignore lint/suspicious/noExplicitAny: tests
+      expect((response.result as any).tools).toHaveLength(1);
+
+      // biome-ignore lint/suspicious/noExplicitAny: tests
+      const echoTool = (response.result as any).tools[0];
+      expect(echoTool.name).toBe("echo");
+      expect(echoTool.description).toBe("Echoes the input message");
+
+      // Verify that the ArkType schema was converted to JSON Schema
+      expect(echoTool.inputSchema).toMatchObject({
+        type: "object",
+        properties: {
+          message: { type: "string" },
+        },
+        required: ["message"],
+      });
+    });
+  });
+
   describe("ArkType schema validation", () => {
     it("should accept valid input that matches ArkType schema", async () => {
       const response = await request("tools/call", {
@@ -48,32 +72,40 @@ describe("ArkType Validation Example", () => {
       });
     });
 
-    it("should handle missing required field (ArkType behavior)", async () => {
-      // Test what actually happens with ArkType validation
-      const response = await request("tools/call", {
-        name: "echo",
-        arguments: {}, // Missing required 'message' field
-      });
-
-      // ArkType might handle this differently than Zod - check the actual behavior
-      expect(response.error || response.result).toBeDefined();
+    it("should reject input missing required field", async () => {
+      await expect(
+        request("tools/call", {
+          name: "echo",
+          arguments: {}, // Missing required 'message' field
+        }),
+      ).rejects.toThrow("JSON-RPC Error");
     });
 
-    it("should handle wrong type input (ArkType behavior)", async () => {
-      // Test what actually happens with ArkType validation
-      const response = await request("tools/call", {
-        name: "echo",
-        arguments: {
-          message: 123, // Should be string, not number
-        },
-      });
+    it("should reject input with wrong type", async () => {
+      await expect(
+        request("tools/call", {
+          name: "echo",
+          arguments: {
+            message: 123, // Should be string, not number
+          },
+        }),
+      ).rejects.toThrow("JSON-RPC Error");
+    });
 
-      // ArkType might handle this differently than Zod - check the actual behavior
-      expect(response.error || response.result).toBeDefined();
+    it("should reject input with wrong field name", async () => {
+      // ArkType should reject this because 'message' is required but 'kewlMessagee' was provided
+      expect(
+        request("tools/call", {
+          name: "echo",
+          arguments: {
+            kewlMessagee: "Hello", // Should be 'message', not 'kewlMessagee'
+          },
+        }),
+      ).rejects.toThrow("JSON-RPC Error");
     });
 
     it("should handle extra properties (ArkType behavior)", async () => {
-      // Test what actually happens with ArkType validation
+      // Test what actually happens with ArkType validation for extra properties
       const response = await request("tools/call", {
         name: "echo",
         arguments: {
@@ -82,7 +114,7 @@ describe("ArkType Validation Example", () => {
         },
       });
 
-      // ArkType might strip extra properties or allow them
+      // ArkType might strip extra properties or allow them - check actual behavior
       expect(response.error || response.result).toBeDefined();
     });
   });
