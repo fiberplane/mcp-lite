@@ -5,7 +5,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Create MCP server with Zod schema adapter
 const mcp = new McpServer({
-  name: "example-server",
+  name: "echo-server",
   version: "1.0.0",
   schemaAdapter: (schema) => zodToJsonSchema(schema as z.ZodType),
 });

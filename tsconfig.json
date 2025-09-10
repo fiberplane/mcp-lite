@@ -7,7 +7,7 @@
       "path": "./playground"
     },
     {
-      "path": "./examples/zod"
+      "path": "./examples/validation-zod"
     }
   ],
   "files": []
