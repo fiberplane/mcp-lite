@@ -23,11 +23,11 @@ bunx @modelcontextprotocol/inspect
 The key is the `schemaAdapter` in the server setup:
 
 ```typescript
-import { ArkType } from "arktype";
+import { type Type, type } from "arktype";
 
 const mcp = new McpServer({
   name: "echo-server",
   version: "1.0.0",
-  schemaAdapter: (schema) => (schema as ArkType).toJSONSchema(),
+  schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
 });
 ```
