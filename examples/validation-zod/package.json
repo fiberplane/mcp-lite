@@ -1,0 +1,31 @@
+{
+  "name": "@mcp-lite-examples/validation-zod",
+  "version": "1.0.0",
+  "description": "MCP server example using mcp-lite with Zod 4 for input schema validation",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.9.5",
+    "zod": "^4.1.5",
+    "mcp-lite": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@internal/test-utils": "workspace:*"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-lite",
+    "model-context-protocol",
+    "zod",
+    "validation"
+  ],
+  "author": "Fiberplane <info@fiberplane.com>",
+  "license": "MIT"
+}

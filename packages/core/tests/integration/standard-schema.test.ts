@@ -250,4 +250,119 @@ describe("Standard Schema Support", () => {
       text: "test",
     });
   });
+
+  it("should support callable Standard Schema validators (like ArkType)", async () => {
+    // Create a callable Standard Schema validator that mimics ArkType
+    const callableValidator = Object.assign(
+      (input: unknown) => {
+        // This would be the actual validation logic
+        return input;
+      },
+      {
+        "~standard": {
+          version: 1 as const,
+          vendor: "arktype-like",
+          validate: (input: unknown) => {
+            if (typeof input !== "object" || input === null) {
+              return { issues: [{ message: "Expected object" }] };
+            }
+            const obj = input as Record<string, unknown>;
+            if (typeof obj.name !== "string") {
+              return { issues: [{ message: "name must be a string" }] };
+            }
+            return { value: obj };
+          },
+        },
+        _mockJsonSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+          },
+          required: ["name"],
+        },
+      },
+    );
+
+    const mcp = new McpServer({
+      name: "callable-schema-server",
+      version: "1.0.0",
+      schemaAdapter: mockSchemaAdapter,
+    });
+
+    mcp.tool("greet", {
+      description: "Greets a person",
+      inputSchema: callableValidator,
+      handler: (args: { name: string }) => ({
+        content: [{ type: "text", text: `Hello, ${args.name}!` }],
+      }),
+    });
+
+    const transport = new StreamableHttpTransport();
+    const testHandler = transport.bind(mcp);
+
+    // Test that tools/list properly exposes the JSON Schema
+    const listResponse = await testHandler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "list-1",
+          method: "tools/list",
+        }),
+      }),
+    );
+
+    const listData = await listResponse.json();
+    expect(listData.result.tools).toHaveLength(1);
+    expect(listData.result.tools[0].inputSchema).toMatchObject({
+      type: "object",
+      properties: {
+        name: { type: "string" },
+      },
+      required: ["name"],
+    });
+
+    // Test that validation works for valid input
+    const validResponse = await testHandler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "valid-1",
+          method: "tools/call",
+          params: {
+            name: "greet",
+            arguments: { name: "Alice" },
+          },
+        }),
+      }),
+    );
+
+    const validData = await validResponse.json();
+    expect(validData.error).toBeUndefined();
+    expect(validData.result.content[0].text).toBe("Hello, Alice!");
+
+    // Test that validation rejects invalid input
+    const invalidResponse = await testHandler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "invalid-1",
+          method: "tools/call",
+          params: {
+            name: "greet",
+            arguments: { name: 123 }, // Wrong type
+          },
+        }),
+      }),
+    );
+
+    const invalidData = await invalidResponse.json();
+    expect(invalidData.error).toBeDefined();
+    expect(invalidData.error.message).toContain("Validation failed");
+  });
 });
