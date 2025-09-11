@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.1.4
+
+### Patch Changes
+
+- 03ebec9: Add a docstring to the schemaAdapter option for McpServer, to clarify its usage in practice
+
 ## 0.1.3
 
 ### Patch Changes

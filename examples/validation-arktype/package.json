@@ -1,6 +1,6 @@
 {
   "name": "@mcp-lite-examples/validation-arktype",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP server example using mcp-lite with ArkType for input schema validation",
   "type": "module",
   "private": true,
