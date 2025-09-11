@@ -188,7 +188,7 @@ export class StreamableHttpTransport {
       }
 
       if (
-        !isJsonRpcNotification(jsonRpcMessage) ||
+        !isJsonRpcNotification(jsonRpcMessage) &&
         !isJsonRpcRequest(jsonRpcMessage)
       ) {
         const errorResponse = createJsonRpcError(
