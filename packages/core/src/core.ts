@@ -856,7 +856,7 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<PromptGetResult> {
-    if (typeof params !== "object" || params === null) {
+    if (!isObject(params)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "prompts/get requires an object with name and arguments",
@@ -865,7 +865,7 @@ export class McpServer {
 
     const getParams = params as Record<string, unknown>;
 
-    if (typeof getParams.name !== "string") {
+    if (!isString(getParams.name)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "prompts/get requires a string 'name' field",
