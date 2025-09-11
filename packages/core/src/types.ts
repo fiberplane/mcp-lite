@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { JSON_RPC_VERSION } from "./constants.js";
 import type { UriMatcher } from "./uri-template.js";
 import {
+  isNumber,
   isObject,
   isString,
   objectWithDefinedKey,
@@ -122,7 +123,7 @@ export function isJsonRpcNotification(
     return false;
   }
 
-  if (!objectWithKeyOfType(candidate, "method", isString)) {
+  if (!isString(candidate.method)) {
     return false;
   }
 
@@ -144,14 +145,16 @@ export function isJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
     return false;
   }
 
-  if (typeof candidate.method !== "string") {
+  if (!isString(candidate.method)) {
     return false;
   }
+
   if (!("id" in candidate)) {
     return false;
   }
+
   const id = candidate.id;
-  if (typeof id !== "string" && typeof id !== "number" && id !== null) {
+  if (!isString(id) && !isNumber(id) && id !== null) {
     return false;
   }
 
@@ -172,8 +175,9 @@ export function isJsonRpcResponse(obj: unknown): obj is JsonRpcRes {
   if (!("id" in candidate)) {
     return false;
   }
+
   const id = candidate.id;
-  if (typeof id !== "string" && typeof id !== "number" && id !== null) {
+  if (!isString(id) && !isNumber(id) && id !== null) {
     return false;
   }
 
