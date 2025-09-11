@@ -32,6 +32,9 @@ const oauthCorsMiddleware = cors({
   maxAge: parseInt(corsHeaders["Access-Control-Max-Age"], 10),
 });
 
+/**
+ * Implement the OAuth Protected Resource endpoint
+ */
 app.on(
   ["GET", "OPTIONS"],
   ".well-known/oauth-protected-resource",
@@ -46,9 +49,13 @@ app.on(
   },
 );
 
-// NOTE - In our case, Clerk is the authorization server, so we shouldn't *need* to implement this;
-//        however, in earlier versions of the MCP spec, this was required,
-//        so we implement it for backwards compatibility with clients.
+/**
+ * Implement the OAuth Authorization Server endpoint
+ *
+ * @note - In our case, Clerk is the authorization server, so we shouldn't *need* to implement this;
+ *         however, in earlier versions of the MCP spec, this was required,
+ *         so we implement it for backwards compatibility with clients.
+ */
 app.on(
   ["GET", "OPTIONS"],
   ".well-known/oauth-authorization-server",
@@ -64,6 +71,10 @@ app.on(
   },
 );
 
+/**
+ * Create auth middleware for the MCP server.
+ * This should be run on all "/mcp" requests.
+ */
 const mcpAuthMiddleware = createMiddleware(async (_c, next) => {
   // TODO: Implement auth middleware for the MCP server.
   // - [ ] Use Clerk Machine auth: https://clerk.com/docs/nextjs/mcp/build-mcp-server
