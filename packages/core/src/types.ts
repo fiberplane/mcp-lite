@@ -1,6 +1,13 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { JSON_RPC_VERSION } from "./constants.js";
 import type { UriMatcher } from "./uri-template.js";
+import {
+  isNumber,
+  isObject,
+  isString,
+  objectWithDefinedKey,
+  objectWithKeyOfType,
+} from "./utils.js";
 
 export const JSON_RPC_ERROR_CODES = {
   PARSE_ERROR: -32700,
@@ -73,6 +80,14 @@ export interface InitializeResult {
   };
 }
 
+export type ProgressToken = string | number;
+
+export interface ProgressUpdate {
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
 export interface MCPServerContext {
   request: JsonRpcMessage;
   requestId: JsonRpcId | undefined;
@@ -80,7 +95,9 @@ export interface MCPServerContext {
   env: Record<string, unknown>;
   state: Record<string, unknown>;
   session?: { id: string; protocolVersion: string };
+  progressToken?: ProgressToken;
   validate<T>(validator: unknown, input: unknown): T;
+  progress?(update: ProgressUpdate): Promise<void> | void;
 }
 
 export type Middleware = (
@@ -96,7 +113,7 @@ export type MethodHandler = (
 export function isJsonRpcNotification(
   obj: unknown,
 ): obj is JsonRpcNotification {
-  if (typeof obj !== "object" || obj === null) {
+  if (!isObject(obj)) {
     return false;
   }
 
@@ -106,9 +123,10 @@ export function isJsonRpcNotification(
     return false;
   }
 
-  if (typeof candidate.method !== "string") {
+  if (!isString(candidate.method)) {
     return false;
   }
+
   if ("id" in candidate) {
     return false;
   }
@@ -117,7 +135,7 @@ export function isJsonRpcNotification(
 }
 
 export function isJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
-  if (typeof obj !== "object" || obj === null) {
+  if (!isObject(obj)) {
     return false;
   }
 
@@ -127,22 +145,48 @@ export function isJsonRpcRequest(obj: unknown): obj is JsonRpcReq {
     return false;
   }
 
-  if (typeof candidate.method !== "string") {
+  if (!isString(candidate.method)) {
     return false;
   }
+
   if (!("id" in candidate)) {
     return false;
   }
+
   const id = candidate.id;
-  if (typeof id !== "string" && typeof id !== "number" && id !== null) {
+  if (!isString(id) && !isNumber(id) && id !== null) {
     return false;
   }
 
   return true;
 }
 
-export function isValidJsonRpcMessage(obj: unknown): obj is JsonRpcMessage {
-  return isJsonRpcRequest(obj) || isJsonRpcNotification(obj);
+export function isJsonRpcResponse(obj: unknown): obj is JsonRpcRes {
+  if (!isObject(obj)) {
+    return false;
+  }
+
+  const candidate = obj as Record<string, unknown>;
+
+  if (candidate.jsonrpc !== "2.0") {
+    return false;
+  }
+
+  if (!("id" in candidate)) {
+    return false;
+  }
+
+  const id = candidate.id;
+  if (!isString(id) && !isNumber(id) && id !== null) {
+    return false;
+  }
+
+  // Must have either result or error
+  if (!("result" in candidate) && !("error" in candidate)) {
+    return false;
+  }
+
+  return true;
 }
 
 export function createJsonRpcResponse(
@@ -168,40 +212,31 @@ export function createJsonRpcError(
 }
 
 export function isInitializeParams(obj: unknown): obj is InitializeParams {
-  if (typeof obj !== "object" || obj === null) {
+  if (!isObject(obj)) {
     return false;
   }
 
   const candidate = obj as Record<string, unknown>;
 
+  if (!objectWithKeyOfType(candidate, "protocolVersion", isString)) {
+    return false;
+  }
+
   if (
-    !("protocolVersion" in candidate) ||
-    typeof candidate.protocolVersion !== "string"
+    objectWithDefinedKey(candidate, "capabilities") &&
+    !objectWithKeyOfType(candidate, "capabilities", isObject)
   ) {
     return false;
   }
 
-  if ("capabilities" in candidate && candidate.capabilities !== undefined) {
-    if (
-      typeof candidate.capabilities !== "object" ||
-      candidate.capabilities === null
-    ) {
+  if (objectWithDefinedKey(candidate, "clientInfo")) {
+    if (!objectWithKeyOfType(candidate, "clientInfo", isObject)) {
       return false;
     }
-  }
 
-  if ("clientInfo" in candidate && candidate.clientInfo !== undefined) {
-    const clientInfo = candidate.clientInfo;
-    if (typeof clientInfo !== "object" || clientInfo === null) {
-      return false;
-    }
-    const clientInfoObj = clientInfo as Record<string, unknown>;
-    if (
-      !("name" in clientInfoObj) ||
-      typeof clientInfoObj.name !== "string" ||
-      !("version" in clientInfoObj) ||
-      typeof clientInfoObj.version !== "string"
-    ) {
+    const clientInfoObj = candidate.clientInfo as Record<string, unknown>;
+
+    if (!isClientInfo(clientInfoObj)) {
       return false;
     }
   }
@@ -209,8 +244,14 @@ export function isInitializeParams(obj: unknown): obj is InitializeParams {
   return true;
 }
 
-export function isString(value: unknown): value is string {
-  return typeof value === "string";
+function isClientInfo(obj: unknown) {
+  if (!objectWithKeyOfType(obj, "name", isString)) {
+    return false;
+  }
+  if (!objectWithKeyOfType(obj, "version", isString)) {
+    return false;
+  }
+  return true;
 }
 
 export interface Tool {
@@ -441,3 +482,13 @@ export type ResourceHandler = (
   vars: ResourceVars,
   ctx: MCPServerContext,
 ) => Promise<ResourceReadResult>;
+
+export interface NotificationSenderOptions {
+  relatedRequestId?: string | number;
+}
+
+export type NotificationSender = (
+  sessionId: string | undefined,
+  notification: { method: string; params?: unknown },
+  options?: NotificationSenderOptions,
+) => Promise<void> | void;

@@ -1,11 +1,17 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
+import {
+  type CreateContextOptions,
+  createContext,
+  getProgressToken,
+} from "./context.js";
 import { RpcError } from "./errors.js";
 import type {
   InferInput,
   InitializeResult,
   JsonRpcId,
   JsonRpcMessage,
+  JsonRpcNotification,
   JsonRpcReq,
   JsonRpcRes,
   ListPromptsResult,
@@ -38,15 +44,11 @@ import {
   createJsonRpcResponse,
   isInitializeParams,
   isJsonRpcNotification,
-  isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
-import {
-  createContext,
-  extractArgumentsFromSchema,
-  resolveToolSchema,
-} from "./validation.js";
+import { isObject, isString } from "./utils.js";
+import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
 
 async function runMiddlewares(
   middlewares: Middleware[],
@@ -72,13 +74,17 @@ function errorToResponse(
   err: unknown,
   requestId: JsonRpcId | undefined,
 ): JsonRpcRes | null {
-  if (requestId === undefined) return null;
+  if (requestId === undefined) {
+    return null;
+  }
 
   if (err instanceof RpcError) {
     return createJsonRpcError(requestId, err.toJson());
   }
+
   const errorData =
     err instanceof Error ? { message: err.message, stack: err.stack } : err;
+
   return createJsonRpcError(
     requestId,
     new RpcError(
@@ -88,6 +94,8 @@ function errorToResponse(
     ).toJson(),
   );
 }
+
+// progress token extraction now lives in context.ts
 
 export interface McpServerOptions {
   name: string;
@@ -235,6 +243,12 @@ export class McpServer {
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
   private resources = new Map<string, ResourceEntry>();
+
+  private notificationSender?: (
+    sessionId: string | undefined,
+    notification: { method: string; params?: unknown },
+    options?: { relatedRequestId?: string | number },
+  ) => Promise<void> | void;
 
   /**
    * Create a new MCP server instance.
@@ -454,6 +468,7 @@ export class McpServer {
 
     const entry: ToolEntry = {
       metadata,
+      // TODO - We could avoid this cast if MethodHandler had a generic type for `params` that defaulted to unknown, but here we could pass TArgs
       handler: def.handler as MethodHandler,
       validator,
     };
@@ -671,20 +686,51 @@ export class McpServer {
     return this;
   }
 
-  async _dispatch(message: unknown): Promise<JsonRpcRes | null> {
-    if (!isValidJsonRpcMessage(message)) {
-      return createJsonRpcError(
-        null,
-        new RpcError(
-          JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-          "Invalid JSON-RPC 2.0 message format",
-        ).toJson(),
-      );
-    }
+  /**
+   * Set the notification sender for streaming notifications.
+   * This is called by the transport to wire up notification delivery.
+   */
+  _setNotificationSender(
+    sender: (
+      sessionId: string | undefined,
+      notification: { method: string; params?: unknown },
+      options?: { relatedRequestId?: string | number },
+    ) => Promise<void> | void,
+  ): void {
+    this.notificationSender = sender;
+  }
 
+  async _dispatch(
+    message: JsonRpcReq | JsonRpcNotification,
+    contextOptions: CreateContextOptions = {},
+  ): Promise<JsonRpcRes | null> {
     const isNotification = isJsonRpcNotification(message);
     const requestId = isNotification ? undefined : (message as JsonRpcReq).id;
-    const ctx = createContext(message, requestId);
+
+    const progressToken = getProgressToken(message as JsonRpcMessage);
+
+    const sessionId = contextOptions.sessionId;
+    const progressSender =
+      sessionId && this.notificationSender && progressToken
+        ? (update: unknown) =>
+            this.notificationSender?.(
+              sessionId,
+              {
+                method: "notifications/progress",
+                params: {
+                  progressToken,
+                  ...(update as Record<string, unknown>),
+                },
+              },
+              { relatedRequestId: requestId ?? undefined },
+            )
+        : undefined;
+
+    const ctx = createContext(message as JsonRpcMessage, requestId, {
+      sessionId,
+      progressToken,
+      progressSender,
+    });
 
     const method = (message as JsonRpcMessage).method;
     const handler = this.methods[method];
@@ -705,7 +751,7 @@ export class McpServer {
         return;
       }
 
-      const result = await handler((message as JsonRpcMessage).params, ctx);
+      const result = await handler(message.params, ctx);
       if (requestId !== undefined) {
         ctx.response = createJsonRpcResponse(requestId, result);
       }
@@ -761,7 +807,7 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<ToolCallResult> {
-    if (typeof params !== "object" || params === null) {
+    if (!isObject(params)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "tools/call requires an object with name and arguments",
@@ -770,7 +816,7 @@ export class McpServer {
 
     const callParams = params as Record<string, unknown>;
 
-    if (typeof callParams.name !== "string") {
+    if (!isString(callParams.name)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "tools/call requires a string 'name' field",
@@ -810,7 +856,7 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<PromptGetResult> {
-    if (typeof params !== "object" || params === null) {
+    if (!isObject(params)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "prompts/get requires an object with name and arguments",
@@ -819,7 +865,7 @@ export class McpServer {
 
     const getParams = params as Record<string, unknown>;
 
-    if (typeof getParams.name !== "string") {
+    if (!isString(getParams.name)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "prompts/get requires a string 'name' field",

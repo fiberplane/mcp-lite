@@ -1,11 +1,5 @@
 import { RpcError } from "./errors.js";
-import type {
-  JsonRpcId,
-  JsonRpcMessage,
-  MCPServerContext,
-  PromptArgumentDef,
-  SchemaAdapter,
-} from "./types.js";
+import type { PromptArgumentDef, SchemaAdapter } from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
 export function resolveToolSchema(
@@ -100,19 +94,4 @@ export function extractArgumentsFromSchema(
   }
 
   return [];
-}
-
-export function createContext(
-  message: JsonRpcMessage,
-  requestId: JsonRpcId | undefined,
-): MCPServerContext {
-  return {
-    request: message,
-    requestId,
-    response: null,
-    env: {},
-    state: {},
-    validate: <T>(validator: unknown, input: unknown): T =>
-      createValidationFunction<T>(validator, input),
-  };
 }

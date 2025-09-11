@@ -201,14 +201,26 @@ describe("E2E MCP Integration", () => {
       expect(result.error?.message).toBe("Method not found");
     });
 
-    it("should reject non-POST methods", async () => {
+    it("should reject GET methods without proper headers", async () => {
       const request = new Request("http://localhost/mcp", {
         method: "GET",
       });
 
       const response = await handler(request);
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe(
+        "Bad Request: Accept header must be text/event-stream",
+      );
+    });
+
+    it("should reject unsupported HTTP methods", async () => {
+      const request = new Request("http://localhost/mcp", {
+        method: "PUT",
+      });
+
+      const response = await handler(request);
       expect(response.status).toBe(405);
-      expect(response.headers.get("Allow")).toBe("POST");
+      expect(response.headers.get("Allow")).toBe("POST, GET, DELETE");
 
       const result = (await response.json()) as JsonRpcResponse;
       expect(result.error).toBeDefined();

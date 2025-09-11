@@ -47,3 +47,8 @@ jobs:
             # NOTE - This also runs the tests for the examples
             - name: Test
               run: bun test
+
+            - name: Publish preview packages
+              if: github.event_name == 'pull_request'
+              run: |
+                  bunx pkg-pr-new publish "./packages/core"
