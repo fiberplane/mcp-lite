@@ -47,6 +47,7 @@ import {
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
+import { isObject, isString } from "./utils.js";
 import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
 
 async function runMiddlewares(
@@ -806,7 +807,7 @@ export class McpServer {
     params: unknown,
     ctx: MCPServerContext,
   ): Promise<ToolCallResult> {
-    if (typeof params !== "object" || params === null) {
+    if (!isObject(params)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "tools/call requires an object with name and arguments",
@@ -815,7 +816,7 @@ export class McpServer {
 
     const callParams = params as Record<string, unknown>;
 
-    if (typeof callParams.name !== "string") {
+    if (!isString(callParams.name)) {
       throw new RpcError(
         JSON_RPC_ERROR_CODES.INVALID_PARAMS,
         "tools/call requires a string 'name' field",
