@@ -467,6 +467,7 @@ export class McpServer {
 
     const entry: ToolEntry = {
       metadata,
+      // TODO - We could avoid this cast if MethodHandler had a generic type for `params` that defaulted to unknown, but here we could pass TArgs
       handler: def.handler as MethodHandler,
       validator,
     };
