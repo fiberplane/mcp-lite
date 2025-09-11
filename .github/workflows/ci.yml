@@ -51,4 +51,4 @@ jobs:
             - name: Publish preview packages
               if: github.event_name == 'pull_request'
               run: |
-                  bunx pkg-pr-new publish "./packages/core"
+                  bunx pkg-pr-new publish --compact "./packages/core"

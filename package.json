@@ -7,6 +7,11 @@
     "playground",
     "examples/*"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fiberplane/mcp.git"
+  },
+  "homepage": "https://github.com/fiberplane/mcp",
   "scripts": {
     "build": "bun run --filter=* build",
     "typecheck": "bun run --filter=* typecheck",
