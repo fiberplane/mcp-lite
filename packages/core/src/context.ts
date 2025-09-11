@@ -6,6 +6,7 @@ import type {
   ProgressToken,
   ProgressUpdate,
 } from "./types.js";
+import { isObject, objectWithKey } from "./utils.js";
 import { createValidationFunction } from "./validation.js";
 
 export interface CreateContextOptions {
@@ -20,10 +21,10 @@ export interface CreateContextOptions {
 export function getProgressToken(
   message: JsonRpcMessage,
 ): ProgressToken | undefined {
-  if (message.params && typeof message.params === "object") {
+  if (isObject(message.params)) {
     const params = message.params as Record<string, unknown>;
     const meta = params._meta as Record<string, unknown> | undefined;
-    if (meta && typeof meta === "object" && "progressToken" in meta) {
+    if (objectWithKey(meta, "progressToken")) {
       return meta.progressToken as ProgressToken;
     }
   }
