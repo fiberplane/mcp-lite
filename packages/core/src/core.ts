@@ -73,13 +73,17 @@ function errorToResponse(
   err: unknown,
   requestId: JsonRpcId | undefined,
 ): JsonRpcRes | null {
-  if (requestId === undefined) return null;
+  if (requestId === undefined) {
+    return null;
+  }
 
   if (err instanceof RpcError) {
     return createJsonRpcError(requestId, err.toJson());
   }
+
   const errorData =
     err instanceof Error ? { message: err.message, stack: err.stack } : err;
+
   return createJsonRpcError(
     requestId,
     new RpcError(
