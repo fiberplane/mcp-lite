@@ -2,7 +2,10 @@
   "name": "mcp-lite",
   "type": "module",
   "version": "0.1.4",
-  "homepage": "https://github.com/fiberplane/mcp/",
+  "homepage": "https://github.com/fiberplane/mcp",
+  "repository": {
+    "url": "https://github.com/fiberplane/mcp"
+  },
   "dependencies": {
     "@standard-schema/spec": "^1.0.0"
   },
