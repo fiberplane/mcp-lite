@@ -750,7 +750,7 @@ export class McpServer {
         return;
       }
 
-      const result = await handler((message as JsonRpcMessage).params, ctx);
+      const result = await handler(message.params, ctx);
       if (requestId !== undefined) {
         ctx.response = createJsonRpcResponse(requestId, result);
       }
