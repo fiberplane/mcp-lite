@@ -112,7 +112,7 @@ export type MethodHandler = (
 export function isJsonRpcNotification(
   obj: unknown,
 ): obj is JsonRpcNotification {
-  if (typeof obj !== "object" || obj === null) {
+  if (!isObject(obj)) {
     return false;
   }
 
@@ -122,9 +122,10 @@ export function isJsonRpcNotification(
     return false;
   }
 
-  if (typeof candidate.method !== "string") {
+  if (!objectWithKeyOfType(candidate, "method", isString)) {
     return false;
   }
+
   if ("id" in candidate) {
     return false;
   }
