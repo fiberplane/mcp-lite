@@ -1,5 +1,12 @@
 # @mcp-lite-examples/validation-valibot
 
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [03ebec9]
+  - mcp-lite@0.1.4
+
 ## 1.0.1
 
 ### Patch Changes
