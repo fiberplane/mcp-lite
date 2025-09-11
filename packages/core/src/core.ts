@@ -11,6 +11,7 @@ import type {
   InitializeResult,
   JsonRpcId,
   JsonRpcMessage,
+  JsonRpcNotification,
   JsonRpcReq,
   JsonRpcRes,
   ListPromptsResult,
@@ -43,7 +44,6 @@ import {
   createJsonRpcResponse,
   isInitializeParams,
   isJsonRpcNotification,
-  isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
@@ -695,19 +695,9 @@ export class McpServer {
   }
 
   async _dispatch(
-    message: unknown,
+    message: JsonRpcReq | JsonRpcNotification,
     contextOptions: CreateContextOptions = {},
   ): Promise<JsonRpcRes | null> {
-    if (!isValidJsonRpcMessage(message)) {
-      return createJsonRpcError(
-        null,
-        new RpcError(
-          JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-          "Invalid JSON-RPC 2.0 message format",
-        ).toJson(),
-      );
-    }
-
     const isNotification = isJsonRpcNotification(message);
     const requestId = isNotification ? undefined : (message as JsonRpcReq).id;
 

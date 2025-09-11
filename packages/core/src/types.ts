@@ -178,14 +178,6 @@ export function isJsonRpcResponse(obj: unknown): obj is JsonRpcRes {
   return true;
 }
 
-export function isValidJsonRpcMessage(obj: unknown): obj is JsonRpcMessage {
-  return (
-    isJsonRpcRequest(obj) ||
-    isJsonRpcNotification(obj) ||
-    isJsonRpcResponse(obj)
-  );
-}
-
 export function createJsonRpcResponse(
   id: JsonRpcId,
   result?: unknown,

@@ -42,6 +42,5 @@ export {
   createJsonRpcResponse,
   isJsonRpcNotification,
   isJsonRpcRequest,
-  isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
 } from "./types.js";

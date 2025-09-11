@@ -13,8 +13,8 @@ import type { EventStore, SessionId, SessionMeta } from "./store.js";
 import {
   createJsonRpcError,
   isJsonRpcNotification,
+  isJsonRpcRequest,
   isJsonRpcResponse,
-  isValidJsonRpcMessage,
   JSON_RPC_ERROR_CODES,
   type JsonRpcMessage,
   type JsonRpcReq,
@@ -179,15 +179,18 @@ export class StreamableHttpTransport {
   private async handlePost(request: Request): Promise<Response> {
     try {
       const body = await request.text();
-      const jsonRpcRequest = parseJsonRpc(body);
+      const jsonRpcMessage = parseJsonRpc(body);
 
       // Check if it's a JSON-RPC response first
-      if (isJsonRpcResponse(jsonRpcRequest)) {
+      if (isJsonRpcResponse(jsonRpcMessage)) {
         // Accept responses but don't process them, just return 202
         return new Response(null, { status: 202 });
       }
 
-      if (!isValidJsonRpcMessage(jsonRpcRequest)) {
+      if (
+        !isJsonRpcNotification(jsonRpcMessage) ||
+        !isJsonRpcRequest(jsonRpcMessage)
+      ) {
         const errorResponse = createJsonRpcError(
           null,
           new RpcError(
@@ -203,9 +206,9 @@ export class StreamableHttpTransport {
         });
       }
 
-      const isNotification = isJsonRpcNotification(jsonRpcRequest);
+      const isNotification = isJsonRpcNotification(jsonRpcMessage);
       const isInitializeRequest =
-        (jsonRpcRequest as JsonRpcMessage).method === "initialize";
+        (jsonRpcMessage as JsonRpcMessage).method === "initialize";
       const acceptHeader = request.headers.get("Accept");
       const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
 
@@ -216,7 +219,7 @@ export class StreamableHttpTransport {
         ) {
           const responseId = isNotification
             ? null
-            : (jsonRpcRequest as JsonRpcReq).id;
+            : (jsonRpcMessage as JsonRpcReq).id;
           const errorResponse = createJsonRpcError(
             responseId,
             new RpcError(
@@ -241,13 +244,13 @@ export class StreamableHttpTransport {
       if (!isInitializeRequest && acceptHeader?.endsWith(SSE_ACCEPT_HEADER)) {
         return this.handlePostSse({
           request,
-          jsonRpcRequest,
+          jsonRpcRequest: jsonRpcMessage,
           sessionId,
           isNotification,
         });
       }
 
-      const response = await this.server?._dispatch(jsonRpcRequest, {
+      const response = await this.server?._dispatch(jsonRpcMessage, {
         sessionId: sessionId || undefined,
       });
 
@@ -256,7 +259,7 @@ export class StreamableHttpTransport {
           const sessionId = this.generateSessionId();
           const sessionMeta: SessionMeta = {
             protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
-            clientInfo: (jsonRpcRequest as JsonRpcReq).params,
+            clientInfo: (jsonRpcMessage as JsonRpcReq).params,
           };
           this.sessions.set(sessionId, { meta: sessionMeta });
           return new Response(JSON.stringify(response), {
@@ -454,7 +457,7 @@ export class StreamableHttpTransport {
 
     // No replay support for request streams - only for session streams
     Promise.resolve(
-      this.server?._dispatch(jsonRpcRequest, {
+      this.server?._dispatch(jsonRpcRequest as JsonRpcReq, {
         sessionId: sessionId || undefined,
       }),
     )
