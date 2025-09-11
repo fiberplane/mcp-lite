@@ -95,6 +95,22 @@ function errorToResponse(
 export interface McpServerOptions {
   name: string;
   version: string;
+  /**
+   * A function that converts a StandardSchema to a JSON Schema
+   *
+   * In practice, you will need to coerce the `schema` parameter of this function to the correct type for the library you are using,
+   * in order to pass it to a helper that handles converting to JSON Schema.
+   *
+   * @example Using Zod
+   * ```typescript
+   * import { z } from "zod";
+   *
+   * const server = new McpServer({
+   *   // ...
+   *   schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
+   * });
+   * ```
+   */
   schemaAdapter?: SchemaAdapter;
 }
 

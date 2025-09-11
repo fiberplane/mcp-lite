@@ -333,7 +333,8 @@ export type JsonSchema = unknown;
 export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
   return (
     value !== null &&
-    typeof value === "object" &&
+    // ArkType uses functions for schemas, so we need to check whether `value` is an object or a function
+    (typeof value === "object" || typeof value === "function") &&
     "~standard" in value &&
     typeof (value as Record<string, unknown>)["~standard"] === "object" &&
     (value as { "~standard": { version: number } })["~standard"].version === 1

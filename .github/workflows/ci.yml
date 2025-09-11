@@ -44,5 +44,6 @@ jobs:
             - name: Build
               run: bun run build
 
+            # NOTE - This also runs the tests for the examples
             - name: Test
               run: bun test

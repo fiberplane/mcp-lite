@@ -4,7 +4,22 @@
       "path": "./packages/core"
     },
     {
+      "path": "./packages/create-mcp-lite"
+    },
+    {
+      "path": "./packages/test-utils"
+    },
+    {
       "path": "./playground"
+    },
+    {
+      "path": "./examples/validation-arktype"
+    },
+    {
+      "path": "./examples/validation-valibot"
+    },
+    {
+      "path": "./examples/validation-zod"
     }
   ],
   "files": []

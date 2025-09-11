@@ -11,6 +11,8 @@
   - Tests: `packages/create-mcp-lite/tests/**/*.test.ts`
   - Build scripts: `packages/create-mcp-lite/scripts`
 - Playground app: `playground/minimal-server.ts` (Hono + MCP HTTP transport)
+- Examples: `examples/*`
+  - These can all run with bun, and test integration of `packages/core` (mcp-lite) with various other libraries.
 
 ## Build, Test, and Development Commands
 - Install deps: `bun install`
