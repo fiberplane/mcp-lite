@@ -8,8 +8,6 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "examples/validation-arktype",
-    "examples/validation-valibot",
-    "examples/validation-zod"
+    "@mcp-lite-examples/*"
   ]
 }
