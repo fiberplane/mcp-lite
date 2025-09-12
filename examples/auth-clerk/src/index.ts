@@ -23,7 +23,7 @@ app.all("/mcp", mcpAuthMiddleware, async (c) => {
 // Root route describing where to find the MCP endpoint
 app.get("/", (c) => {
   return c.text(
-    "Authenticated MCP Server! Connect to /mcp to start the auth flow",
+    "This is Authenticated MCP Server\n\nConnect to /mcp with your MCP client to start the auth flow",
   );
 });
 
