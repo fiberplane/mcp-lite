@@ -39,9 +39,13 @@ app.on(
   ".well-known/oauth-protected-resource",
   oauthCorsMiddleware,
   (c) => {
+    // NOTE - The resource URL is the `/mcp` endpoint
+    const req = c.req.raw;
+    const url = new URL(req.url);
+    const resourceUrl = `${url.origin}/mcp`;
     const result = generateClerkProtectedResourceMetadata({
       publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
-      resourceUrl: "https://myapp.com/current-route",
+      resourceUrl,
     });
 
     return c.json(result);
@@ -59,8 +63,8 @@ app.on(
   ["GET", "OPTIONS"],
   ".well-known/oauth-authorization-server",
   oauthCorsMiddleware,
-  (c) => {
-    const result = fetchClerkAuthorizationServerMetadata({
+  async (c) => {
+    const result = await fetchClerkAuthorizationServerMetadata({
       publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
     });
     // TODO - Remove this log statement, I just wanted to see the output since it isn't typed properly

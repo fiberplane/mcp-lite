@@ -53,14 +53,10 @@ export const mcpAuthMiddleware = createMiddleware<
     const { secretKey, publishableKey, ...rest } = {
       secretKey: clerkEnv.CLERK_SECRET_KEY || "",
       publishableKey: clerkEnv.CLERK_PUBLISHABLE_KEY || "",
-      // apiUrl: clerkEnv.CLERK_API_URL,
-      // apiVersion: clerkEnv.CLERK_API_VERSION,
     };
 
     const clerkClient = createClerkClient({
       ...rest,
-      // apiUrl,
-      // apiVersion,
       secretKey,
       publishableKey,
     });
