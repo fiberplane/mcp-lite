@@ -7,5 +7,9 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": [
+    "examples/validation-arktype",
+    "examples/validation-valibot",
+    "examples/validation-zod"
+  ]
 }
