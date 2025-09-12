@@ -367,6 +367,7 @@ export class StreamableHttpTransport {
       this.createAndRegisterSseStream(sessionKey);
 
     const lastEventId = request.headers.get(MCP_LAST_EVENT_ID_HEADER);
+    let hadReplay = false;
     if (lastEventId && this.eventStore) {
       try {
         await this.eventStore.replay(
@@ -374,6 +375,7 @@ export class StreamableHttpTransport {
           lastEventId,
           (eventId: string, message: unknown) => {
             writer.write(message, eventId);
+            hadReplay = true;
           },
         );
       } catch (_error) {
@@ -383,6 +385,12 @@ export class StreamableHttpTransport {
           status: 500,
         });
       }
+    }
+
+    // Send initial comment to establish SSE connection
+    // For replay streams, only send if no events were replayed
+    if (!hadReplay) {
+      writer.write({ type: "connection", status: "established" });
     }
 
     return new Response(responseStream, {
@@ -406,6 +414,9 @@ export class StreamableHttpTransport {
     monitorStream
       .pipeTo(
         new WritableStream({
+          write() {
+            // Consume and discard chunks to prevent backpressure
+          },
           close: () => {
             this.writers.delete(streamKey);
             writer.end();
