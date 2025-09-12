@@ -1,5 +1,5 @@
 ---
-"@fiberplane/mcp-lite": minor
+"mcp-lite": minor
 ---
 
 Add SSE streaming, sessions, and progress updates
