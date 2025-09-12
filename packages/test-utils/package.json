@@ -1,6 +1,6 @@
 {
   "name": "@internal/test-utils",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Internal test utilities for mcp-lite examples",
   "type": "module",
   "private": true,
