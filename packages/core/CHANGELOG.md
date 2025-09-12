@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.2.0
+
+### Minor Changes
+
+- aae00e3: Add SSE streaming, sessions, and progress updates
+
 ## 0.1.4
 
 ### Patch Changes
