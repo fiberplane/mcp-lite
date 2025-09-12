@@ -7,6 +7,7 @@ import {
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppType } from "../types";
+import { getResourceUrl } from "./utils";
 
 /**
  * Create middleware to handle CORS for the OAuth endpoints,
@@ -48,13 +49,34 @@ authRoutes.on(
     }
 
     // NOTE - The resource URL we are protecting is the `/mcp` endpoint
-    const req = c.req.raw;
-    const url = new URL(req.url);
-    const resourceUrl = `${url.origin}/mcp`;
+    // const req = c.req.raw;
+    // const url = new URL(req.url);
+    // const resourceUrl = `${url.origin}/mcp`;
+
+    const resourceUrl = getResourceUrl(c.req.raw);
 
     const result = generateClerkProtectedResourceMetadata({
       publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
       resourceUrl,
+    });
+
+    return c.json(result);
+  },
+);
+
+authRoutes.on(
+  ["GET", "OPTIONS"],
+  "/.well-known/oauth-protected-resource/mcp",
+  oauthCorsMiddleware,
+  (c) => {
+    const resourceUrl = getResourceUrl(c.req.raw);
+
+    const result = generateClerkProtectedResourceMetadata({
+      publishableKey: c.env.CLERK_PUBLISHABLE_KEY,
+      resourceUrl,
+      properties: {
+        scopes_supported: ["profile", "email"],
+      },
     });
 
     return c.json(result);

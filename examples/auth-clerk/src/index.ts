@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { logger } from 'hono/logger'
+import { logger } from "hono/logger";
 import { mcpAuthMiddleware } from "./auth/middleware";
 import { authRoutes } from "./auth/routes";
 import { httpHandler as mcpHttpHandler } from "./mcp";
