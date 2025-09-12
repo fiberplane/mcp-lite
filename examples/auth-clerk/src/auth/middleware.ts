@@ -53,24 +53,11 @@ export const mcpAuthMiddleware = createMiddleware<
       acceptsToken: TokenType.OAuthToken,
     });
 
-    let authInfo: AuthInfo | undefined;
-    try {
-      // This is the result of the authenticateRequest call, with the token type being OAuthToken
-      const auth = requestState.toAuth();
-      // TODO - call verifyClerkToken
-      const verifiedAuth = verifyClerkToken(auth, token);
-      authInfo = verifiedAuth;
-    } catch (e) {
-      console.error("Unexpected error authenticating bearer token:", e);
-      const publicError = new InvalidTokenError("Invalid token");
-      return new Response(JSON.stringify(publicError.toResponseObject()), {
-        status: publicError.status,
-        headers: {
-          "WWW-Authenticate": `Bearer error="${publicError.errorCode}", error_description="${publicError.message}", resource_metadata="${resourceMetadataUrl}"`,
-          "Content-Type": "application/json",
-        },
-      });
-    }
+    // This is the result of the authenticateRequest call, with the token type being OAuthToken
+    const auth = requestState.toAuth();
+
+    // Source code for verifyClerkToken: https://github.com/clerk/mcp-tools/blob/b0c946c97c41f248289c31174d0d5c84e977c55c/server.ts#L103
+    const authInfo = verifyClerkToken(auth, token);
 
     // Require valid auth for this endpoint
     if (!authInfo) {
@@ -83,6 +70,7 @@ export const mcpAuthMiddleware = createMiddleware<
         },
       });
     }
+
 
     // Optional: enforce scopes if desired; read from context if provided upstream
     // const requiredScopes = c.get("requiredScopes") as string[] | undefined;
