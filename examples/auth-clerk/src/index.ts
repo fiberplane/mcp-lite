@@ -6,10 +6,9 @@ import {
 } from "@clerk/mcp-tools/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { createMiddleware } from "hono/factory";
+import { mcpAuthMiddleware } from "./auth/auth";
 import { httpHandler as mcpHttpHandler } from "./mcp";
-
-type AppType = { Bindings: { CLERK_PUBLISHABLE_KEY: string } };
+import type { AppType } from "./types";
 
 // Create a Hono app to serve our api routes
 const app = new Hono<AppType>();
@@ -70,17 +69,6 @@ app.on(
     return c.json(result);
   },
 );
-
-/**
- * Create auth middleware for the MCP server.
- * This should be run on all "/mcp" requests.
- */
-const mcpAuthMiddleware = createMiddleware(async (_c, next) => {
-  // TODO: Implement auth middleware for the MCP server.
-  // - [ ] Use Clerk Machine auth: https://clerk.com/docs/nextjs/mcp/build-mcp-server
-  // - [ ] Return a 401 with proper WWW-Authenticate header when auth fails
-  await next();
-});
 
 // Add MCP endpoint
 app.all("/mcp", mcpAuthMiddleware, async (c) => {

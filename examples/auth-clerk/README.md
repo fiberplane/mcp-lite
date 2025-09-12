@@ -2,7 +2,7 @@
 
 This is an example of using mcp-lite with auth, using Clerk as the auth provider.
 
-## Development
+## Configuration
 
 Set secret variables in `.dev.vars`
 
@@ -10,6 +10,19 @@ Set secret variables in `.dev.vars`
 # Fill in the values for the secret variables from the example file
 cp .dev.vars.example .dev.vars
 ```
+
+Create an OAuth app in Clerk: https://dashboard.clerk.com/last-active?path=user-authentication/oauth-applications
+
+Copy your Clerk OAuth client secret and client ID from the OAuth app you created into your `.dev.vars` file.
+
+Add a redirect URI to the OAuth app in the Clerk dashboard.
+
+Enable Dynamic Client Registration using the toggle in the Clerk dashboard: https://dashboard.clerk.com/last-active?path=user-authentication/oauth-applications
+
+
+## Development
+
+
 
 Run the development server
 
