@@ -11,7 +11,7 @@
       },
     },
     "examples/auth-clerk": {
-      "name": "auth-clerk",
+      "name": "@mcp-lite-examples/auth-clerk",
       "dependencies": {
         "@clerk/backend": "^2.13.0",
         "@clerk/mcp-tools": "^0.3.1",
@@ -26,7 +26,7 @@
     },
     "examples/validation-arktype": {
       "name": "@mcp-lite-examples/validation-arktype",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "dependencies": {
         "arktype": "^2.1.22",
         "hono": "^4.9.5",
@@ -39,7 +39,7 @@
     },
     "examples/validation-valibot": {
       "name": "@mcp-lite-examples/validation-valibot",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "dependencies": {
         "@valibot/to-json-schema": "^1.3.0",
         "hono": "^4.9.5",
@@ -53,7 +53,7 @@
     },
     "examples/validation-zod": {
       "name": "@mcp-lite-examples/validation-zod",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "dependencies": {
         "hono": "^4.9.5",
         "mcp-lite": "workspace:*",
@@ -66,7 +66,7 @@
     },
     "packages/core": {
       "name": "mcp-lite",
-      "version": "0.1.4",
+      "version": "0.2.0",
       "dependencies": {
         "@standard-schema/spec": "^1.0.0",
       },
@@ -98,7 +98,7 @@
     },
     "packages/test-utils": {
       "name": "@internal/test-utils",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "dependencies": {
         "mcp-lite": "workspace:*",
       },
@@ -324,6 +324,8 @@
 
     "@manypkg/get-packages": ["@manypkg/get-packages@1.1.3", "", { "dependencies": { "@babel/runtime": "^7.5.5", "@changesets/types": "^4.0.1", "@manypkg/find-root": "^1.1.0", "fs-extra": "^8.1.0", "globby": "^11.0.0", "read-yaml-file": "^1.1.0" } }, "sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A=="],
 
+    "@mcp-lite-examples/auth-clerk": ["@mcp-lite-examples/auth-clerk@workspace:examples/auth-clerk"],
+
     "@mcp-lite-examples/validation-arktype": ["@mcp-lite-examples/validation-arktype@workspace:examples/validation-arktype"],
 
     "@mcp-lite-examples/validation-valibot": ["@mcp-lite-examples/validation-valibot@workspace:examples/validation-valibot"],
@@ -405,8 +407,6 @@
     "array-union": ["array-union@2.1.0", "", {}, "sha512-HGyxoOTYUyCM6stUe6EJgnd4EoewAI7zMdfqO+kGjnlZmBDz/cR5pf8r/cR4Wq60sL/p0IkcjUEEPwS3GFrIyw=="],
 
     "atomic-sleep": ["atomic-sleep@1.0.0", "", {}, "sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ=="],
-
-    "auth-clerk": ["auth-clerk@workspace:examples/auth-clerk"],
 
     "before-after-hook": ["before-after-hook@2.2.3", "", {}, "sha512-NzUnlZexiaH/46WDhANlyR2bXRopNg4F/zuSA3OpZnllCUgRaOF2znDioDWrmbNVsuZk6l9pMquQB38cfBZwkQ=="],
 

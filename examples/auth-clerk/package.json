@@ -1,5 +1,5 @@
 {
-  "name": "auth-clerk",
+  "name": "@mcp-lite-examples/auth-clerk",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
