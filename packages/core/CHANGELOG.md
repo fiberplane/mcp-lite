@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.2.1
+
+### Patch Changes
+
+- f7e7f3a: Add list_changed notifications for tools/resources/prompts.
+
 ## 0.2.0
 
 ### Minor Changes
