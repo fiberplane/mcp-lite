@@ -15,6 +15,29 @@ interface JsonRpcResponse {
   };
 }
 
+// Reusable initialize request payload
+const INIT_REQUEST_BODY = {
+  jsonrpc: "2.0",
+  id: "init",
+  method: "initialize",
+  params: {
+    protocolVersion: "2025-06-18",
+    clientInfo: { name: "test-client", version: "1.0.0" },
+  },
+} as const;
+
+// Utility function to create initialize request
+function createInitializationRequest(): Request {
+  return new Request("http://localhost/mcp", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "MCP-Protocol-Version": "2025-06-18",
+    },
+    body: JSON.stringify(INIT_REQUEST_BODY),
+  });
+}
+
 describe("AuthInfo Integration", () => {
   let server: McpServer;
   let transport: StreamableHttpTransport;
@@ -53,22 +76,7 @@ describe("AuthInfo Integration", () => {
       const handler = transport.bind(server);
 
       // Initialize the server first
-      const initRequest = new Request("http://localhost/mcp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "init",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-06-18",
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-        }),
-      });
+      const initRequest = createInitializationRequest();
 
       await handler(initRequest, { authInfo: mockAuthInfo });
 
@@ -120,22 +128,7 @@ describe("AuthInfo Integration", () => {
       const handler = transport.bind(server);
 
       // Initialize without authInfo
-      const initRequest = new Request("http://localhost/mcp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "init",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-06-18",
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-        }),
-      });
+      const initRequest = createInitializationRequest();
 
       await handler(initRequest);
 
@@ -206,22 +199,7 @@ describe("AuthInfo Integration", () => {
       const handler = transport.bind(server);
 
       // Initialize with authInfo
-      const initRequest = new Request("http://localhost/mcp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "init",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-06-18",
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-        }),
-      });
+      const initRequest = createInitializationRequest();
 
       await handler(initRequest, { authInfo: mockAuthInfo });
 
@@ -296,22 +274,7 @@ describe("AuthInfo Integration", () => {
       const handler = transport.bind(server);
 
       // Initialize without authInfo
-      const initRequest = new Request("http://localhost/mcp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "init",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-06-18",
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-        }),
-      });
+      const initRequest = createInitializationRequest();
 
       await handler(initRequest);
 
