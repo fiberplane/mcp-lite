@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { AuthInfo } from "./auth.js";
 import { JSON_RPC_VERSION } from "./constants.js";
 import type { UriMatcher } from "./uri-template.js";
 import {
@@ -94,6 +95,10 @@ export interface MCPServerContext {
   response: JsonRpcRes | null;
   env: Record<string, unknown>;
   state: Record<string, unknown>;
+  /**
+   * Info on the authenticated user, if any
+   */
+  authInfo?: AuthInfo;
   session?: { id: string; protocolVersion: string };
   progressToken?: ProgressToken;
   validate<T>(validator: unknown, input: unknown): T;

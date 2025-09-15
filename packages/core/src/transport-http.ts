@@ -162,7 +162,7 @@ export class StreamableHttpTransport {
 
     switch (request.method) {
       case "POST":
-        return this.handlePost(request);
+        return this.handlePost(request, { authInfo: options?.authInfo });
       case "GET":
         return this.handleGet(request);
       case "DELETE":
@@ -259,6 +259,7 @@ export class StreamableHttpTransport {
           jsonRpcRequest: jsonRpcMessage,
           sessionId,
           isNotification,
+          authInfo: options?.authInfo,
         });
       }
 
@@ -433,8 +434,10 @@ export class StreamableHttpTransport {
     jsonRpcRequest: unknown;
     sessionId: string | null;
     isNotification: boolean;
+    authInfo?: AuthInfo;
   }): Promise<Response> {
-    const { request, jsonRpcRequest, sessionId, isNotification } = args;
+    const { request, jsonRpcRequest, sessionId, isNotification, authInfo } =
+      args;
 
     if (isNotification) {
       return new Response(
@@ -472,6 +475,7 @@ export class StreamableHttpTransport {
     Promise.resolve(
       this.server?._dispatch(jsonRpcRequest as JsonRpcReq, {
         sessionId: sessionId || undefined,
+        authInfo,
       }),
     )
       .then(async (rpcResponse) => {

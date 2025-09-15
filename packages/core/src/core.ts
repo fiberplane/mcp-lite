@@ -730,6 +730,7 @@ export class McpServer {
       sessionId,
       progressToken,
       progressSender,
+      authInfo: contextOptions.authInfo,
     });
 
     const method = (message as JsonRpcMessage).method;
