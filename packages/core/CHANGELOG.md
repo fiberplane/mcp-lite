@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.2.2
+
+### Patch Changes
+
+- 32d88c7: Simplify the stream writer, fix a concurrency bug, fix a publishing workflow.
+
 ## 0.2.1
 
 ### Patch Changes
