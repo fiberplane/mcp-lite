@@ -1,3 +1,4 @@
+import type { AuthInfo } from "./auth.js";
 import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import type {
   JsonRpcId,
@@ -13,6 +14,7 @@ export interface CreateContextOptions {
   sessionId?: string;
   progressToken?: ProgressToken;
   progressSender?: (update: ProgressUpdate) => Promise<void> | void;
+  authInfo?: AuthInfo;
 }
 
 /**
@@ -44,6 +46,7 @@ export function createContext(
 
   const context: MCPServerContext = {
     request: message,
+    authInfo: options.authInfo,
     requestId,
     response: null,
     env: {},

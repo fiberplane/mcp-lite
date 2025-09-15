@@ -16,7 +16,8 @@ app.route("/", authRoutes);
 
 // Add MCP endpoint
 app.all("/mcp", mcpAuthMiddleware, async (c) => {
-  const response = await mcpHttpHandler(c.req.raw);
+  const authInfo = c.get("auth");
+  const response = await mcpHttpHandler(c.req.raw, { authInfo });
   return response;
 });
 
