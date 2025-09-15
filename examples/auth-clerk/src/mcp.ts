@@ -17,9 +17,14 @@ const EchoSchema = v.object({
 mcp.tool("echo", {
   description: "Echoes the input message",
   inputSchema: EchoSchema,
-  handler: (args) => ({
-    content: [{ type: "text", text: args.message }],
-  }),
+  handler: (args, context) => {
+    // Log the authInfo to show it's here
+    console.log("[echo] authInfo", context.authInfo);
+
+    return {
+      content: [{ type: "text", text: args.message }],
+    };
+  },
 });
 
 // Create HTTP transport
