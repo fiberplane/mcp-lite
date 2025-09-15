@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
+import { NOTIFICATIONS, SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import {
   type CreateContextOptions,
   createContext,
@@ -232,7 +232,6 @@ export interface McpServerOptions {
  */
 export class McpServer {
   private methods: Record<string, MethodHandler> = {};
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in handleInitialize
   private initialized = false;
   private serverInfo: { name: string; version: string };
   private middlewares: Middleware[] = [];
@@ -473,6 +472,11 @@ export class McpServer {
       validator,
     };
     this.tools.set(name, entry);
+    if (this.initialized) {
+      this.notificationSender?.(undefined, {
+        method: NOTIFICATIONS.TOOLS_LIST_CHANGED,
+      });
+    }
     return this;
   }
 
@@ -550,7 +554,7 @@ export class McpServer {
     handler?: ResourceHandler,
   ): this {
     if (!this.capabilities.resources) {
-      this.capabilities.resources = {};
+      this.capabilities.resources = { listChanged: true };
     }
 
     const actualHandler = handler || (validatorsOrHandler as ResourceHandler);
@@ -582,6 +586,11 @@ export class McpServer {
     };
 
     this.resources.set(template, entry);
+    if (this.initialized) {
+      this.notificationSender?.(undefined, {
+        method: NOTIFICATIONS.RESOURCES_LIST_CHANGED,
+      });
+    }
     return this;
   }
 
@@ -683,6 +692,12 @@ export class McpServer {
 
     this.prompts.set(name, entry);
 
+    if (this.initialized) {
+      this.notificationSender?.(undefined, {
+        method: NOTIFICATIONS.PROMPTS_LIST_CHANGED,
+      });
+    }
+
     return this;
   }
 
@@ -716,7 +731,7 @@ export class McpServer {
             this.notificationSender?.(
               sessionId,
               {
-                method: "notifications/progress",
+                method: NOTIFICATIONS.PROGRESS,
                 params: {
                   progressToken,
                   ...(update as Record<string, unknown>),

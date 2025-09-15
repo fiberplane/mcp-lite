@@ -1,5 +1,13 @@
-import { beforeEach, describe, expect, it } from "bun:test";
-import { McpServer } from "../../src/core.js";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import {
+  closeSession,
+  collectSseEventsCount,
+  createTestHarness,
+  initializeSession,
+  openSessionStream,
+  type TestServer,
+} from "@internal/test-utils";
+import { McpServer } from "../../src/index.js";
 import { StreamableHttpTransport } from "../../src/transport-http.js";
 
 describe("JSON-RPC Notification Handling", () => {
@@ -146,5 +154,112 @@ describe("JSON-RPC Notification Handling", () => {
     const notificationResponse = await httpHandler(notificationRequest);
     expect(notificationResponse.status).toBe(202);
     expect(notificationResponse.body).toBeNull();
+  });
+});
+
+describe("List changed notifications over SSE", () => {
+  let testServer: TestServer;
+  let mcpServer: McpServer;
+
+  beforeEach(async () => {
+    mcpServer = new McpServer({ name: "test-server", version: "1.0.0" });
+    testServer = await createTestHarness(mcpServer, {
+      // enable sessions
+      sessionId: "sess-listchanged",
+    });
+  });
+
+  afterEach(async () => {
+    await testServer.stop();
+  });
+
+  it("emits notifications/tools/list_changed when a tool is registered after initialize", async () => {
+    const sessionId = await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+
+    const sse = await openSessionStream(testServer.url, sessionId);
+
+    // Register a tool post-initialize; should emit a list_changed notification
+    mcpServer.tool("dynTool", {
+      description: "dynamic tool",
+      handler: () => ({ content: [{ type: "text", text: "ok" }] }),
+    });
+
+    const events = await collectSseEventsCount(sse, 2, 2000);
+    await closeSession(testServer.url, sessionId);
+
+    expect(events).toHaveLength(2);
+    // First event is connection
+    expect(events[0].data).toEqual({
+      type: "connection",
+      status: "established",
+    });
+    // Second is the notification
+    expect(events[1].data).toEqual({
+      jsonrpc: "2.0",
+      method: "notifications/tools/list_changed",
+      params: undefined,
+    });
+  });
+
+  it("emits notifications/prompts/list_changed when a prompt is registered after initialize", async () => {
+    const sessionId = await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+
+    const sse = await openSessionStream(testServer.url, sessionId);
+
+    // Register a prompt post-initialize
+    mcpServer.prompt("dynPrompt", {
+      description: "dynamic prompt",
+      handler: () => ({ messages: [] }),
+    });
+
+    const events = await collectSseEventsCount(sse, 2, 2000);
+    await closeSession(testServer.url, sessionId);
+
+    expect(events).toHaveLength(2);
+    expect(events[0].data).toEqual({
+      type: "connection",
+      status: "established",
+    });
+    expect(events[1].data).toEqual({
+      jsonrpc: "2.0",
+      method: "notifications/prompts/list_changed",
+      params: undefined,
+    });
+  });
+
+  it("emits notifications/resources/list_changed when a resource is registered after initialize", async () => {
+    const sessionId = await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+
+    const sse = await openSessionStream(testServer.url, sessionId);
+
+    // Register a resource post-initialize
+    mcpServer.resource(
+      "mem://foo",
+      { description: "dynamic resource" },
+      async () => ({ contents: [{ uri: "mem://foo", text: "bar", type: "text" }] }),
+    );
+
+    const events = await collectSseEventsCount(sse, 2, 2000);
+    await closeSession(testServer.url, sessionId);
+
+    expect(events).toHaveLength(2);
+    expect(events[0].data).toEqual({
+      type: "connection",
+      status: "established",
+    });
+    expect(events[1].data).toEqual({
+      jsonrpc: "2.0",
+      method: "notifications/resources/list_changed",
+      params: undefined,
+    });
   });
 });

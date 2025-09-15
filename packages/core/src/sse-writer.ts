@@ -1,69 +1,54 @@
 import type { EventId } from "./store.js";
 
 export interface StreamWriter {
-  write(message: unknown, eventId?: EventId): Promise<void> | void;
+  write(message: unknown, eventId?: EventId): void;
   end(): void;
 }
 
-export class SSEStreamWriter implements StreamWriter {
-  private controller: ReadableStreamDefaultController<Uint8Array>;
-  private encoder = new TextEncoder();
-  private closed = false;
-
-  constructor(controller: ReadableStreamDefaultController<Uint8Array>) {
-    this.controller = controller;
-  }
-
-  write(message: unknown, eventId?: EventId): void {
-    if (this.closed) {
-      return;
-    }
-
-    try {
-      const data = JSON.stringify(message);
-      let sseEvent = "";
-      if (eventId) {
-        sseEvent += `id: ${eventId}\n`;
-      }
-      sseEvent += `data: ${data}\n\n`;
-      const encoded = this.encoder.encode(sseEvent);
-      this.controller.enqueue(encoded);
-    } catch (error) {
-      console.error("Error writing SSE event:", error);
-      this.end();
-    }
-  }
-
-  end(): void {
-    if (!this.closed) {
-      this.closed = true;
-      try {
-        this.controller.close();
-      } catch (_error) {
-        // Controller might already be closed
-      }
-    }
-  }
-}
-
-export function createSSEStream(): {
+export function createSSEStream(options?: {
+  onClose?: () => void;
+}): {
   stream: ReadableStream<Uint8Array>;
   writer: StreamWriter;
 } {
-  let writer: SSEStreamWriter | undefined;
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array>;
+  let closed = false;
+
+  const end = (): void => {
+    if (closed) return;
+    closed = true;
+    try {
+      controller.close();
+    } catch (_error) {}
+    try {
+      options?.onClose?.();
+    } catch (_e) {}
+  };
 
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      writer = new SSEStreamWriter(controller);
+    start(c) {
+      controller = c;
     },
     cancel() {
-      writer?.end();
+      end();
     },
   });
 
-  if (!writer) {
-    throw new Error("Failed to initialize SSE writer");
-  }
+  const writer: StreamWriter = {
+    write(message: unknown, eventId?: EventId): void {
+      if (closed) return;
+      try {
+        let sse = "";
+        if (eventId) sse += `id: ${eventId}\n`;
+        sse += `data: ${JSON.stringify(message)}\n\n`;
+        controller.enqueue(encoder.encode(sse));
+      } catch (_error) {
+        end();
+      }
+    },
+    end,
+  };
 
   return { stream, writer };
 }
