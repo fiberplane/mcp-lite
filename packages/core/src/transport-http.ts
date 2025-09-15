@@ -1,3 +1,4 @@
+import type { AuthInfo } from "./auth.js";
 import {
   JSON_RPC_VERSION,
   MCP_LAST_EVENT_ID_HEADER,
@@ -66,7 +67,12 @@ export class StreamableHttpTransport {
     this.allowedHosts = options.allowedHosts;
   }
 
-  bind(server: McpServer): (request: Request) => Promise<Response> {
+  bind(
+    server: McpServer,
+  ): (
+    request: Request,
+    options?: { authInfo?: AuthInfo },
+  ) => Promise<Response> {
     this.server = server;
 
     server._setNotificationSender(async (sessionId, notification, options) => {
@@ -132,7 +138,10 @@ export class StreamableHttpTransport {
     return this.handleRequest.bind(this);
   }
 
-  private async handleRequest(request: Request): Promise<Response> {
+  private async handleRequest(
+    request: Request,
+    options?: { authInfo?: AuthInfo },
+  ): Promise<Response> {
     if (!this.server) {
       throw new Error("Transport not bound to a server");
     }
@@ -153,7 +162,7 @@ export class StreamableHttpTransport {
 
     switch (request.method) {
       case "POST":
-        return this.handlePost(request);
+        return this.handlePost(request, { authInfo: options?.authInfo });
       case "GET":
         return this.handleGet(request);
       case "DELETE":
@@ -176,7 +185,10 @@ export class StreamableHttpTransport {
     }
   }
 
-  private async handlePost(request: Request): Promise<Response> {
+  private async handlePost(
+    request: Request,
+    options?: { authInfo?: AuthInfo },
+  ): Promise<Response> {
     try {
       const body = await request.text();
       const jsonRpcMessage = parseJsonRpc(body);
@@ -247,11 +259,13 @@ export class StreamableHttpTransport {
           jsonRpcRequest: jsonRpcMessage,
           sessionId,
           isNotification,
+          authInfo: options?.authInfo,
         });
       }
 
       const response = await this.server?._dispatch(jsonRpcMessage, {
         sessionId: sessionId || undefined,
+        authInfo: options?.authInfo,
       });
 
       if (isInitializeRequest && response) {
@@ -420,8 +434,10 @@ export class StreamableHttpTransport {
     jsonRpcRequest: unknown;
     sessionId: string | null;
     isNotification: boolean;
+    authInfo?: AuthInfo;
   }): Promise<Response> {
-    const { request, jsonRpcRequest, sessionId, isNotification } = args;
+    const { request, jsonRpcRequest, sessionId, isNotification, authInfo } =
+      args;
 
     if (isNotification) {
       return new Response(
@@ -459,6 +475,7 @@ export class StreamableHttpTransport {
     Promise.resolve(
       this.server?._dispatch(jsonRpcRequest as JsonRpcReq, {
         sessionId: sessionId || undefined,
+        authInfo,
       }),
     )
       .then(async (rpcResponse) => {
