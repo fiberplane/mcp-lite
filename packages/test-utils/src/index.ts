@@ -134,7 +134,6 @@ export async function waitForReady(
 
 // Export test harness utilities
 export {
-  createEchoTestServer,
   createTestHarness,
   type TestHarnessOptions,
 } from "./harness.js";

@@ -3,6 +3,7 @@ import {
   MCP_LAST_EVENT_ID_HEADER,
   MCP_PROTOCOL_HEADER,
   MCP_SESSION_ID_HEADER,
+  NOTIFICATIONS,
   SSE_ACCEPT_HEADER,
   SUPPORTED_MCP_PROTOCOL_VERSION,
 } from "./constants.js";
@@ -139,8 +140,27 @@ export class StreamableHttpTransport {
           }
           return;
         }
+        const allowedCrossSessionNotifications = [
+          NOTIFICATIONS.TOOLS_LIST_CHANGED,
+          NOTIFICATIONS.PROMPTS_LIST_CHANGED,
+          NOTIFICATIONS.RESOURCES_LIST_CHANGED,
+        ];
 
-        // No session: discard to avoid cross-session leakage
+        // No session: allow safe broadcast for list_changed notifications to all session streams
+        const method = notification.method;
+        if (
+          allowedCrossSessionNotifications.includes(
+            method as (typeof allowedCrossSessionNotifications)[number],
+          )
+        ) {
+          for (const [key, w] of this.writers) {
+            if (key.startsWith("session:")) {
+              w.write(jsonRpcNotification);
+            }
+          }
+          return;
+        }
+        // Otherwise discard to avoid cross-session leakage
         return;
       } else {
         // Stateless mode: only deliver when relatedRequestId is present
