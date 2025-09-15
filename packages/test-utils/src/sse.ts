@@ -12,10 +12,23 @@ export interface SseEvent {
  */
 export async function* readSse(
   stream: ReadableStream<Uint8Array>,
+  signal?: { aborted: boolean; addEventListener: (type: "abort", listener: () => void) => void; removeEventListener: (type: "abort", listener: () => void) => void },
 ): AsyncGenerator<SseEvent> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buf = "";
+  const onAbort = () => {
+    try {
+      reader.cancel();
+    } catch {}
+  };
+  if (signal) {
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener("abort", onAbort);
+    }
+  }
   try {
     while (true) {
       const { value, done } = await reader.read();
@@ -40,6 +53,9 @@ export async function* readSse(
       }
     }
   } finally {
+    if (signal) {
+      signal.removeEventListener("abort", onAbort);
+    }
     reader.releaseLock();
   }
 }
@@ -52,15 +68,15 @@ export async function collectSseEvents(
   timeoutMs: number = 5000,
 ): Promise<SseEvent[]> {
   const events: SseEvent[] = [];
-  const controller = new AbortController();
+  const controller: any = new (globalThis as any).AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    for await (const event of readSse(stream)) {
+    for await (const event of readSse(stream, controller.signal)) {
       events.push(event);
     }
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (controller.signal && controller.signal.aborted) {
       // Timeout occurred - return events collected so far
       return events;
     }
@@ -80,18 +96,18 @@ export async function collectSseEventsCount(
   timeoutMs: number = 5000,
 ): Promise<SseEvent[]> {
   const events: SseEvent[] = [];
-  const controller = new AbortController();
+  const controller: any = new (globalThis as any).AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    for await (const event of readSse(stream)) {
+    for await (const event of readSse(stream, controller.signal)) {
       events.push(event);
       if (events.length >= count) {
         break;
       }
     }
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (controller.signal && controller.signal.aborted) {
       // Timeout occurred - return events collected so far
       return events;
     }

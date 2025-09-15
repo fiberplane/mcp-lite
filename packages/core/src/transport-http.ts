@@ -80,45 +80,67 @@ export class StreamableHttpTransport {
         const relatedRequestId = options?.relatedRequestId;
         // Prefer routing to request streams when a related request is specified
         if (relatedRequestId !== undefined) {
+          // 1) Try session-scoped request stream
           if (sessionId) {
             const requestKey = keyForRequest(sessionId, relatedRequestId);
             const writer = this.writers.get(requestKey);
             if (writer) {
+              // Per-request streams are ephemeral; do not persist
               writer.write(jsonRpcNotification);
               return;
             }
           }
-          // Also support request-only streams (created without session header)
+          // 2) Try request-only stream (stateless per-request)
           const requestOnlyKey = `request:${String(relatedRequestId)}`;
           const requestOnlyWriter = this.writers.get(requestOnlyKey);
           if (requestOnlyWriter) {
+            // Ephemeral; do not persist
             requestOnlyWriter.write(jsonRpcNotification);
+            return;
+          }
+          // 3) No per-request stream present. If we have a session, persist for replay
+          if (sessionId && this.eventStore) {
+            const eventId = await this.eventStore.append(
+              sessionId,
+              jsonRpcNotification,
+            );
+            const sessionKey = keyForSession(sessionId);
+            const sessionWriter = this.writers.get(sessionKey);
+            if (sessionWriter) {
+              sessionWriter.write(jsonRpcNotification, eventId);
+            }
+            return;
+          }
+          // If no session or no store, attempt best-effort delivery to session stream if present
+          if (sessionId) {
+            const sessionKey = keyForSession(sessionId);
+            const sessionWriter = this.writers.get(sessionKey);
+            if (sessionWriter) {
+              sessionWriter.write(jsonRpcNotification);
+            }
             return;
           }
         }
 
-        // Fallback to session stream when available
+        // No relatedRequestId: deliver to session stream and persist if possible
         if (sessionId) {
           const sessionKey = keyForSession(sessionId);
-          const writer = this.writers.get(sessionKey);
-          if (writer) {
-            if (this.eventStore) {
-              const eventId = await this.eventStore.append(
-                sessionId,
-                jsonRpcNotification,
-              );
-              writer.write(jsonRpcNotification, eventId);
-            } else {
-              writer.write(jsonRpcNotification);
+          const sessionWriter = this.writers.get(sessionKey);
+          if (this.eventStore) {
+            const eventId = await this.eventStore.append(
+              sessionId,
+              jsonRpcNotification,
+            );
+            if (sessionWriter) {
+              sessionWriter.write(jsonRpcNotification, eventId);
             }
+          } else if (sessionWriter) {
+            sessionWriter.write(jsonRpcNotification);
           }
           return;
         }
 
-        // Broadcast to all active session streams when no sessionId is provided
-        for (const [_, writer] of this.writers) {
-          writer.write(jsonRpcNotification);
-        }
+        // No session: discard to avoid cross-session leakage
         return;
       } else {
         // Stateless mode: only deliver when relatedRequestId is present
@@ -380,15 +402,13 @@ export class StreamableHttpTransport {
         );
       } catch (_error) {
         writer.end();
-        this.writers.delete(sessionKey);
         return new Response("Internal Server Error: Replay failed", {
           status: 500,
         });
       }
     }
 
-    // Send initial comment to establish SSE connection
-    // For replay streams, only send if no events were replayed
+    // Emit a JSON connection event only when not replaying existing events
     if (!hadReplay) {
       writer.write({ type: "connection", status: "established" });
     }
@@ -407,32 +427,13 @@ export class StreamableHttpTransport {
     responseStream: ReadableStream;
     writer: StreamWriter;
   } {
-    const { stream, writer } = createSSEStream();
-    this.writers.set(streamKey, writer);
-
-    const [responseStream, monitorStream] = stream.tee();
-    monitorStream
-      .pipeTo(
-        new WritableStream({
-          write() {
-            // Consume and discard chunks to prevent backpressure
-          },
-          close: () => {
-            this.writers.delete(streamKey);
-            writer.end();
-          },
-          abort: () => {
-            this.writers.delete(streamKey);
-            writer.end();
-          },
-        }),
-      )
-      .catch(() => {
+    const { stream, writer } = createSSEStream({
+      onClose: () => {
         this.writers.delete(streamKey);
-        writer.end();
-      });
-
-    return { responseStream, writer };
+      },
+    });
+    this.writers.set(streamKey, writer);
+    return { responseStream: stream as ReadableStream, writer };
   }
 
   private async handlePostSse(args: {
@@ -496,7 +497,6 @@ export class StreamableHttpTransport {
       })
       .finally(() => {
         writer.end();
-        this.writers.delete(streamKey);
       });
 
     const headers: Record<string, string> = {

@@ -312,13 +312,17 @@ describe("Per-request SSE", () => {
       throw new Error("No session stream body");
     }
 
-    // Read from session stream with a short timeout (should be empty)
+    // Read from session stream with a short timeout (should be empty of replayed data events)
     const sessionEvents = await collectSseEvents(response.body, 1000);
+    // Ignore optional connection event
+    const dataEvents = sessionEvents.filter(
+      (e) => !(e.data && (e as any).data.type === "connection"),
+    );
 
     // Close session after reading
     await closeSession(testServer.url, sessionId);
 
     // Should be empty - request stream events are ephemeral
-    expect(sessionEvents).toHaveLength(0);
+    expect(dataEvents).toHaveLength(0);
   });
 });
