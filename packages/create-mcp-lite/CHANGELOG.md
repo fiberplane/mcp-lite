@@ -1,5 +1,11 @@
 # create-mcp-lite
 
+## 0.0.4
+
+### Patch Changes
+
+- 7bf9ae7: Added AGENTS.md to vscode projects
+
 ## 0.0.3
 
 ### Patch Changes
