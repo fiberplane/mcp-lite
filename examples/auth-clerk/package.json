@@ -1,7 +1,7 @@
 {
   "name": "@mcp-lite-examples/auth-clerk",
   "type": "module",
-	"private": true,
+  "private": true,
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
