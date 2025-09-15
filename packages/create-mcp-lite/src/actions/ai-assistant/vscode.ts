@@ -66,7 +66,7 @@ export async function actionVSCode(context: Context) {
 
     s.stop(`${pico.green("✓")} VSCode configuration created`);
 
-    const createdFiles = [".github/copilot-instructions.md"];
+    const createdFiles = [".github/copilot-instructions.md", "AGENTS.md"];
     if (context.fpMcpServerEnabled) {
       createdFiles.push(".vscode/mcp.json");
     }
