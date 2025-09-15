@@ -26,6 +26,8 @@ export const mcpAuthMiddleware = createMiddleware<
     const resourceMetadataUrl = getPRMUrl(c.req.raw);
     c.header(
       "WWW-Authenticate",
+      // NOTE - The mcp sdk adds `error` and `error_description` to this header as well, depending on the error
+      //        see: https://github.com/modelcontextprotocol/typescript-sdk/blob/b28c297184cb0cb64611a3357d6438dd1b0824c6/src/server/auth/middleware/bearerAuth.ts#L76C1-L95C8
       `Bearer resource_metadata="${resourceMetadataUrl}"`,
     );
     return c.json({ error: "Unauthorized" }, 401);
