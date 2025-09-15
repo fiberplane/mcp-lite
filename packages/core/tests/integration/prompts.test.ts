@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import type { StandardSchemaV1 } from "@standard-schema/spec";
+// import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { SchemaAdapter } from "../../src/types.js";
+import { type Type, type } from "arktype";
 
 // Type for JSON-RPC response
 interface JsonRpcResponse {
@@ -15,47 +15,15 @@ interface JsonRpcResponse {
   };
 }
 
-// Mock Standard Schema validator for testing
-const mockStandardSchema: StandardSchemaV1 & { _mockJsonSchema: unknown } = {
-  "~standard": {
-    version: 1 as const,
-    vendor: "test",
-    validate: (value: unknown) => {
-      const input = value as { message?: string };
-      if (!input || typeof input.message !== "string") {
-        return {
-          issues: [
-            { message: "message field is required and must be a string" },
-          ],
-        };
-      }
-      return { value: input };
-    },
-  },
-  _mockJsonSchema: {
-    type: "object",
-    properties: {
-      message: { type: "string" },
-    },
-    required: ["message"],
-  },
-};
-
-// Mock SchemaAdapter for tests
-const mockSchemaAdapter: SchemaAdapter = (schema: StandardSchemaV1) => {
-  return (
-    (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
-      type: "object",
-    }
-  );
-};
+// Real Standard Schema validator using ArkType
+const messageValidator = type({ message: "string" });
 
 // Create a test handler function with prompts
 function createTestHandler() {
   const mcp = new McpServer({
     name: "test-server",
     version: "1.0.0",
-    schemaAdapter: mockSchemaAdapter,
+    schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
   });
 
   // Add a simple prompt without arguments
@@ -124,7 +92,7 @@ function createTestHandler() {
   // Add a prompt with Standard Schema validation to test runtime validation
   mcp.prompt("validated", {
     description: "Prompt with runtime validation",
-    inputSchema: mockStandardSchema,
+    inputSchema: messageValidator,
     handler: (args: { message: string }) => ({
       messages: [
         {

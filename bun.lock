@@ -6,6 +6,7 @@
       "devDependencies": {
         "@biomejs/biome": "^2.2.4",
         "@changesets/cli": "^2.29.7",
+        "arktype": "^2.1.22",
         "pkg-pr-new": "^0.0.59",
         "typescript": "^5.9.2",
       },
@@ -66,7 +67,7 @@
     },
     "packages/core": {
       "name": "mcp-lite",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@standard-schema/spec": "^1.0.0",
       },
@@ -77,7 +78,7 @@
     },
     "packages/create-mcp-lite": {
       "name": "create-mcp-lite",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "bin": {
         "create-mcp-lite": "dist/index.js",
       },
