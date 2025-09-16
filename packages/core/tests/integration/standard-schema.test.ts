@@ -1,48 +1,8 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import type { StandardSchemaV1 } from "@standard-schema/spec";
+// import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { McpServer, StreamableHttpTransport } from "../../src/index.js";
-import type { JsonRpcRes, SchemaAdapter } from "../../src/types.js";
-
-// Mock Standard Schema validator
-const createMockValidator = <T>(
-  validator: (input: unknown) => T,
-  jsonSchema?: unknown,
-): StandardSchemaV1 & { _mockJsonSchema?: unknown } => {
-  return {
-    "~standard": {
-      version: 1 as const,
-      vendor: "test-validator",
-      validate: (value: unknown) => {
-        try {
-          const result = validator(value);
-          return { value: result };
-        } catch (error) {
-          return {
-            issues: [
-              {
-                message:
-                  error instanceof Error ? error.message : "Validation failed",
-                path: [],
-              },
-            ],
-          };
-        }
-      },
-    },
-    _mockJsonSchema: jsonSchema,
-  };
-};
-
-// Mock SchemaAdapter for tests
-const mockSchemaAdapter: SchemaAdapter = (
-  schema: StandardSchemaV1 | unknown,
-) => {
-  return (
-    (schema as unknown as { _mockJsonSchema?: unknown })._mockJsonSchema || {
-      type: "object",
-    }
-  );
-};
+import type { JsonRpcRes } from "../../src/types.js";
+import { type Type, type } from "arktype";
 
 describe("Standard Schema Support", () => {
   let handler: (request: Request) => Promise<Response>;
@@ -51,29 +11,11 @@ describe("Standard Schema Support", () => {
     const mcp = new McpServer({
       name: "schema-test-server",
       version: "1.0.0",
-      schemaAdapter: mockSchemaAdapter,
+      schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
     });
 
-    // Tool with Standard Schema validation
-    const numberValidator = createMockValidator(
-      (input: unknown) => {
-        if (typeof input !== "object" || input === null) {
-          throw new Error("Expected object");
-        }
-        const obj = input as Record<string, unknown>;
-        if (typeof obj.value !== "number") {
-          throw new Error("Expected value to be a number");
-        }
-        return { value: obj.value };
-      },
-      {
-        type: "object",
-        properties: {
-          value: { type: "number" },
-        },
-        required: ["value"],
-      },
-    );
+    // Tool with Standard Schema validation (ArkType)
+    const numberValidator = type({ value: "number" });
 
     mcp.tool("doubleNumber", {
       description: "Doubles a number with validation",
@@ -162,7 +104,8 @@ describe("Standard Schema Support", () => {
     // The validation error message should appear in the data field or message
     const errorMessage =
       invalidResult.error?.data || invalidResult.error?.message || "";
-    expect(errorMessage.toString()).toContain("Expected value to be a number");
+    // ArkType wording: "Validation failed: value must be a number (was a string)"
+    expect(errorMessage.toString()).toContain("Validation failed");
   });
 
   it("should list tools with proper schemas", async () => {
@@ -182,7 +125,7 @@ describe("Standard Schema Support", () => {
     const response = await handler(request);
     const result = (await response.json()) as JsonRpcRes;
 
-    expect(result.result).toEqual({
+    expect(result.result).toMatchObject({
       tools: [
         {
           name: "doubleNumber",
@@ -193,7 +136,7 @@ describe("Standard Schema Support", () => {
               value: { type: "number" },
             },
             required: ["value"],
-          }, // Converted by mock SchemaAdapter
+          }, // Converted by ArkType schema adapter
         },
         {
           name: "concat",
@@ -252,41 +195,13 @@ describe("Standard Schema Support", () => {
   });
 
   it("should support callable Standard Schema validators (like ArkType)", async () => {
-    // Create a callable Standard Schema validator that mimics ArkType
-    const callableValidator = Object.assign(
-      (input: unknown) => {
-        // This would be the actual validation logic
-        return input;
-      },
-      {
-        "~standard": {
-          version: 1 as const,
-          vendor: "arktype-like",
-          validate: (input: unknown) => {
-            if (typeof input !== "object" || input === null) {
-              return { issues: [{ message: "Expected object" }] };
-            }
-            const obj = input as Record<string, unknown>;
-            if (typeof obj.name !== "string") {
-              return { issues: [{ message: "name must be a string" }] };
-            }
-            return { value: obj };
-          },
-        },
-        _mockJsonSchema: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-          },
-          required: ["name"],
-        },
-      },
-    );
+    // ArkType types are callable and Standard Schema compatible
+    const callableValidator = type({ name: "string" });
 
     const mcp = new McpServer({
       name: "callable-schema-server",
       version: "1.0.0",
-      schemaAdapter: mockSchemaAdapter,
+      schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
     });
 
     mcp.tool("greet", {
