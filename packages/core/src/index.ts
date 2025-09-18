@@ -25,6 +25,7 @@ export type {
   JsonRpcReq,
   JsonRpcRes,
   JsonSchema,
+  MCPClient,
   MCPServerContext as Ctx,
   Middleware,
   ProgressToken,

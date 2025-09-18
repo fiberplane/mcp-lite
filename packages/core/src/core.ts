@@ -8,6 +8,8 @@ import {
 import { RpcError } from "./errors.js";
 import type {
   InferOutput,
+  ElicitationResult,
+  InferInput,
   InitializeResult,
   JsonRpcMessage,
   JsonRpcNotification,
@@ -37,6 +39,7 @@ import type {
   Tool,
   ToolCallResult,
   ToolEntry,
+  JsonRpcId,
 } from "./types.js";
 import {
   createJsonRpcError,
@@ -247,6 +250,12 @@ export class McpServer {
     notification: { method: string; params?: unknown },
     options?: { relatedRequestId?: string },
   ) => Promise<void> | void;
+
+  private clientRequestSender?: (
+    sessionId: string | undefined,
+    request: JsonRpcReq,
+    options?: { relatedRequestId?: string | number; timeout_ms?: number },
+  ) => Promise<JsonRpcRes>;
 
   /**
    * Create a new MCP server instance.
