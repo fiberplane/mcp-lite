@@ -40,6 +40,7 @@ export async function createTestHarness(
   } else if (sessionAdapter !== undefined) {
     // Session-based with random IDs
     transportOptions.sessionAdapter = sessionAdapter;
+    transportOptions.generateSessionId = () => crypto.randomUUID();
   }
 
   // If neither sessionId nor sessionAdapter are provided, create stateless transport
