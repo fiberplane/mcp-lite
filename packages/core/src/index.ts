@@ -8,21 +8,14 @@ export { McpServer, type McpServerOptions } from "./core.js";
 export { RpcError } from "./errors.js";
 export {
   type EventId,
-  InMemorySessionAdapter,
-  type SessionAdapter,
   type SessionId,
   type SessionMeta,
-} from "./session-store.js";
-export {
-  createSSEStream,
-  type StreamWriter,
-} from "./sse-writer.js";
+} from "./store.js";
 export {
   StreamableHttpTransport,
   type StreamableHttpTransportOptions,
 } from "./transport-http/transport-http.js";
 export type {
-  Content as ToolCallContent,
   InitializeParams,
   InitializeResult,
   JsonRpcError,
