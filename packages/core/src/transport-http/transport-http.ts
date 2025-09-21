@@ -21,6 +21,10 @@ import {
   JSON_RPC_ERROR_CODES,
   type JsonRpcReq,
 } from "../types.js";
+import {
+  respondToInvalidJsonRpc,
+  respondToProtocolMismatch,
+} from "./http-responses.js";
 
 function parseJsonRpc(body: string): unknown {
   try {
@@ -227,6 +231,7 @@ export class StreamableHttpTransport {
       // Check if it's a JSON-RPC response first
       if (isJsonRpcResponse(jsonRpcMessage)) {
         // Accept responses but don't process them, just return 202
+        // TODO: If the server is configured to use sessions, we should return a 400 if there is no session id for the http request associated with this message
         return new Response(null, { status: 202 });
       }
 
@@ -234,19 +239,7 @@ export class StreamableHttpTransport {
         !isJsonRpcNotification(jsonRpcMessage) &&
         !isJsonRpcRequest(jsonRpcMessage)
       ) {
-        const errorResponse = createJsonRpcError(
-          null,
-          new RpcError(
-            JSON_RPC_ERROR_CODES.INVALID_REQUEST,
-            "Invalid JSON-RPC 2.0 message format",
-          ).toJson(),
-        );
-        return new Response(JSON.stringify(errorResponse), {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+        return respondToInvalidJsonRpc();
       }
 
       const isNotification = isJsonRpcNotification(jsonRpcMessage);
@@ -262,23 +255,7 @@ export class StreamableHttpTransport {
         const responseId = isNotification
           ? null
           : (jsonRpcMessage as JsonRpcReq).id;
-        const errorResponse = createJsonRpcError(
-          responseId,
-          new RpcError(
-            JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-            "Protocol version mismatch",
-            {
-              expectedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
-              receivedVersion: protocolHeader,
-            },
-          ).toJson(),
-        );
-        return new Response(JSON.stringify(errorResponse), {
-          status: 400,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+        return respondToProtocolMismatch(responseId, protocolHeader);
       }
 
       const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
