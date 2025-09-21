@@ -8,7 +8,7 @@ import {
   type TestServer,
 } from "@internal/test-utils";
 import { McpServer } from "../../src/index.js";
-import { StreamableHttpTransport } from "../../src/transport-http.js";
+import { StreamableHttpTransport } from "../../src/transport-http/index.js";
 
 describe("JSON-RPC Notification Handling", () => {
   let server: McpServer;

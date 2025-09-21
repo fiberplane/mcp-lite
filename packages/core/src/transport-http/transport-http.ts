@@ -1,4 +1,4 @@
-import type { AuthInfo } from "./auth.js";
+import type { AuthInfo } from "../auth.js";
 import {
   JSON_RPC_VERSION,
   MCP_LAST_EVENT_ID_HEADER,
@@ -7,11 +7,11 @@ import {
   SSE_ACCEPT_HEADER,
   SSE_STREAM_ID,
   SUPPORTED_MCP_PROTOCOL_VERSION,
-} from "./constants.js";
-import type { McpServer } from "./core.js";
-import { RpcError } from "./errors.js";
-import type { SessionAdapter, SessionMeta } from "./session-store.js";
-import { createSSEStream, type StreamWriter } from "./sse-writer.js";
+} from "../constants.js";
+import type { McpServer } from "../core.js";
+import { RpcError } from "../errors.js";
+import type { SessionAdapter, SessionMeta } from "../session-store.js";
+import { createSSEStream, type StreamWriter } from "../sse-writer.js";
 import {
   createJsonRpcError,
   isGlobalNotification,
@@ -20,7 +20,7 @@ import {
   isJsonRpcResponse,
   JSON_RPC_ERROR_CODES,
   type JsonRpcReq,
-} from "./types.js";
+} from "../types.js";
 
 function parseJsonRpc(body: string): unknown {
   try {

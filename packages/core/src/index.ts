@@ -20,7 +20,7 @@ export {
 export {
   StreamableHttpTransport,
   type StreamableHttpTransportOptions,
-} from "./transport-http.js";
+} from "./transport-http/transport-http.js";
 export type {
   Content as ToolCallContent,
   InitializeParams,
