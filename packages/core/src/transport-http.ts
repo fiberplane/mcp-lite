@@ -141,10 +141,7 @@ export class StreamableHttpTransport {
           }
         }
       } else {
-        // Stateless mode: only deliver to request streams
-        // FIXME - This is not correct, we should not have a session id in stateless mode
-        //         We need to deliver to the SSE stream for the originating request
-        //         Simultaneously, if our server handles multiple requests, this notification sender should not ovewrite previous ones on the same server instance
+        // Stateless mode: deliver to request streams using synthetic session ID
         if (options?.relatedRequestId && sessionId) {
           const requestWriter = this.getRequestWriter(
             sessionId,
@@ -152,6 +149,18 @@ export class StreamableHttpTransport {
           );
           if (requestWriter) {
             requestWriter.write(jsonRpcNotification);
+          }
+        }
+
+        // Handle global notifications in stateless mode (broadcast to all request streams)
+        const shouldBroadcastToAllRequests =
+          !sessionId || isGlobalNotification(notification.method);
+        if (shouldBroadcastToAllRequests) {
+          for (const [requestKey, writer] of this.requestStreams) {
+            // Don't double-send to the originating request
+            if (!sessionId || !requestKey.startsWith(`${sessionId}:`)) {
+              writer.write(jsonRpcNotification);
+            }
           }
         }
       }
@@ -383,23 +392,22 @@ export class StreamableHttpTransport {
       );
     }
 
+    // Generate synthetic session ID for stateless mode to enable notification routing
+    const effectiveSessionId = sessionId || crypto.randomUUID();
+
     const { stream, writer } = createSSEStream({
       onClose: () => {
-        if (sessionId) {
-          this.requestStreams.delete(`${sessionId}:${requestId}`);
-        }
+        this.requestStreams.delete(`${effectiveSessionId}:${requestId}`);
       },
     });
 
-    // Register this request stream
-    if (sessionId) {
-      this.requestStreams.set(`${sessionId}:${requestId}`, writer);
-    }
+    // Register this request stream using effective session ID
+    this.requestStreams.set(`${effectiveSessionId}:${requestId}`, writer);
 
     // Dispatch; route progress/responses to this writer (ephemeral; do not persist)
     Promise.resolve(
       this.server?._dispatch(jsonRpcRequest as JsonRpcReq, {
-        sessionId: sessionId || undefined,
+        sessionId: effectiveSessionId,
         authInfo,
       }),
     )
@@ -426,6 +434,8 @@ export class StreamableHttpTransport {
       })
       .finally(() => {
         writer.end();
+        // Ensure cleanup in case onClose wasn't triggered
+        this.requestStreams.delete(`${effectiveSessionId}:${requestId}`);
       });
 
     const headers: Record<string, string> = {
