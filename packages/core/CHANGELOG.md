@@ -2,6 +2,9 @@
 
 ## 0.2.3
 
+thank you @jacksteamdev for the quality of life bump!
+
+
 ### Patch Changes
 
 - ebb14bc: Use InferOutput type instead of InferInput in tool handler
