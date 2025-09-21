@@ -442,3 +442,105 @@ describe("Session SSE Happy Path", () => {
     });
   });
 });
+
+describe("Session ID Validation", () => {
+  let testServer: TestServer;
+  let mcpServer: McpServer;
+  let sessionAdapter: InMemorySessionAdapter;
+
+  beforeEach(async () => {
+    sessionAdapter = new InMemorySessionAdapter({ maxEventBufferSize: 1024 });
+    mcpServer = new McpServer({ name: "test-server", version: "1.0.0" });
+
+    testServer = await createTestHarness(mcpServer, {
+      sessionAdapter,
+    });
+  });
+
+  afterEach(async () => {
+    await testServer.stop();
+  });
+
+  it("should return 400 Bad Request for POST requests missing session ID", async () => {
+    // First initialize to create a session
+    const sessionId = await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+    expect(sessionId).toBeTruthy();
+
+    // Now try to make a request without the session ID header
+    const response = await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        // Intentionally omitting MCP-Session-Id header
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ping",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const errorMessage = await response.text();
+    expect(errorMessage).toBe("Bad Request: Missing required session ID");
+  });
+
+  it("should return 400 Bad Request for notification without session ID", async () => {
+    // First initialize to create a session
+    await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+
+    // Try to send a notification without session ID
+    const response = await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        // Intentionally omitting MCP-Session-Id header
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const errorMessage = await response.text();
+    expect(errorMessage).toBe("Bad Request: Missing required session ID");
+  });
+
+  it("should allow initialize requests without session ID", async () => {
+    // Initialize requests should work without session ID
+    const response = await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        // No session ID header - this should be fine for initialize
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.result).toBeTruthy();
+    expect(response.headers.get("MCP-Session-Id")).toBeTruthy();
+  });
+});

@@ -23,6 +23,7 @@ import {
 } from "../types.js";
 import {
   respondToInvalidJsonRpc,
+  respondToMissingSessionId,
   respondToProtocolMismatch,
 } from "./http-responses.js";
 
@@ -225,13 +226,16 @@ export class StreamableHttpTransport {
     options?: { authInfo?: AuthInfo },
   ): Promise<Response> {
     try {
+      const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
       const body = await request.text();
       const jsonRpcMessage = parseJsonRpc(body);
 
       // Check if it's a JSON-RPC response first
       if (isJsonRpcResponse(jsonRpcMessage)) {
+        if (this.sessionAdapter && !sessionId) {
+          return respondToMissingSessionId();
+        }
         // Accept responses but don't process them, just return 202
-        // TODO: If the server is configured to use sessions, we should return a 400 if there is no session id for the http request associated with this message
         return new Response(null, { status: 202 });
       }
 
@@ -247,6 +251,10 @@ export class StreamableHttpTransport {
       const acceptHeader = request.headers.get("Accept");
       const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
 
+      // Return a protocol mismatch error if all the below are true:
+      // 1. it's not an initialize request
+      // 2. the protocol header is present
+      // 3. the protocol header is not the supported version
       const shouldReturnProtocolMismatchError =
         !isInitializeRequest &&
         protocolHeader &&
@@ -258,7 +266,10 @@ export class StreamableHttpTransport {
         return respondToProtocolMismatch(responseId, protocolHeader);
       }
 
-      const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
+      // Check for missing session ID (except for initialize requests)
+      if (this.sessionAdapter && !sessionId && !isInitializeRequest) {
+        return respondToMissingSessionId();
+      }
 
       if (
         !isInitializeRequest &&

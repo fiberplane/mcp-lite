@@ -46,3 +46,17 @@ export function respondToProtocolMismatch(
     },
   });
 }
+
+/**
+ * Responds with a 400 bad request if the session id is missing
+ * @todo - we will want to make this response configurable, so someone can use a response format more tailored to their api conventions
+ * @note - since this validaiton happens at the transport layer, we do not respond with a JSON-RPC error
+ */
+export function respondToMissingSessionId() {
+  return new Response("Bad Request: Missing required session ID", {
+    status: 400,
+    headers: {
+      "Content-Type": "text/plain",
+    },
+  });
+}
