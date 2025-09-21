@@ -254,33 +254,33 @@ export class StreamableHttpTransport {
       const acceptHeader = request.headers.get("Accept");
       const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
 
-      if (!isInitializeRequest) {
-        if (
-          protocolHeader &&
-          protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION
-        ) {
-          const responseId = isNotification
-            ? null
-            : (jsonRpcMessage as JsonRpcReq).id;
-          const errorResponse = createJsonRpcError(
-            responseId,
-            new RpcError(
-              JSON_RPC_ERROR_CODES.INVALID_PARAMS,
-              "Protocol version mismatch",
-              {
-                expectedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
-                receivedVersion: protocolHeader,
-              },
-            ).toJson(),
-          );
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: {
-              "Content-Type": "application/json",
+      const shouldReturnProtocolMismatchError =
+        !isInitializeRequest &&
+        protocolHeader &&
+        protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION;
+      if (shouldReturnProtocolMismatchError) {
+        const responseId = isNotification
+          ? null
+          : (jsonRpcMessage as JsonRpcReq).id;
+        const errorResponse = createJsonRpcError(
+          responseId,
+          new RpcError(
+            JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+            "Protocol version mismatch",
+            {
+              expectedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+              receivedVersion: protocolHeader,
             },
-          });
-        }
+          ).toJson(),
+        );
+        return new Response(JSON.stringify(errorResponse), {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
       }
+
       const sessionId = request.headers.get(MCP_SESSION_ID_HEADER);
 
       if (

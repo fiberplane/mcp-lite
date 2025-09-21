@@ -178,6 +178,62 @@ describe("E2E MCP Integration", () => {
       expect(result.error?.code).toBe(-32000);
     });
 
+    it("should reject protocol version mismatch in header for non-initialize requests", async () => {
+      // First initialize the server with correct protocol version
+      const initRequest = new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "init",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            clientInfo: {
+              name: "test-client",
+              version: "1.0.0",
+            },
+          },
+        }),
+      });
+
+      const initResponse = await handler(initRequest);
+      expect(initResponse.ok).toBe(true);
+
+      // Now make a non-initialize request with wrong protocol header
+      const toolRequest = new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "1.0.0", // Wrong header version
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "2",
+          method: "tools/call",
+          params: {
+            name: "echo",
+            arguments: { message: "test" },
+          },
+        }),
+      });
+
+      const response = await handler(toolRequest);
+      expect(response.status).toBe(400);
+
+      const result = (await response.json()) as JsonRpcResponse;
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe(-32602); // INVALID_PARAMS
+      expect(result.error?.message).toBe("Protocol version mismatch");
+      expect(result.error?.data).toEqual({
+        expectedVersion: "2025-06-18",
+        receivedVersion: "1.0.0",
+      });
+    });
+
     it("should handle unknown methods", async () => {
       const request = new Request("http://localhost/mcp", {
         method: "POST",
