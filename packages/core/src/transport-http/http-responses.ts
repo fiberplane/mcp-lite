@@ -49,7 +49,7 @@ export function respondToProtocolMismatch(
 
 /**
  * Responds with a 400 bad request if the session id is missing
- * @todo - we will want to make this response configurable, so someone can use a response format more tailored to their api conventions
+ * @todo - we will want to make this response configurable, so someone can use a response format more tailored to their api conventions (https://github.com/fiberplane/mcp/issues/83)
  * @note - since this validaiton happens at the transport layer, we do not respond with a JSON-RPC error
  */
 export function respondToMissingSessionId() {
