@@ -22,6 +22,7 @@ export {
   type StreamableHttpTransportOptions,
 } from "./transport-http.js";
 export type {
+  Content as ToolCallContent,
   InitializeParams,
   InitializeResult,
   JsonRpcError,
@@ -37,7 +38,6 @@ export type {
   ProgressUpdate,
   SchemaAdapter,
   ToolCallResult,
-  Content as ToolCallContent,
 } from "./types.js";
 export {
   createJsonRpcError,
