@@ -1,5 +1,16 @@
 # mcp-lite
 
+## 0.2.3
+
+thank you @jacksteamdev for the quality of life bump!
+
+
+### Patch Changes
+
+- ebb14bc: Use InferOutput type instead of InferInput in tool handler
+- d6c2ea6: Fix ResourceLink type property to match specs
+- 5511983: Export tool call return types
+
 ## 0.2.2
 
 ### Patch Changes
