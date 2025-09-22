@@ -8,16 +8,16 @@ import {
   openSessionStream,
   type TestServer,
 } from "@internal/test-utils";
-import { InMemoryEventStore, McpServer } from "../../src/index.js";
+import { InMemorySessionAdapter, McpServer } from "../../src/index.js";
 
 describe("Session SSE Happy Path", () => {
   let testServer: TestServer;
   let mcpServer: McpServer;
-  let eventStore: InMemoryEventStore;
+  let sessionAdapter: InMemorySessionAdapter;
   const fixedSessionId = "test-session-123";
 
   beforeEach(async () => {
-    eventStore = new InMemoryEventStore();
+    sessionAdapter = new InMemorySessionAdapter({ maxEventBufferSize: 1024 });
     mcpServer = new McpServer({ name: "test-server", version: "1.0.0" });
 
     // Add tool that emits progress updates when progressToken is present
@@ -42,7 +42,7 @@ describe("Session SSE Happy Path", () => {
 
     testServer = await createTestHarness(mcpServer, {
       sessionId: fixedSessionId,
-      eventStore,
+      sessionAdapter,
     });
   });
 
@@ -95,20 +95,21 @@ describe("Session SSE Happy Path", () => {
     // Close the session after we've collected events
     await closeSession(testServer.url, sessionId);
 
-    // Verify we received 4 events total (1 connection + 3 progress notifications)
+    // Verify we received 4 events total (1 ping + 3 progress notifications)
     expect(events).toHaveLength(4);
 
-    // First event should be connection event (no ID)
+    // First event should be ping to establish connection (no ID)
     expect(events[0].id).toBeUndefined();
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
 
-    // Next 3 events should be progress notifications with IDs (1, 2, 3)
+    // Next 3 events should be progress notifications with IDs (1, 2, 3) suffixed by _GET_stream
     for (let i = 1; i <= 3; i++) {
       const event = events[i];
-      expect(event.id).toBe(String(i));
+      expect(event.id).toBe(`${String(i)}#_GET_stream`);
       expect(event.data).toEqual({
         jsonrpc: "2.0",
         method: "notifications/progress",
@@ -149,8 +150,12 @@ describe("Session SSE Happy Path", () => {
       }),
     });
 
-    // Open session stream asking for replay from event 2 onwards
-    const sseStream = await openSessionStream(testServer.url, sessionId, "1");
+    // Open session stream asking for replay from event 2 onwards, for the same stream
+    const sseStream = await openSessionStream(
+      testServer.url,
+      sessionId,
+      "1#_GET_stream",
+    );
 
     // For replay, events should be delivered immediately, so collect with a short timeout
     const events = await collectSseEvents(sseStream, 1000);
@@ -161,7 +166,7 @@ describe("Session SSE Happy Path", () => {
     // Should receive events 2 and 3 (after event 1), no connection event for replay
     expect(events).toHaveLength(2);
 
-    expect(events[0].id).toBe("2");
+    expect(events[0].id).toBe("2#_GET_stream");
     expect(events[0].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/progress",
@@ -173,7 +178,7 @@ describe("Session SSE Happy Path", () => {
       },
     });
 
-    expect(events[1].id).toBe("3");
+    expect(events[1].id).toBe("3#_GET_stream");
     expect(events[1].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/progress",
@@ -242,19 +247,20 @@ describe("Session SSE Happy Path", () => {
 
     const events = await ssePromise;
 
-    // Should receive 5 events total (1 connection + 4 progress)
+    // Should receive 5 events total (1 ping + 4 progress)
     expect(events).toHaveLength(5);
 
-    // First event should be connection event (no ID)
+    // First event should be ping to establish connection (no ID)
     expect(events[0].id).toBeUndefined();
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
 
-    // Verify monotonic event IDs for progress events (1, 2, 3, 4)
+    // Verify monotonic event IDs for progress events (1, 2, 3, 4) with _GET_stream suffix
     for (let i = 1; i <= 4; i++) {
-      expect(events[i].id).toBe(String(i));
+      expect(events[i].id).toBe(`${i}#_GET_stream`);
     }
 
     // Verify first two progress events are from token1
@@ -304,6 +310,94 @@ describe("Session SSE Happy Path", () => {
     });
   });
 
+  it("replays events from a specific sequence when Last-Event-ID is provided", async () => {
+    // Initialize session
+    const sessionId = await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+
+    // Generate two events for token1 (ids 1 and 2)
+    await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        "MCP-Session-Id": sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "call1",
+        method: "tools/call",
+        params: {
+          _meta: { progressToken: "token1" },
+          name: "longTask",
+          arguments: { count: 2 },
+        },
+      }),
+    });
+
+    // Generate two events for token2 (ids 3 and 4)
+    await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        "MCP-Session-Id": sessionId,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "call2",
+        method: "tools/call",
+        params: {
+          _meta: { progressToken: "token2" },
+          name: "longTask",
+          arguments: { count: 2 },
+        },
+      }),
+    });
+
+    // Reconnect asking to replay from after sequence 2 on the _GET_stream
+    const sseStream = await openSessionStream(
+      testServer.url,
+      sessionId,
+      "2#_GET_stream",
+    );
+
+    // Collect replayed events (should be immediate)
+    const events = await collectSseEvents(sseStream, 1000);
+
+    // Close session
+    await closeSession(testServer.url, sessionId);
+
+    // Should receive events 3 and 4 (after event 2)
+    expect(events).toHaveLength(2);
+
+    expect(events[0].id).toBe("3#_GET_stream");
+    expect(events[0].data).toEqual({
+      jsonrpc: "2.0",
+      method: "notifications/progress",
+      params: {
+        progressToken: "token2",
+        progress: 1,
+        total: 2,
+        message: "step 1",
+      },
+    });
+
+    expect(events[1].id).toBe("4#_GET_stream");
+    expect(events[1].data).toEqual({
+      jsonrpc: "2.0",
+      method: "notifications/progress",
+      params: {
+        progressToken: "token2",
+        progress: 2,
+        total: 2,
+        message: "step 2",
+      },
+    });
+  });
+
   it("no progress notifications when progressToken is missing", async () => {
     // Initialize session
     const sessionId = await initializeSession(testServer.url, {
@@ -339,14 +433,117 @@ describe("Session SSE Happy Path", () => {
 
     const events = await ssePromise;
 
-    // Should receive only the connection event
+    // Should receive only the ping event (no progress notifications without progressToken)
     expect(events).toHaveLength(1);
 
-    // First event should be connection event (no ID)
+    // First event should be ping to establish connection (no ID)
     expect(events[0].id).toBeUndefined();
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
+  });
+});
+
+describe("Session ID Validation", () => {
+  let testServer: TestServer;
+  let mcpServer: McpServer;
+  let sessionAdapter: InMemorySessionAdapter;
+
+  beforeEach(async () => {
+    sessionAdapter = new InMemorySessionAdapter({ maxEventBufferSize: 1024 });
+    mcpServer = new McpServer({ name: "test-server", version: "1.0.0" });
+
+    testServer = await createTestHarness(mcpServer, {
+      sessionAdapter,
+    });
+  });
+
+  afterEach(async () => {
+    await testServer.stop();
+  });
+
+  it("should return 400 Bad Request for POST requests missing session ID", async () => {
+    // First initialize to create a session
+    const sessionId = await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+    expect(sessionId).toBeTruthy();
+
+    // Now try to make a request without the session ID header
+    const response = await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        // Intentionally omitting MCP-Session-Id header
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ping",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const errorMessage = await response.text();
+    expect(errorMessage).toBe("Bad Request: Missing required session ID");
+  });
+
+  it("should return 400 Bad Request for notification without session ID", async () => {
+    // First initialize to create a session
+    await initializeSession(testServer.url, {
+      name: "test-client",
+      version: "1.0.0",
+    });
+
+    // Try to send a notification without session ID
+    const response = await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        // Intentionally omitting MCP-Session-Id header
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const errorMessage = await response.text();
+    expect(errorMessage).toBe("Bad Request: Missing required session ID");
+  });
+
+  it("should allow initialize requests without session ID", async () => {
+    // Initialize requests should work without session ID
+    const response = await fetch(testServer.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+        // No session ID header - this should be fine for initialize
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.result).toBeTruthy();
+    expect(response.headers.get("MCP-Session-Id")).toBeTruthy();
   });
 });

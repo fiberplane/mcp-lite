@@ -7,16 +7,16 @@ import {
   openRequestStream,
   type TestServer,
 } from "@internal/test-utils";
-import { InMemoryEventStore, McpServer } from "../../src/index.js";
+import { InMemorySessionAdapter, McpServer } from "../../src/index.js";
 
 describe("Per-request SSE", () => {
   let testServer: TestServer;
   let mcpServer: McpServer;
-  let eventStore: InMemoryEventStore;
+  let sessionAdapter: InMemorySessionAdapter;
   const fixedSessionId = "test-session-456";
 
   beforeEach(async () => {
-    eventStore = new InMemoryEventStore();
+    sessionAdapter = new InMemorySessionAdapter({ maxEventBufferSize: 1024 });
     mcpServer = new McpServer({ name: "test-server", version: "1.0.0" });
 
     // Add tool that emits progress updates when progressToken is present
@@ -41,7 +41,7 @@ describe("Per-request SSE", () => {
 
     testServer = await createTestHarness(mcpServer, {
       sessionId: fixedSessionId,
-      eventStore,
+      sessionAdapter,
     });
   });
 
@@ -314,9 +314,10 @@ describe("Per-request SSE", () => {
 
     // Read from session stream with a short timeout (should be empty of replayed data events)
     const sessionEvents = await collectSseEvents(response.body, 1000);
-    // Ignore optional connection event
+    // Ignore ping event used for connection establishment
     const dataEvents = sessionEvents.filter(
-      (e) => !(e.data && (e as any).data.type === "connection"),
+      // biome-ignore lint/suspicious/noExplicitAny: tests
+      (e) => !(e.data && (e as any)?.data?.method === "ping"),
     );
 
     // Close session after reading

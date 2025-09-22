@@ -6,19 +6,23 @@ export {
 } from "./constants.js";
 export { McpServer, type McpServerOptions } from "./core.js";
 export { RpcError } from "./errors.js";
-export { createSSEStream, type StreamWriter } from "./sse-writer.js";
 export {
   type EventId,
-  type EventStore,
-  InMemoryEventStore,
+  InMemorySessionAdapter,
+  type SessionAdapter,
   type SessionId,
   type SessionMeta,
-} from "./store.js";
+} from "./session-store.js";
+export {
+  createSSEStream,
+  type StreamWriter,
+} from "./sse-writer.js";
 export {
   StreamableHttpTransport,
   type StreamableHttpTransportOptions,
-} from "./transport-http.js";
+} from "./transport-http/transport-http.js";
 export type {
+  Content as ToolCallContent,
   InitializeParams,
   InitializeResult,
   JsonRpcError,
@@ -34,7 +38,6 @@ export type {
   ProgressUpdate,
   SchemaAdapter,
   ToolCallResult,
-  Content as ToolCallContent,
 } from "./types.js";
 export {
   createJsonRpcError,
