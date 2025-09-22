@@ -487,12 +487,10 @@ export class StreamableHttpTransport {
 
     // Optional resume (store expects suffixed Last-Event-ID: "<n>#<streamId>")
     const lastEventId = request.headers.get(MCP_LAST_EVENT_ID_HEADER);
-    let hadReplay = false;
     if (lastEventId) {
       try {
         await this.sessionAdapter.replay(sessionId, lastEventId, (eid, msg) => {
           writer.write(msg, eid);
-          hadReplay = true;
         });
       } catch (_error) {
         writer.end();
@@ -502,9 +500,9 @@ export class StreamableHttpTransport {
       }
     }
 
-    if (!hadReplay) {
-      writer.write({ type: "connection", status: "established" });
-    }
+    // Connection establishment is implicit with SSE stream opening
+    // No need to send explicit connection message as it causes issues with MCP inspector
+    // that expects all messages to be JSON-RPC format
 
     return new Response(stream as ReadableStream, {
       status: 200,
