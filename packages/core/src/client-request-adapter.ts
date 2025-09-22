@@ -1,4 +1,4 @@
-export interface ClientRequestStore {
+export interface ClientRequestAdapter {
   /**
    * Create and track a pending client request. Returns a promise that
    * resolves when a matching JSON-RPC response is received (or rejects on timeout).
@@ -43,7 +43,7 @@ function makeKey(
   return `${sessionId ?? ""}:${String(requestId)}`;
 }
 
-export class InMemoryClientRequestStore implements ClientRequestStore {
+export class InMemoryClientRequestAdapter implements ClientRequestAdapter {
   private pending = new Map<string, PendingEntry>();
 
   createPending(

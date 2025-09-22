@@ -1,3 +1,5 @@
+export type { ClientRequestAdapter } from "./client-request-adapter.js";
+export { InMemoryClientRequestAdapter } from "./client-request-adapter.js";
 export {
   MCP_PROTOCOL_HEADER,
   MCP_SESSION_ID_HEADER,
@@ -8,12 +10,12 @@ export { McpServer, type McpServerOptions } from "./core.js";
 export { RpcError } from "./errors.js";
 export type {
   EventId,
+  SessionAdapter,
+  SessionData,
   SessionId,
   SessionMeta,
-	SessionData,
-	InMemorySessionAdapter,
-	SessionAdapter
 } from "./session-store.js";
+export { InMemorySessionAdapter } from "./session-store.js";
 export {
   StreamableHttpTransport,
   type StreamableHttpTransportOptions,

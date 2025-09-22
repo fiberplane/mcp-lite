@@ -1,9 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import {
-  GLOBAL_NOTIFICATIONS,
-  METHODS,
-  SUPPORTED_MCP_PROTOCOL_VERSION,
-} from "./constants.js";
+import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
 import {
   type CreateContextOptions,
   createContext,
@@ -11,8 +7,6 @@ import {
 } from "./context.js";
 import { RpcError } from "./errors.js";
 import type {
-  ElicitationResult,
-  InferInput,
   InferOutput,
   InitializeResult,
   JsonRpcId,
@@ -742,17 +736,6 @@ export class McpServer {
     this.clientRequestSender = sender;
   }
 
-  private async _elicit<T>(
-    _ctx: MCPServerContext,
-    _params: { message: string; schema: unknown },
-    _options?: { timeout_ms?: number; strict?: boolean },
-  ): Promise<ElicitationResult<T>> {
-    throw new RpcError(
-      JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
-      "Elicitation not fully implemented yet",
-    );
-  }
-
   async _dispatch(
     message: JsonRpcReq | JsonRpcNotification,
     contextOptions: CreateContextOptions = {},
@@ -785,17 +768,9 @@ export class McpServer {
       progressSender,
       authInfo: contextOptions.authInfo,
       clientCapabilities: contextOptions.clientCapabilities,
+      schemaAdapter: this.schemaAdapter,
+      clientRequestSender: this.clientRequestSender,
     });
-
-    // Override elicit method with real implementation if capabilities are available
-    if (
-      contextOptions.clientCapabilities &&
-      "elicitation" in contextOptions.clientCapabilities
-    ) {
-      ctx.elicit = async (params: any, options?: any) => {
-        return this._elicit(ctx, params, options);
-      };
-    }
 
     const method = (message as JsonRpcMessage).method;
     const handler = this.methods[method];
