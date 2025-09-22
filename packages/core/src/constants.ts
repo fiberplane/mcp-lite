@@ -54,48 +54,7 @@ export const METHODS = {
   LOGGING: {
     SET_LEVEL: "logging/setLevel",
   },
-export const METHODS = {
-  INITIALIZE: "initialize",
-  PING: "ping",
-  TOOLS: {
-    LIST: "tools/list",
-    CALL: "tools/call",
-  },
-  PROMPTS: {
-    LIST: "prompts/list",
-    GET: "prompts/get",
-  },
-  RESOURCES: {
-    LIST: "resources/list",
-    TEMPLATES_LIST: "resources/templates/list",
-    READ: "resources/read",
-    SUBSCRIBE: "resources/subscribe",
-    UNSUBSCRIBE: "resources/unsubscribe",
-  },
-  NOTIFICATIONS: {
-    CANCELLED: "notifications/cancelled",
-    INITIALIZED: "notifications/initialized",
-    PROGRESS: "notifications/progress",
-    ROOTS: {
-      LIST_CHANGED: "notifications/roots/list_changed",
-    },
-    TOOLS: {
-      LIST_CHANGED: "notifications/tools/list_changed",
-    },
-    PROMPTS: {
-      LIST_CHANGED: "notifications/prompts/list_changed",
-    },
-    RESOURCES: {
-      LIST_CHANGED: "notifications/resources/list_changed",
-    },
-  },
-  LOGGING: {
-    SET_LEVEL: "logging/setLevel",
-  },
-  COMPLETION: {
-    COMPLETE: "completion/complete",
-  },
-} as const;
+};
 
 export const GLOBAL_NOTIFICATIONS = [
   METHODS.NOTIFICATIONS.TOOLS.LIST_CHANGED,

@@ -6,11 +6,14 @@ export {
 } from "./constants.js";
 export { McpServer, type McpServerOptions } from "./core.js";
 export { RpcError } from "./errors.js";
-export {
-  type EventId,
-  type SessionId,
-  type SessionMeta,
-} from "./store.js";
+export type {
+  EventId,
+  SessionId,
+  SessionMeta,
+	SessionData,
+	InMemorySessionAdapter,
+	SessionAdapter
+} from "./session-store.js";
 export {
   StreamableHttpTransport,
   type StreamableHttpTransportOptions,
