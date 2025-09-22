@@ -1,10 +1,10 @@
-import { RpcError } from "./errors";
+import { RpcError } from "./errors.js";
 import {
   createJsonRpcError,
   JSON_RPC_ERROR_CODES,
   type JsonRpcId,
   type JsonRpcRes,
-} from "./types";
+} from "./types.js";
 
 /**
  * Checks if a value is an object.
