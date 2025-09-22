@@ -314,10 +314,10 @@ describe("Per-request SSE", () => {
 
     // Read from session stream with a short timeout (should be empty of replayed data events)
     const sessionEvents = await collectSseEvents(response.body, 1000);
-    // Ignore optional connection event
+    // Ignore ping event used for connection establishment
     const dataEvents = sessionEvents.filter(
       // biome-ignore lint/suspicious/noExplicitAny: tests
-      (e) => !(e.data && (e as any)?.data?.type === "connection"),
+      (e) => !(e.data && (e as any)?.data?.method === "ping"),
     );
 
     // Close session after reading

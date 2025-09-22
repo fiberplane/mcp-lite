@@ -101,12 +101,12 @@ export async function collectSseEventsCount(
   timeoutMs: number = 5000,
 ): Promise<SseEvent[]> {
   const events: SseEvent[] = [];
-  
+
   // If count is 0, return immediately
   if (count === 0) {
     return events;
   }
-  
+
   // biome-ignore lint/suspicious/noExplicitAny: tests
   const controller: any = new (globalThis as any).AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

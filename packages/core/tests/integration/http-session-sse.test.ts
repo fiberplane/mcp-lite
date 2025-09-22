@@ -95,14 +95,15 @@ describe("Session SSE Happy Path", () => {
     // Close the session after we've collected events
     await closeSession(testServer.url, sessionId);
 
-    // Verify we received 4 events total (1 connection + 3 progress notifications)
+    // Verify we received 4 events total (1 ping + 3 progress notifications)
     expect(events).toHaveLength(4);
 
-    // First event should be connection event (no ID)
+    // First event should be ping to establish connection (no ID)
     expect(events[0].id).toBeUndefined();
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
 
     // Next 3 events should be progress notifications with IDs (1, 2, 3) suffixed by _GET_stream
@@ -246,14 +247,15 @@ describe("Session SSE Happy Path", () => {
 
     const events = await ssePromise;
 
-    // Should receive 5 events total (1 connection + 4 progress)
+    // Should receive 5 events total (1 ping + 4 progress)
     expect(events).toHaveLength(5);
 
-    // First event should be connection event (no ID)
+    // First event should be ping to establish connection (no ID)
     expect(events[0].id).toBeUndefined();
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
 
     // Verify monotonic event IDs for progress events (1, 2, 3, 4) with _GET_stream suffix
@@ -431,14 +433,15 @@ describe("Session SSE Happy Path", () => {
 
     const events = await ssePromise;
 
-    // Should receive only the connection event
+    // Should receive only the ping event (no progress notifications without progressToken)
     expect(events).toHaveLength(1);
 
-    // First event should be connection event (no ID)
+    // First event should be ping to establish connection (no ID)
     expect(events[0].id).toBeUndefined();
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
   });
 });

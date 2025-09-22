@@ -487,7 +487,9 @@ export class StreamableHttpTransport {
 
     // Optional resume (store expects suffixed Last-Event-ID: "<n>#<streamId>")
     const lastEventId = request.headers.get(MCP_LAST_EVENT_ID_HEADER);
+    let attemptedReplay = false;
     if (lastEventId) {
+      attemptedReplay = true;
       try {
         await this.sessionAdapter.replay(sessionId, lastEventId, (eid, msg) => {
           writer.write(msg, eid);
@@ -500,9 +502,21 @@ export class StreamableHttpTransport {
       }
     }
 
-    // Connection establishment is implicit with SSE stream opening
-    // No need to send explicit connection message as it causes issues with MCP inspector
-    // that expects all messages to be JSON-RPC format
+    // Send a JSON-RPC ping to establish the SSE connection if we didn't attempt replay
+    // This is needed because SSE clients expect initial data to confirm the stream is working.
+    // If we attempted replay (even if it returned 0 events), we don't send ping because the
+    // client explicitly requested to resume from a specific point. If no replay was requested,
+    // we send a ping (not awaiting pong) just to establish the connection - this is not
+    // fully spec-compliant but ensures compatibility with MCP inspector (which expects
+    // valid JSON-RPC format) while maintaining SSE stream functionality.
+    if (!attemptedReplay) {
+      const pingNotification = {
+        jsonrpc: JSON_RPC_VERSION,
+        method: "ping",
+        params: {},
+      };
+      writer.write(pingNotification);
+    }
 
     return new Response(stream as ReadableStream, {
       status: 200,

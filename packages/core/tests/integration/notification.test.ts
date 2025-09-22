@@ -191,10 +191,11 @@ describe("List changed notifications over SSE", () => {
     await closeSession(testServer.url, sessionId);
 
     expect(events).toHaveLength(2);
-    // First event is connection
+    // First event is ping to establish connection
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
     // Second is the notification
     expect(events[1].data).toEqual({
@@ -223,8 +224,9 @@ describe("List changed notifications over SSE", () => {
 
     expect(events).toHaveLength(2);
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
     expect(events[1].data).toEqual({
       jsonrpc: "2.0",
@@ -255,8 +257,9 @@ describe("List changed notifications over SSE", () => {
 
     expect(events).toHaveLength(2);
     expect(events[0].data).toEqual({
-      type: "connection",
-      status: "established",
+      jsonrpc: "2.0",
+      method: "ping",
+      params: {},
     });
     expect(events[1].data).toEqual({
       jsonrpc: "2.0",
