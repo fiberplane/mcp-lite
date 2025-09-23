@@ -253,25 +253,25 @@ export class McpServer {
     this.schemaAdapter = options.schemaAdapter;
 
     this.methods = {
-      initialize: this.handleInitialize.bind(this),
-      ping: this.handlePing.bind(this),
-      "tools/list": this.handleToolsList.bind(this),
-      "tools/call": this.handleToolsCall.bind(this),
-      "prompts/list": this.handlePromptsList.bind(this),
-      "prompts/get": this.handlePromptsGet.bind(this),
-      "resources/list": this.handleResourcesList.bind(this),
-      "resources/templates/list": this.handleResourceTemplatesList.bind(this),
-      "resources/read": this.handleResourcesRead.bind(this),
-      "resources/subscribe": this.handleNotImplemented.bind(this),
-      "notifications/cancelled": this.handleNotificationCancelled.bind(this),
-      "notifications/initialized":
+      [METHODS.INITIALIZE]: this.handleInitialize.bind(this),
+      [METHODS.PING]: this.handlePing.bind(this),
+      [METHODS.TOOLS.LIST]: this.handleToolsList.bind(this),
+      [METHODS.TOOLS.CALL]: this.handleToolsCall.bind(this),
+      [METHODS.PROMPTS.LIST]: this.handlePromptsList.bind(this),
+      [METHODS.PROMPTS.GET]: this.handlePromptsGet.bind(this),
+      [METHODS.RESOURCES.LIST]: this.handleResourcesList.bind(this),
+      [METHODS.RESOURCES.TEMPLATES_LIST]: this.handleResourceTemplatesList.bind(this),
+      [METHODS.RESOURCES.READ]: this.handleResourcesRead.bind(this),
+      [METHODS.RESOURCES.SUBSCRIBE]: this.handleNotImplemented.bind(this),
+      [METHODS.NOTIFICATIONS.CANCELLED]: this.handleNotificationCancelled.bind(this),
+      [METHODS.NOTIFICATIONS.INITIALIZED]:
         this.handleNotificationInitialized.bind(this),
-      "notifications/progress": this.handleNotificationProgress.bind(this),
-      "notifications/roots/list_changed":
+      [METHODS.NOTIFICATIONS.PROGRESS]: this.handleNotificationProgress.bind(this),
+      [METHODS.NOTIFICATIONS.ROOTS.LIST_CHANGED]:
         this.handleNotificationRootsListChanged.bind(this),
-      "logging/setLevel": this.handleLoggingSetLevel.bind(this),
-      "resources/unsubscribe": this.handleNotImplemented.bind(this),
-      "completion/complete": this.handleNotImplemented.bind(this),
+      [METHODS.LOGGING.SET_LEVEL]: this.handleLoggingSetLevel.bind(this),
+      [METHODS.RESOURCES.UNSUBSCRIBE]: this.handleNotImplemented.bind(this),
+      [METHODS.COMPLETION.COMPLETE]: this.handleNotImplemented.bind(this),
     };
   }
 
