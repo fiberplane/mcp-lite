@@ -301,6 +301,222 @@ mcp.prompt("summarize", {
 });
 ```
 
+## Elicitation
+
+Elicitation enables MCP servers to request input from the client on behalf of the user during tool execution. This allows tools to gather additional information, confirm sensitive operations, or present choices to users through the connected AI application.
+
+### Usage Example
+
+```typescript
+import { z } from "zod";
+
+const DeleteRecordSchema = z.object({
+  recordId: z.string(),
+  tableName: z.string(),
+});
+
+mcp.tool("delete_database_record", {
+  description: "Delete a database record with user confirmation",
+  inputSchema: DeleteRecordSchema,
+  handler: async (args, ctx) => {
+    // Check if client supports elicitation
+    if (!ctx.client.supports("elicitation")) {
+      throw new Error("This tool requires a client that supports elicitation");
+    }
+
+    // Request user confirmation through elicitation
+    const response = await ctx.elicit({
+      type: "confirmation",
+      title: "Confirm Record Deletion",
+      description: `Are you sure you want to delete record "${args.recordId}" from table "${args.tableName}"? This action cannot be undone.`,
+      confirmationText: "Delete Record",
+      cancelText: "Cancel"
+    });
+
+    // Handle different response types
+    switch (response.type) {
+      case "accept":
+        // User confirmed - proceed with deletion
+        await deleteFromDatabase(args.tableName, args.recordId);
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Record "${args.recordId}" has been deleted from "${args.tableName}".` 
+          }],
+        };
+      
+      case "decline":
+        return {
+          content: [{ 
+            type: "text", 
+            text: "Record deletion cancelled by user." 
+          }],
+        };
+      
+      case "cancel":
+        throw new Error("Operation was cancelled");
+      
+      default:
+        throw new Error("Unexpected elicitation response");
+    }
+  },
+});
+```
+
+### Setup Instructions
+
+To use elicitation, configure your transport with a `ClientRequestAdapter` alongside your `SessionAdapter`:
+
+```typescript
+import { 
+  StreamableHttpTransport, 
+  InMemorySessionAdapter, 
+  InMemoryClientRequestAdapter 
+} from "mcp-lite";
+
+const transport = new StreamableHttpTransport({
+  sessionAdapter: new InMemorySessionAdapter({
+    maxEventBufferSize: 1024
+  }),
+  clientRequestAdapter: new InMemoryClientRequestAdapter({
+    defaultTimeoutMs: 30000  // 30 second timeout for server-to-client requests
+  })
+});
+
+const httpHandler = transport.bind(mcp);
+```
+
+The `ClientRequestAdapter` manages pending server-to-client requests (such as elicitation), storing them temporarily while waiting for client responses. This enables the server to pause execution, send a request to the client, and resume once the client provides a response.
+
+### Advanced Example: Cloudflare KV Adapter
+
+For distributed deployments where multiple worker instances might handle different parts of the same session, implement a custom `ClientRequestAdapter` using persistent storage. This example shows handling elicitation requests, but the same pattern applies to other server-to-client request types:
+
+```typescript
+import type { ClientRequestAdapter, ElicitationRequest, ElicitationResponse } from "mcp-lite";
+
+export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
+  constructor(
+    private kv: KVNamespace,
+    private defaultTimeoutMs: number = 30000
+  ) {}
+
+  generateRequestId(): string {
+    return crypto.randomUUID();
+  }
+
+  async storeRequest(
+    sessionId: string, 
+    requestId: string, 
+    request: ElicitationRequest
+  ): Promise<void> {
+    const key = `elicitation:${sessionId}:${requestId}`;
+    const expirationTtl = Math.ceil(this.defaultTimeoutMs / 1000) + 10; // Add buffer
+    
+    await this.kv.put(key, JSON.stringify({
+      request,
+      timestamp: Date.now(),
+      timeoutMs: this.defaultTimeoutMs
+    }), { expirationTtl });
+  }
+
+  async getRequest(
+    sessionId: string, 
+    requestId: string
+  ): Promise<ElicitationRequest | undefined> {
+    const key = `elicitation:${sessionId}:${requestId}`;
+    const stored = await this.kv.get(key, "json") as {
+      request: ElicitationRequest;
+      timestamp: number;
+      timeoutMs: number;
+    } | null;
+
+    if (!stored) return undefined;
+
+    // Check if request has timed out
+    const elapsed = Date.now() - stored.timestamp;
+    if (elapsed > stored.timeoutMs) {
+      await this.kv.delete(key);
+      return undefined;
+    }
+
+    return stored.request;
+  }
+
+  async storeResponse(
+    sessionId: string, 
+    requestId: string, 
+    response: ElicitationResponse
+  ): Promise<void> {
+    const responseKey = `elicitation_response:${sessionId}:${requestId}`;
+    
+    // Store response with short TTL (just long enough for retrieval)
+    await this.kv.put(responseKey, JSON.stringify(response), { 
+      expirationTtl: 60 
+    });
+
+    // Clean up the original request
+    const requestKey = `elicitation:${sessionId}:${requestId}`;
+    await this.kv.delete(requestKey);
+  }
+
+  async getResponse(
+    sessionId: string, 
+    requestId: string
+  ): Promise<ElicitationResponse | undefined> {
+    const key = `elicitation_response:${sessionId}:${requestId}`;
+    const response = await this.kv.get(key, "json") as ElicitationResponse | null;
+    
+    if (response) {
+      // Clean up after retrieval
+      await this.kv.delete(key);
+    }
+    
+    return response || undefined;
+  }
+
+  async cleanup(sessionId: string): Promise<void> {
+    // List all keys for this session (requires list operation)
+    const listResult = await this.kv.list({ 
+      prefix: `elicitation:${sessionId}:` 
+    });
+    
+    const deletePromises = listResult.keys.map(key => this.kv.delete(key.name));
+    await Promise.all(deletePromises);
+
+    // Also clean up any response keys
+    const responseListResult = await this.kv.list({ 
+      prefix: `elicitation_response:${sessionId}:` 
+    });
+    
+    const responseDeletePromises = responseListResult.keys.map(key => 
+      this.kv.delete(key.name)
+    );
+    await Promise.all(responseDeletePromises);
+  }
+}
+
+// Usage in Cloudflare Worker
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const transport = new StreamableHttpTransport({
+      sessionAdapter: new InMemorySessionAdapter({
+        maxEventBufferSize: 1024
+      }),
+      clientRequestAdapter: new CloudflareKVClientRequestAdapter(
+        env.ELICITATION_KV,
+        30000
+      )
+    });
+
+    const httpHandler = transport.bind(mcp);
+    return await httpHandler(request);
+  }
+};
+```
+
+This distributed adapter ensures server-to-client requests persist across worker instances and automatically handles cleanup and timeouts using Cloudflare KV's built-in TTL functionality.
+
 ## Middleware
 
 Basic middleware pattern for logging, authentication, or request processing:
