@@ -47,7 +47,7 @@ import {
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
-import { isObject, isString } from "./utils.js";
+import { isObject, isString, errorToResponse } from "./utils.js";
 import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
 
 async function runMiddlewares(
@@ -68,31 +68,6 @@ async function runMiddlewares(
     }
   };
   await dispatch(0);
-}
-
-function errorToResponse(
-  err: unknown,
-  requestId: JsonRpcId | undefined,
-): JsonRpcRes | null {
-  if (requestId === undefined) {
-    return null;
-  }
-
-  if (err instanceof RpcError) {
-    return createJsonRpcError(requestId, err.toJson());
-  }
-
-  const errorData =
-    err instanceof Error ? { message: err.message, stack: err.stack } : err;
-
-  return createJsonRpcError(
-    requestId,
-    new RpcError(
-      JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
-      "Internal error",
-      errorData,
-    ).toJson(),
-  );
 }
 
 // progress token extraction now lives in context.ts
