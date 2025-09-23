@@ -9,7 +9,6 @@ import { RpcError } from "./errors.js";
 import type {
   InferOutput,
   InitializeResult,
-  JsonRpcId,
   JsonRpcMessage,
   JsonRpcNotification,
   JsonRpcReq,
