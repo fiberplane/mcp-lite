@@ -16,6 +16,9 @@
       "path": "./examples/validation-arktype"
     },
     {
+      "path": "./examples/validation-effectschema"
+    },
+    {
       "path": "./examples/validation-valibot"
     },
     {
