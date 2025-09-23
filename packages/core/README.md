@@ -390,109 +390,89 @@ The `ClientRequestAdapter` manages pending server-to-client requests (such as el
 
 ### Advanced Example: Cloudflare KV Adapter
 
-For distributed deployments where multiple worker instances might handle different parts of the same session, implement a custom `ClientRequestAdapter` using persistent storage. This example shows handling elicitation requests, but the same pattern applies to other server-to-client request types:
+For distributed deployments where multiple worker instances might handle different parts of the same session, implement a custom `ClientRequestAdapter` using persistent storage:
 
 ```typescript
-import type { ClientRequestAdapter, ElicitationRequest, ElicitationResponse } from "mcp-lite";
+import type { ClientRequestAdapter } from "mcp-lite";
 
 export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
+  private pending = new Map<string, { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }>();
+
   constructor(
     private kv: KVNamespace,
     private defaultTimeoutMs: number = 30000
   ) {}
 
-  generateRequestId(): string {
-    return crypto.randomUUID();
-  }
+  createPending(
+    sessionId: string | undefined,
+    requestId: string | number,
+    options?: { timeout_ms?: number }
+  ): { promise: Promise<unknown> } {
+    const key = `${sessionId ?? ""}:${String(requestId)}`;
+    const timeoutMs = options?.timeout_ms ?? this.defaultTimeoutMs;
 
-  async storeRequest(
-    sessionId: string, 
-    requestId: string, 
-    request: ElicitationRequest
-  ): Promise<void> {
-    const key = `elicitation:${sessionId}:${requestId}`;
-    const expirationTtl = Math.ceil(this.defaultTimeoutMs / 1000) + 10; // Add buffer
-    
-    await this.kv.put(key, JSON.stringify({
-      request,
+    let resolve!: (value: unknown) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<unknown>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    // Store promise handlers
+    this.pending.set(key, { resolve, reject });
+
+    // Store pending request in KV for cross-instance sharing
+    this.kv.put(`pending:${key}`, JSON.stringify({
       timestamp: Date.now(),
-      timeoutMs: this.defaultTimeoutMs
-    }), { expirationTtl });
-  }
+      timeoutMs
+    }), {
+      expirationTtl: Math.ceil(timeoutMs / 1000) + 10
+    });
 
-  async getRequest(
-    sessionId: string, 
-    requestId: string
-  ): Promise<ElicitationRequest | undefined> {
-    const key = `elicitation:${sessionId}:${requestId}`;
-    const stored = await this.kv.get(key, "json") as {
-      request: ElicitationRequest;
-      timestamp: number;
-      timeoutMs: number;
-    } | null;
-
-    if (!stored) return undefined;
-
-    // Check if request has timed out
-    const elapsed = Date.now() - stored.timestamp;
-    if (elapsed > stored.timeoutMs) {
-      await this.kv.delete(key);
-      return undefined;
+    // Set timeout
+    if (timeoutMs > 0) {
+      setTimeout(() => {
+        this.rejectPending(sessionId, requestId, new Error("Timeout"));
+      }, timeoutMs);
     }
 
-    return stored.request;
+    return { promise };
   }
 
-  async storeResponse(
-    sessionId: string, 
-    requestId: string, 
-    response: ElicitationResponse
-  ): Promise<void> {
-    const responseKey = `elicitation_response:${sessionId}:${requestId}`;
+  resolvePending(
+    sessionId: string | undefined,
+    requestId: string | number,
+    response: unknown
+  ): boolean {
+    const key = `${sessionId ?? ""}:${String(requestId)}`;
+    const entry = this.pending.get(key);
     
-    // Store response with short TTL (just long enough for retrieval)
-    await this.kv.put(responseKey, JSON.stringify(response), { 
-      expirationTtl: 60 
-    });
-
-    // Clean up the original request
-    const requestKey = `elicitation:${sessionId}:${requestId}`;
-    await this.kv.delete(requestKey);
-  }
-
-  async getResponse(
-    sessionId: string, 
-    requestId: string
-  ): Promise<ElicitationResponse | undefined> {
-    const key = `elicitation_response:${sessionId}:${requestId}`;
-    const response = await this.kv.get(key, "json") as ElicitationResponse | null;
-    
-    if (response) {
-      // Clean up after retrieval
-      await this.kv.delete(key);
+    if (entry) {
+      this.pending.delete(key);
+      this.kv.delete(`pending:${key}`);
+      entry.resolve(response);
+      return true;
     }
     
-    return response || undefined;
+    return false;
   }
 
-  async cleanup(sessionId: string): Promise<void> {
-    // List all keys for this session (requires list operation)
-    const listResult = await this.kv.list({ 
-      prefix: `elicitation:${sessionId}:` 
-    });
+  rejectPending(
+    sessionId: string | undefined,
+    requestId: string | number,
+    reason: unknown
+  ): boolean {
+    const key = `${sessionId ?? ""}:${String(requestId)}`;
+    const entry = this.pending.get(key);
     
-    const deletePromises = listResult.keys.map(key => this.kv.delete(key.name));
-    await Promise.all(deletePromises);
-
-    // Also clean up any response keys
-    const responseListResult = await this.kv.list({ 
-      prefix: `elicitation_response:${sessionId}:` 
-    });
+    if (entry) {
+      this.pending.delete(key);
+      this.kv.delete(`pending:${key}`);
+      entry.reject(reason);
+      return true;
+    }
     
-    const responseDeletePromises = responseListResult.keys.map(key => 
-      this.kv.delete(key.name)
-    );
-    await Promise.all(responseDeletePromises);
+    return false;
   }
 }
 
@@ -504,7 +484,7 @@ export default {
         maxEventBufferSize: 1024
       }),
       clientRequestAdapter: new CloudflareKVClientRequestAdapter(
-        env.ELICITATION_KV,
+        env.PENDING_REQUESTS_KV,
         30000
       )
     });
@@ -515,7 +495,7 @@ export default {
 };
 ```
 
-This distributed adapter ensures server-to-client requests persist across worker instances and automatically handles cleanup and timeouts using Cloudflare KV's built-in TTL functionality.
+This adapter manages pending server-to-client requests across distributed worker instances by storing request metadata in Cloudflare KV while keeping promise handlers in memory for the current instance.
 
 ## Middleware
 
