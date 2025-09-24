@@ -100,8 +100,14 @@ export class StreamableHttpTransport {
       }
     | undefined
   > {
-    if (!sessionId || !this.sessionAdapter) {
+    if (!sessionId) {
       return undefined;
+    }
+
+    // In stateless mode (no sessionAdapter), don't advertise elicitation capability
+    // since synthetic sessionId is never returned to client, causing elicitations to hang
+    if (!this.sessionAdapter) {
+      return {};
     }
 
     try {

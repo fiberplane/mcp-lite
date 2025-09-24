@@ -53,6 +53,18 @@ export class InMemoryClientRequestAdapter implements ClientRequestAdapter {
   ): { promise: Promise<unknown> } {
     const key = makeKey(sessionId, requestId);
 
+    // Check if key already exists and clean up existing entry
+    const existingEntry = this.pending.get(key);
+    if (existingEntry) {
+      if (existingEntry.timer) {
+        clearTimeout(existingEntry.timer);
+      }
+      existingEntry.reject(
+        new Error("Request replaced by new request with same key"),
+      );
+      this.pending.delete(key);
+    }
+
     let resolve!: (value: unknown) => void;
     let reject!: (reason?: unknown) => void;
     const promise = new Promise<unknown>((res, rej) => {

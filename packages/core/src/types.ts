@@ -103,7 +103,7 @@ export interface MCPServerContext {
   progressToken?: ProgressToken;
   validate<T>(validator: unknown, input: unknown): T;
   progress?(update: ProgressUpdate): Promise<void> | void;
-  client: MCPClient;
+  client: MCPClientFeatures;
   elicit<S extends StandardSchemaV1<unknown, unknown>>(
     params: { message: string; schema: S },
     options?: { timeout_ms?: number; strict?: boolean },
@@ -114,7 +114,7 @@ export interface MCPServerContext {
   ): Promise<ElicitationResult<T>>;
 }
 
-export interface MCPClient {
+export interface MCPClientFeatures {
   supports(feature: ClientCapabilities | string): boolean;
 }
 

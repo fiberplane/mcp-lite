@@ -46,7 +46,7 @@ import {
   JSON_RPC_ERROR_CODES,
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
-import { isObject, isString, errorToResponse } from "./utils.js";
+import { errorToResponse, isObject, isString } from "./utils.js";
 import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
 
 async function runMiddlewares(
@@ -259,13 +259,16 @@ export class McpServer {
       [METHODS.PROMPTS.LIST]: this.handlePromptsList.bind(this),
       [METHODS.PROMPTS.GET]: this.handlePromptsGet.bind(this),
       [METHODS.RESOURCES.LIST]: this.handleResourcesList.bind(this),
-      [METHODS.RESOURCES.TEMPLATES_LIST]: this.handleResourceTemplatesList.bind(this),
+      [METHODS.RESOURCES.TEMPLATES_LIST]:
+        this.handleResourceTemplatesList.bind(this),
       [METHODS.RESOURCES.READ]: this.handleResourcesRead.bind(this),
       [METHODS.RESOURCES.SUBSCRIBE]: this.handleNotImplemented.bind(this),
-      [METHODS.NOTIFICATIONS.CANCELLED]: this.handleNotificationCancelled.bind(this),
+      [METHODS.NOTIFICATIONS.CANCELLED]:
+        this.handleNotificationCancelled.bind(this),
       [METHODS.NOTIFICATIONS.INITIALIZED]:
         this.handleNotificationInitialized.bind(this),
-      [METHODS.NOTIFICATIONS.PROGRESS]: this.handleNotificationProgress.bind(this),
+      [METHODS.NOTIFICATIONS.PROGRESS]:
+        this.handleNotificationProgress.bind(this),
       [METHODS.NOTIFICATIONS.ROOTS.LIST_CHANGED]:
         this.handleNotificationRootsListChanged.bind(this),
       [METHODS.LOGGING.SET_LEVEL]: this.handleLoggingSetLevel.bind(this),

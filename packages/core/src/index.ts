@@ -30,7 +30,7 @@ export type {
   JsonRpcReq,
   JsonRpcRes,
   JsonSchema,
-  MCPClient,
+  MCPClientFeatures,
   MCPServerContext as Ctx,
   Middleware,
   ProgressToken,
