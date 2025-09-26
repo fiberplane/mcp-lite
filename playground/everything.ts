@@ -255,6 +255,9 @@ mcp.tool("annotatedMessage", {
               } as const,
             ]
           : []),
+        ...(args.includeResource
+          ? ([{ type: "resource_link", uri: "file://config.json" }] as const)
+          : []),
       ],
     };
   },
