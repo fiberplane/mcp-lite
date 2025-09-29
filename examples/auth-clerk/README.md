@@ -1,4 +1,4 @@
-# mcp-lit with auth (featuring: Clerk)
+# mcp-lite with auth (featuring: Clerk)
 
 This is an example of using mcp-lite with auth, using Clerk as the auth provider.
 

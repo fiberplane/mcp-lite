@@ -34,5 +34,5 @@
       }
     }
   ],
-  "files": { "includes": ["**", "!**/dist"] }
+  "files": { "includes": ["**", "!**/dist", "!**/worker-configuration.d.ts"] }
 }
