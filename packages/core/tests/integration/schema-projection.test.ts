@@ -372,6 +372,7 @@ describe("toElicitationRequestedSchema", () => {
       });
 
       // Use Zod's built-in toJSONSchema method
+      // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
       const { mcpInputSchema } = resolveToolSchema(zodSchema, schemaAdapter);
@@ -420,6 +421,7 @@ describe("toElicitationRequestedSchema", () => {
       });
 
       // Use ArkType's built-in toJsonSchema method
+      // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => schema.toJsonSchema();
 
       const { mcpInputSchema } = resolveToolSchema(arkSchema, schemaAdapter);
@@ -464,6 +466,7 @@ describe("toElicitationRequestedSchema", () => {
         optional: z.string().optional(),
       });
 
+      // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
       const { mcpInputSchema } = resolveToolSchema(

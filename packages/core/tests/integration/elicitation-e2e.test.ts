@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: tests */
+/** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { collectSseEventsCount } from "../../../test-utils/src/sse.js";
@@ -7,7 +9,6 @@ import {
   McpServer,
   StreamableHttpTransport,
 } from "../../src/index.js";
-import type { ElicitationAction, ElicitationResult } from "../../src/types.js";
 
 describe("Elicitation E2E Tests", () => {
   test("E2E: ctx.elicit() throws when client has elicitation capability", async () => {
