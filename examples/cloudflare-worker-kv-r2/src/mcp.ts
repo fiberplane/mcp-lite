@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { toJsonSchema } from "@valibot/to-json-schema";
-import { McpServer } from "mcp-lite";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import * as v from "valibot";
 
 export const mcpServer = new McpServer({
@@ -43,3 +43,8 @@ mcpServer.tool("put-kv", {
     };
   },
 });
+
+const transport = new StreamableHttpTransport();
+const httpHandler = transport.bind(mcpServer);
+
+export { httpHandler };
