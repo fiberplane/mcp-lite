@@ -17,7 +17,7 @@ mcpServer.tool("get-kv", {
   handler: async (args) => {
     const value = await env.KV.get(args.key);
 
-    if (!value) {
+    if (value === null) {
       return {
         content: [{ type: "text", text: "Key not found" }],
       };
