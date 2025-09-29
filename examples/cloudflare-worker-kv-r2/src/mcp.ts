@@ -4,7 +4,7 @@ import { McpServer } from "mcp-lite";
 import * as v from "valibot";
 
 export const mcpServer = new McpServer({
-  name: "auth-clerk",
+  name: "cloudflare-worker-kv",
   version: "1.0.0",
   schemaAdapter: (schema) => toJsonSchema(schema as v.AnySchema),
 });
