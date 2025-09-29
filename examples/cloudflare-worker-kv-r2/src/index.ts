@@ -2,10 +2,9 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { StreamableHttpTransport } from "mcp-lite";
 import { mcpServer } from "./mcp";
-import type { AppType } from "./types";
 
 // Create a Hono app to serve our api routes
-const app = new Hono<AppType>();
+const app = new Hono<{ Bindings: CloudflareBindings }>();
 
 // Set up a logger to log requests
 app.use(logger());
