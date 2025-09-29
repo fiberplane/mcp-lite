@@ -37,6 +37,18 @@
         "wrangler": "^4.36.0",
       },
     },
+    "examples/groups-composition": {
+      "name": "@mcp-lite-examples/groups-composition",
+      "version": "1.0.0",
+      "dependencies": {
+        "hono": "^4.9.5",
+        "mcp-lite": "workspace:*",
+      },
+      "devDependencies": {
+        "@internal/test-utils": "workspace:*",
+        "typescript": "^5.9.2",
+      },
+    },
     "examples/validation-arktype": {
       "name": "@mcp-lite-examples/validation-arktype",
       "version": "1.0.3",
@@ -340,6 +352,8 @@
     "@mcp-lite-examples/auth-clerk": ["@mcp-lite-examples/auth-clerk@workspace:examples/auth-clerk"],
 
     "@mcp-lite-examples/cloudflare-worker-kv-r2": ["@mcp-lite-examples/cloudflare-worker-kv-r2@workspace:examples/cloudflare-worker-kv-r2"],
+
+    "@mcp-lite-examples/groups-composition": ["@mcp-lite-examples/groups-composition@workspace:examples/groups-composition"],
 
     "@mcp-lite-examples/validation-arktype": ["@mcp-lite-examples/validation-arktype@workspace:examples/validation-arktype"],
 
