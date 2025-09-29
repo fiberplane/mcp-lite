@@ -8,15 +8,14 @@ interface PendingRequest {
   error?: string;
 }
 
+type ClientRequestEntry = {
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+  pollInterval?: ReturnType<typeof setInterval>;
+};
+
 export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
-  private localPending = new Map<
-    string,
-    {
-      resolve: (value: unknown) => void;
-      reject: (reason?: unknown) => void;
-      pollInterval?: ReturnType<typeof setInterval>;
-    }
-  >();
+  private localPending = new Map<string, ClientRequestEntry>();
 
   constructor(
     private kv: KVNamespace,
@@ -52,7 +51,7 @@ export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
     });
 
     // Store local handlers for this instance
-    const localEntry = { resolve, reject };
+    const localEntry: ClientRequestEntry = { resolve, reject };
     this.localPending.set(key, localEntry);
 
     // Start polling for response from other instances
