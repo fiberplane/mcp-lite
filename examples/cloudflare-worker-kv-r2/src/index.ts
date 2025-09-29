@@ -21,7 +21,7 @@ app.all("/mcp", async (c) => {
 // Root route describing where to find the MCP endpoint
 app.get("/", (c) => {
   return c.text(
-    "This is Authenticated MCP Server\n\nConnect to /mcp with your MCP client to start the auth flow",
+    "This is an MCP Server that controls Cloudflare KV\n\nConnect to /mcp with your MCP client to start PUTting and GETting values",
   );
 });
 
