@@ -372,6 +372,7 @@ export class StreamableHttpTransport {
         !isInitializeRequest &&
         protocolHeader &&
         protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION;
+
       if (shouldReturnProtocolMismatchError) {
         const responseId = isNotification
           ? null

@@ -69,8 +69,6 @@ async function runMiddlewares(
   await dispatch(0);
 }
 
-// progress token extraction now lives in context.ts
-
 export interface McpServerOptions {
   name: string;
   version: string;
