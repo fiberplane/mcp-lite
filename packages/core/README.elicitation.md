@@ -33,17 +33,21 @@ interface PendingRequest {
 }
 
 export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
-  private localPending = new Map<string, { 
-    resolve: (value: unknown) => void; 
+  private localPending = new Map<string, {
+    resolve: (value: unknown) => void;
     reject: (reason?: unknown) => void;
     pollInterval?: ReturnType<typeof setInterval>;
   }>();
+  private defaultTimeoutMs: number;
+  private pollIntervalMs: number;
 
   constructor(
     private kv: KVNamespace,
-    private defaultTimeoutMs: number = 30000,
-    private pollIntervalMs: number = 1000
-  ) {}
+    options: { defaultTimeoutMs?: number; pollIntervalMs?: number } = {}
+  ) {
+    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 30000;
+    this.pollIntervalMs = options.pollIntervalMs ?? 1000;
+  }
 
   createPending(
     sessionId: string | undefined,
@@ -202,8 +206,10 @@ export default {
       }),
       clientRequestAdapter: new CloudflareKVClientRequestAdapter(
         env.PENDING_REQUESTS_KV,
-        30000,  // 30s timeout
-        1000    // 1s poll interval
+        {
+          defaultTimeoutMs: 30000,  // 30s timeout
+          pollIntervalMs: 1000      // 1s poll interval
+        }
       )
     });
 

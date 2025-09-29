@@ -94,8 +94,10 @@ const transport = new StreamableHttpTransport({
   }),
   clientRequestAdapter: new CloudflareKVClientRequestAdapter(
     env.PENDING_REQUESTS_KV,
-    30000, // 30s timeout
-    1000, // 1s poll interval
+    {
+      defaultTimeoutMs: 30000, // 30s timeout
+      pollIntervalMs: 1000, // 1s poll interval
+    },
   ),
 });
 const httpHandler = transport.bind(mcpServer);

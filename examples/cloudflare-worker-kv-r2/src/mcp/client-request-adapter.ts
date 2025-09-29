@@ -14,14 +14,23 @@ type ClientRequestEntry = {
   pollInterval?: ReturnType<typeof setInterval>;
 };
 
+export interface CloudflareKVClientRequestAdapterOptions {
+  defaultTimeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
 export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
   private localPending = new Map<string, ClientRequestEntry>();
+  private defaultTimeoutMs: number;
+  private pollIntervalMs: number;
 
   constructor(
     private kv: KVNamespace,
-    private defaultTimeoutMs: number = 30000,
-    private pollIntervalMs: number = 1000,
-  ) {}
+    options: CloudflareKVClientRequestAdapterOptions = {},
+  ) {
+    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 30000;
+    this.pollIntervalMs = options.pollIntervalMs ?? 1000;
+  }
 
   createPending(
     sessionId: string | undefined,
