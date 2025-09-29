@@ -5,7 +5,7 @@ This is an example of using mcp-lite with Cloudflare KV, making calls to KV from
 To make this work, we generate types for the Worker (`bun cf-typegen`), then import the bindings using:
 
 ```ts
-import { env } from "cloudflare:worker";
+import { env } from "cloudflare:workers";
 
 // now `env.KV` gives us access to the KV store
 // however! we can only call it from within an execution context (like inside a tool call)
