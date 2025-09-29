@@ -16,7 +16,7 @@
       "path": "./examples/auth-clerk"
     },
     {
-      "path": "./examples/cloudflare-worker-kv"
+      "path": "./examples/cloudflare-worker-kv-r2"
     },
     {
       "path": "./examples/validation-arktype"
