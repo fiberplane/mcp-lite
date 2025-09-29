@@ -2,6 +2,8 @@ import { env } from "cloudflare:workers";
 import { toJsonSchema } from "@valibot/to-json-schema";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import * as v from "valibot";
+import { CloudflareKVClientRequestAdapter } from "./client-request-adapter";
+import { CloudflareKVSessionAdapter } from "./session-adapter";
 
 export const mcpServer = new McpServer({
   name: "cloudflare-worker-kv",
@@ -44,7 +46,18 @@ mcpServer.tool("put-kv", {
   },
 });
 
-const transport = new StreamableHttpTransport();
+const transport = new StreamableHttpTransport({
+  sessionAdapter: new CloudflareKVSessionAdapter({
+    kv: env.SESSIONS_KV,
+    maxEventBufferSize: 1000,
+    keyPrefix: "mcp-session:",
+  }),
+  clientRequestAdapter: new CloudflareKVClientRequestAdapter(
+    env.PENDING_REQUESTS_KV,
+    30000, // 30s timeout
+    1000, // 1s poll interval
+  ),
+});
 const httpHandler = transport.bind(mcpServer);
 
 export { httpHandler };
