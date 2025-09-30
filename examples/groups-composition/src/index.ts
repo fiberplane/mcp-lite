@@ -5,6 +5,13 @@ import { McpServer, StreamableHttpTransport } from "mcp-lite";
 const validateServer = new McpServer({ name: "validate", version: "1.0.0" })
   .tool("email", {
     description: "Check if string is valid email",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(args.value);
       return {
@@ -14,6 +21,13 @@ const validateServer = new McpServer({ name: "validate", version: "1.0.0" })
   })
   .tool("url", {
     description: "Check if string is valid URL",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       try {
         new URL(args.value);
@@ -25,6 +39,13 @@ const validateServer = new McpServer({ name: "validate", version: "1.0.0" })
   })
   .tool("json", {
     description: "Check if string is valid JSON",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       try {
         JSON.parse(args.value);
@@ -39,6 +60,13 @@ const validateServer = new McpServer({ name: "validate", version: "1.0.0" })
 const transformServer = new McpServer({ name: "transform", version: "1.0.0" })
   .tool("camelCase", {
     description: "Convert string to camelCase",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       const camel = args.value
         .replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => chr.toUpperCase())
@@ -48,6 +76,13 @@ const transformServer = new McpServer({ name: "transform", version: "1.0.0" })
   })
   .tool("snakeCase", {
     description: "Convert string to snake_case",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       const snake = args.value
         .replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
@@ -58,6 +93,13 @@ const transformServer = new McpServer({ name: "transform", version: "1.0.0" })
   })
   .tool("base64Encode", {
     description: "Encode string to base64",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       const encoded = btoa(args.value);
       return { content: [{ type: "text", text: encoded }] };
@@ -65,6 +107,13 @@ const transformServer = new McpServer({ name: "transform", version: "1.0.0" })
   })
   .tool("base64Decode", {
     description: "Decode base64 string",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string }) => {
       try {
         const decoded = atob(args.value);
@@ -79,6 +128,14 @@ const transformServer = new McpServer({ name: "transform", version: "1.0.0" })
 const formatServer = new McpServer({ name: "format", version: "1.0.0" })
   .tool("json", {
     description: "Pretty-print JSON with indentation",
+    inputSchema: {
+      type: "object",
+      properties: {
+        value: { type: "string" },
+        indent: { type: "number" },
+      },
+      required: ["value"],
+    },
     handler: (args: { value: string; indent?: number }) => {
       try {
         const parsed = JSON.parse(args.value);
@@ -91,6 +148,13 @@ const formatServer = new McpServer({ name: "format", version: "1.0.0" })
   })
   .tool("bytes", {
     description: "Format bytes to human-readable size",
+    inputSchema: {
+      type: "object",
+      properties: {
+        bytes: { type: "number" },
+      },
+      required: ["bytes"],
+    },
     handler: (args: { bytes: number }) => {
       const units = ["B", "KB", "MB", "GB", "TB"];
       let size = args.bytes;
