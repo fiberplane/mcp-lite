@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.4.0
+
+### Minor Changes
+
+- 097977b: Add support for making server-to-client requests and elicitations. This enables the MCP server to request more information over the wire.
+
 ## 0.3.0
 
 ### Minor Changes
