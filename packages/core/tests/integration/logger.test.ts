@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/complexity/useLiteralKeys: testing a private property */
 import { describe, expect, it } from "bun:test";
 import { McpServer } from "../../src/core.js";
 import type { MCPServerContext } from "../../src/types.js";
@@ -5,7 +6,7 @@ import type { MCPServerContext } from "../../src/types.js";
 describe("Logger", () => {
   it("should use console as default logger", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
-    expect(server.logger).toBe(console);
+    expect(server["logger"]).toBe(console);
   });
 
   it("should use custom logger when provided", () => {
@@ -23,7 +24,7 @@ describe("Logger", () => {
       logger: customLogger,
     });
 
-    expect(server.logger).toBe(customLogger);
+    expect(server["logger"]).toBe(customLogger);
   });
 
   it("should log error when child middleware doesn't call next()", async () => {
@@ -52,9 +53,9 @@ describe("Logger", () => {
     parent.group(child);
 
     try {
-      await parent.handleToolsCall({ name: "test", arguments: {} }, {
+      await parent["handleToolsCall"]({ name: "test", arguments: {} }, {
         validate: () => ({}),
-      } as MCPServerContext);
+      } as unknown as MCPServerContext);
       expect(true).toBe(false); // Should not reach here
     } catch (_error) {
       // Should throw error
@@ -95,9 +96,9 @@ describe("Logger", () => {
     parent.group(child);
 
     try {
-      await parent.handleResourcesRead({ uri: "file://test.txt" }, {
+      await parent["handleResourcesRead"]({ uri: "file://test.txt" }, {
         validate: () => ({}),
-      } as MCPServerContext);
+      } as unknown as MCPServerContext);
       expect(true).toBe(false); // Should not reach here
     } catch (_error) {
       // Should throw error
@@ -108,8 +109,11 @@ describe("Logger", () => {
   });
 
   it("should allow disabling logs with no-op logger", async () => {
+    let errorCallCount = 0;
     const noopLogger = {
-      error: () => {},
+      error: () => {
+        errorCallCount++;
+      },
       warn: () => {},
       info: () => {},
       debug: () => {},
@@ -131,14 +135,16 @@ describe("Logger", () => {
 
     parent.group(child);
 
-    // Should not throw during test setup, just when calling the tool
     try {
-      await parent.handleToolsCall({ name: "test", arguments: {} }, {
+      await parent["handleToolsCall"]({ name: "test", arguments: {} }, {
         validate: () => ({}),
-      } as MCPServerContext);
+      } as unknown as MCPServerContext);
+      expect(true).toBe(false); // Should not reach here
     } catch (error) {
-      // Error should be thrown, but no logs should be produced
       expect(error).toBeDefined();
+      // Verify logger was called but didn't capture/output anything
+      // This is imperfect, but is 'good enough' verification that console.log was not called
+      expect(errorCallCount).toBe(1);
     }
   });
 });
