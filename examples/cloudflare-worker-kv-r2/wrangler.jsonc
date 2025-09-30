@@ -11,6 +11,14 @@
     {
       "binding": "KV",
       "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "binding": "SESSIONS_KV",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "binding": "PENDING_REQUESTS_KV",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     }
   ],
   "r2_buckets": [
