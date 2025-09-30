@@ -6,7 +6,7 @@ export {
   SSE_ACCEPT_HEADER,
   SUPPORTED_MCP_PROTOCOL_VERSION,
 } from "./constants.js";
-export { McpServer, type McpServerOptions } from "./core.js";
+export { type Logger, McpServer, type McpServerOptions } from "./core.js";
 export { RpcError } from "./errors.js";
 export type {
   EventId,

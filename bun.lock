@@ -37,6 +37,18 @@
         "wrangler": "^4.36.0",
       },
     },
+    "examples/composing-servers": {
+      "name": "@mcp-lite-examples/composing-servers",
+      "version": "1.0.0",
+      "dependencies": {
+        "hono": "^4.9.5",
+        "mcp-lite": "workspace:*",
+      },
+      "devDependencies": {
+        "@internal/test-utils": "workspace:*",
+        "typescript": "^5.9.2",
+      },
+    },
     "examples/validation-arktype": {
       "name": "@mcp-lite-examples/validation-arktype",
       "version": "1.0.3",
@@ -79,7 +91,7 @@
     },
     "packages/core": {
       "name": "mcp-lite",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "dependencies": {
         "@standard-schema/spec": "^1.0.0",
       },
@@ -341,6 +353,8 @@
     "@mcp-lite-examples/auth-clerk": ["@mcp-lite-examples/auth-clerk@workspace:examples/auth-clerk"],
 
     "@mcp-lite-examples/cloudflare-worker-kv-r2": ["@mcp-lite-examples/cloudflare-worker-kv-r2@workspace:examples/cloudflare-worker-kv-r2"],
+
+    "@mcp-lite-examples/composing-servers": ["@mcp-lite-examples/composing-servers@workspace:examples/composing-servers"],
 
     "@mcp-lite-examples/validation-arktype": ["@mcp-lite-examples/validation-arktype@workspace:examples/validation-arktype"],
 

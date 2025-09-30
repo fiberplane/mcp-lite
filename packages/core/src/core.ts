@@ -69,6 +69,17 @@ async function runMiddlewares(
   await dispatch(0);
 }
 
+/**
+ * Logger interface for MCP server internal logging.
+ * Defaults to console if not provided.
+ */
+export interface Logger {
+  error(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  debug(message: string, ...args: unknown[]): void;
+}
+
 export interface McpServerOptions {
   name: string;
   version: string;
@@ -89,6 +100,39 @@ export interface McpServerOptions {
    * ```
    */
   schemaAdapter?: SchemaAdapter;
+  /**
+   * Logger for internal server messages.
+   * Defaults to console if not provided.
+   *
+   * @example Using a custom logger
+   * ```typescript
+   * const server = new McpServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   logger: {
+   *     error: (msg, ...args) => myLogger.error(msg, ...args),
+   *     warn: (msg, ...args) => myLogger.warn(msg, ...args),
+   *     info: (msg, ...args) => myLogger.info(msg, ...args),
+   *     debug: (msg, ...args) => myLogger.debug(msg, ...args),
+   *   }
+   * });
+   * ```
+   *
+   * @example Disabling logs
+   * ```typescript
+   * const server = new McpServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   logger: {
+   *     error: () => {},
+   *     warn: () => {},
+   *     info: () => {},
+   *     debug: () => {},
+   *   }
+   * });
+   * ```
+   */
+  logger?: Logger;
 }
 
 /**
@@ -210,6 +254,7 @@ export class McpServer {
   private capabilities: InitializeResult["capabilities"] = {};
   private onErrorHandler?: OnError;
   private schemaAdapter?: SchemaAdapter;
+  private logger: Logger;
 
   private tools = new Map<string, ToolEntry>();
   private prompts = new Map<string, PromptEntry>();
@@ -248,6 +293,7 @@ export class McpServer {
       version: options.version,
     };
     this.schemaAdapter = options.schemaAdapter;
+    this.logger = options.logger || console;
 
     this.methods = {
       [METHODS.INITIALIZE]: this.handleInitialize.bind(this),
@@ -681,6 +727,348 @@ export class McpServer {
     }
 
     return this;
+  }
+
+  /**
+   * Mount a child server into this parent server for composition.
+   *
+   * Enables modular server design by composing multiple McpServer instances.
+   * Uses keep-first semantics: first registered tool/prompt/resource wins,
+   * later duplicates are silently skipped.
+   *
+   * @param child - Child server to mount (flat, no namespacing)
+   * @returns This server instance for chaining
+   *
+   * @see {@link Logger} For configuring logging to track duplicate warnings
+   * @see {@link Middleware} For middleware composition behavior
+   *
+   * @example Flat mounting (no namespacing)
+   * ```typescript
+   * const git = new McpServer({ name: 'git', version: '1.0.0' })
+   *   .tool('clone', { handler: cloneHandler });
+   *
+   * const app = new McpServer({ name: 'app', version: '1.0.0' })
+   *   .group(git);  // tools/list shows 'clone'
+   * ```
+   *
+   * @example Complete example
+   * See examples/composing-servers for a full working example with multiple
+   * child servers, middleware composition, and real-world patterns.
+   */
+  group(child: McpServer): this;
+
+  /**
+   * Mount a child server with namespaced tools and prompts.
+   *
+   * @param prefix - Namespace prefix (e.g., 'git' makes 'clone' → 'git/clone')
+   * @param child - Child server to mount
+   * @returns This server instance for chaining
+   *
+   * @see {@link Logger} For configuring logging to track duplicate warnings
+   * @see {@link Middleware} For middleware composition behavior
+   *
+   * @example Prefix namespacing
+   * ```typescript
+   * const git = new McpServer({ name: 'git', version: '1.0.0' })
+   *   .tool('clone', { handler: cloneHandler });
+   *
+   * const app = new McpServer({ name: 'app', version: '1.0.0' })
+   *   .group('git', git);  // tools/list shows 'git/clone'
+   * ```
+   *
+   * @example Complete example
+   * See examples/composing-servers for a full working example with multiple
+   * child servers, middleware composition, and real-world patterns.
+   */
+  group(prefix: string, child: McpServer): this;
+
+  /**
+   * Mount a child server with flexible namespacing options.
+   *
+   * @param options - Namespacing configuration
+   * @param child - Child server to mount
+   * @returns This server instance for chaining
+   *
+   * @see {@link Logger} For configuring logging to track duplicate warnings
+   * @see {@link Middleware} For middleware composition behavior
+   *
+   * @example Suffix namespacing
+   * ```typescript
+   * const claude = new McpServer({ name: 'claude', version: '1.0.0' })
+   *   .tool('generateText', { handler: claudeHandler });
+   *
+   * const app = new McpServer({ name: 'app', version: '1.0.0' })
+   *   .group({ suffix: 'claude' }, claude);  // tools/list shows 'generateText_claude'
+   * ```
+   *
+   * @example Both prefix and suffix
+   * ```typescript
+   * .group({ prefix: 'ai', suffix: 'v2' }, server);  // 'ai/generateText_v2'
+   * ```
+   */
+  group(options: { prefix?: string; suffix?: string }, child: McpServer): this;
+
+  group(
+    prefixOrOptionsOrChild:
+      | string
+      | { prefix?: string; suffix?: string }
+      | McpServer,
+    child?: McpServer,
+  ): this {
+    let prefix = "";
+    let suffix = "";
+    let childServer: McpServer;
+
+    if (typeof prefixOrOptionsOrChild === "string") {
+      // .group("prefix", child)
+      prefix = prefixOrOptionsOrChild;
+      childServer = child as McpServer;
+    } else if (prefixOrOptionsOrChild instanceof McpServer) {
+      // .group(child)
+      childServer = prefixOrOptionsOrChild;
+    } else {
+      // .group({ prefix?, suffix? }, child)
+      prefix = prefixOrOptionsOrChild.prefix || "";
+      suffix = prefixOrOptionsOrChild.suffix || "";
+      childServer = child as McpServer;
+    }
+
+    this.mountChild(prefix, suffix, childServer);
+    return this;
+  }
+
+  /**
+   * Export registries snapshot for child server mounting.
+   * Used internally by .group() to compose servers.
+   * @internal
+   */
+  protected _exportRegistries(): {
+    tools: Array<{ name: string; entry: ToolEntry }>;
+    prompts: Array<{ name: string; entry: PromptEntry }>;
+    resources: Array<{ template: string; entry: ResourceEntry }>;
+  } {
+    return {
+      tools: Array.from(this.tools.entries()).map(([name, entry]) => ({
+        name,
+        entry,
+      })),
+      prompts: Array.from(this.prompts.entries()).map(([name, entry]) => ({
+        name,
+        entry,
+      })),
+      resources: Array.from(this.resources.entries()).map(
+        ([template, entry]) => ({ template, entry }),
+      ),
+    };
+  }
+
+  /**
+   * Export middlewares snapshot for child server mounting.
+   * Used internally by .group() to compose middleware chains.
+   * @internal
+   */
+  protected _exportMiddlewares(): Middleware[] {
+    return [...this.middlewares];
+  }
+
+  /**
+   * Wrap a tool or prompt handler with child middlewares for composition.
+   * Ensures child middlewares run around the handler while parent middlewares
+   * run around the entire wrapped handler.
+   * @internal
+   */
+  private wrapWithMiddlewares(
+    mws: Middleware[],
+    handler: MethodHandler,
+  ): MethodHandler {
+    return async (params, ctx) => {
+      let result: unknown;
+      let handlerCalled = false;
+
+      await runMiddlewares(mws, ctx, async () => {
+        result = await handler(params, ctx);
+        handlerCalled = true;
+      });
+
+      if (!handlerCalled) {
+        this.logger.error(
+          "[mcp-lite] Handler was not executed. A middleware in the child server's middleware chain did not call next(). This is a server configuration issue.",
+        );
+        throw new RpcError(
+          JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+          "Internal server error",
+        );
+      }
+
+      return result;
+    };
+  }
+
+  /**
+   * Wrap a resource handler with child middlewares for composition.
+   * Ensures child middlewares run around the handler while parent middlewares
+   * run around the entire wrapped handler.
+   * @internal
+   */
+  private wrapResourceHandler(
+    mws: Middleware[],
+    handler: ResourceHandler,
+  ): ResourceHandler {
+    return async (uri, vars, ctx) => {
+      let result: ResourceReadResult | undefined;
+      let handlerCalled = false;
+
+      await runMiddlewares(mws, ctx, async () => {
+        result = await handler(uri, vars, ctx);
+        handlerCalled = true;
+      });
+
+      if (!handlerCalled) {
+        this.logger.error(
+          "[mcp-lite] Resource handler was not executed. A middleware in the child server's middleware chain did not call next(). This is a server configuration issue.",
+        );
+        throw new RpcError(
+          JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+          "Internal server error",
+        );
+      }
+
+      if (!result) {
+        this.logger.error(
+          "[mcp-lite] Resource handler returned no result. This is a server implementation issue.",
+        );
+        throw new RpcError(
+          JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+          "Internal server error",
+        );
+      }
+
+      return result;
+    };
+  }
+
+  /**
+   * Mount a child server into this parent server.
+   * Implements keep-first semantics: first registered tool/prompt/resource wins,
+   * duplicates are silently skipped.
+   * @internal
+   */
+  private mountChild(prefix: string, suffix: string, child: McpServer): void {
+    /**
+     * Adds prefix or suffix to a tool name before mounting
+     */
+    const buildScopedName = (originalName: string) => {
+      let scopedName = originalName;
+      if (prefix) scopedName = `${prefix}/${scopedName}`;
+      if (suffix) scopedName = `${scopedName}_${suffix}`;
+      return scopedName;
+    };
+    const regs = child._exportRegistries();
+    const childMWs = child._exportMiddlewares();
+    let addedTools = 0;
+    let addedPrompts = 0;
+    let addedResources = 0;
+
+    for (const { name, entry } of regs.tools) {
+      const qualifiedName = buildScopedName(name);
+      if (!this.tools.has(qualifiedName)) {
+        const wrappedHandler =
+          childMWs.length > 0
+            ? this.wrapWithMiddlewares(childMWs, entry.handler)
+            : entry.handler;
+
+        const wrappedEntry: ToolEntry = {
+          metadata: { ...entry.metadata, name: qualifiedName },
+          handler: wrappedHandler,
+          validator: entry.validator,
+        };
+
+        this.tools.set(qualifiedName, wrappedEntry);
+        addedTools++;
+      } else {
+        this.logger.warn(
+          `[mcp-lite] Tool '${qualifiedName}' already exists, skipping duplicate from child server. ` +
+            `This follows keep-first semantics where the first registered tool wins.`,
+        );
+      }
+    }
+
+    for (const { name, entry } of regs.prompts) {
+      const qualifiedName = buildScopedName(name);
+      if (!this.prompts.has(qualifiedName)) {
+        const wrappedHandler =
+          childMWs.length > 0
+            ? (this.wrapWithMiddlewares(
+                childMWs,
+                entry.handler as MethodHandler,
+              ) as PromptHandler)
+            : entry.handler;
+
+        const wrappedEntry: PromptEntry = {
+          metadata: { ...entry.metadata, name: qualifiedName },
+          handler: wrappedHandler,
+          validator: entry.validator,
+        };
+
+        this.prompts.set(qualifiedName, wrappedEntry);
+        addedPrompts++;
+      } else {
+        this.logger.warn(
+          `[mcp-lite] Prompt '${qualifiedName}' already exists, skipping duplicate from child server. ` +
+            `This follows keep-first semantics where the first registered prompt wins.`,
+        );
+      }
+    }
+
+    for (const { template, entry } of regs.resources) {
+      if (!this.resources.has(template)) {
+        const wrappedHandler =
+          childMWs.length > 0
+            ? this.wrapResourceHandler(childMWs, entry.handler)
+            : entry.handler;
+
+        const wrappedEntry: ResourceEntry = {
+          ...entry,
+          handler: wrappedHandler,
+        };
+
+        this.resources.set(template, wrappedEntry);
+        addedResources++;
+      } else {
+        this.logger.warn(
+          `[mcp-lite] Resource '${template}' already exists, skipping duplicate from child server. ` +
+            `This follows keep-first semantics where the first registered resource wins.`,
+        );
+      }
+    }
+
+    if (addedTools > 0 && !this.capabilities.tools) {
+      this.capabilities.tools = { listChanged: true };
+    }
+    if (addedPrompts > 0 && !this.capabilities.prompts) {
+      this.capabilities.prompts = { listChanged: true };
+    }
+    if (addedResources > 0 && !this.capabilities.resources) {
+      this.capabilities.resources = { listChanged: true };
+    }
+
+    if (this.initialized) {
+      if (addedTools > 0) {
+        this.notificationSender?.(undefined, {
+          method: METHODS.NOTIFICATIONS.TOOLS.LIST_CHANGED,
+        });
+      }
+      if (addedPrompts > 0) {
+        this.notificationSender?.(undefined, {
+          method: METHODS.NOTIFICATIONS.PROMPTS.LIST_CHANGED,
+        });
+      }
+      if (addedResources > 0) {
+        this.notificationSender?.(undefined, {
+          method: METHODS.NOTIFICATIONS.RESOURCES.LIST_CHANGED,
+        });
+      }
+    }
   }
 
   /**
