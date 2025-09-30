@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.5.1
+
+### Patch Changes
+
+- 89d32a7: Fix releases (internal fix)
+
 ## 0.5.0
 
 ### Minor Changes
