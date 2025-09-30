@@ -9,9 +9,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fiberplane/mcp.git"
+    "url": "git+https://github.com/fiberplane/mcp-lite.git"
   },
-  "homepage": "https://github.com/fiberplane/mcp",
+  "homepage": "https://github.com/fiberplane/mcp-lite",
   "scripts": {
     "build": "bun run --filter=* build",
     "typecheck": "bun run --filter=* typecheck",
