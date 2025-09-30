@@ -1,12 +1,17 @@
 # mcp-lite with Cloudflare bindings
 
-This is an example of using mcp-lite with Cloudflare KV and R2, demonstrating:
+This is an example of using mcp-lite with Cloudflare KV.
 
-- **KV storage for tools**: Making calls to KV from within tool handlers
+The MCP server exposes get, put, and delete functionality for a KV instance,
+so that an MCP client can manage values in the KV store.
+The server requests a confirmation, via an elicitation, when the client attempts to delete a record.
+
+The example also uses two additional KV stores for session persistence and for client request handling (e.g., elicitations).
+
 - **Session persistence**: Using CloudflareKVSessionAdapter for session storage
 - **Client request handling**: Using CloudflareKVClientRequestAdapter for async request processing
 
-To make this work, we generate types for the Worker (`bun cf-typegen`), then import the bindings using:
+To make this work properly, we generate types for the Worker (`bun cf-typegen`), then import the KV bindings on the env _at the top level_ using:
 
 ```ts
 import { env } from "cloudflare:workers";
@@ -17,18 +22,19 @@ import { env } from "cloudflare:workers";
 
 ## Architecture
 
-This example includes two custom adapters:
+This example includes two custom adapters to enable statefulness:
 
 ### CloudflareKVSessionAdapter
 - Stores MCP session data in Cloudflare KV
 - Handles session lifecycle (create, get, update, delete)
 - Manages event streaming with buffering and replay functionality
-- Serializes Map-based session data to JSON for KV storage
 
 ### CloudflareKVClientRequestAdapter  
-- Handles asynchronous client requests using KV for coordination
+- Handles asynchronous server-to-client requests (sampling, elicitation) using KV for coordination
 - Implements polling mechanism for request/response communication
 - Manages request timeouts and cleanup
+
+> **NOTE** This adapter would be better modeled in Cloudflare's ecosystem as a Durable Object.
 
 ## Development
 
