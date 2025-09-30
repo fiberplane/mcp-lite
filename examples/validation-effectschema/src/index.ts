@@ -1,25 +1,27 @@
 import { JSONSchema, Schema } from "effect";
-import {McpServer, StreamableHttpTransport} from "mcp-lite";
-import {Hono} from "hono";
+import { Hono } from "hono";
+import { McpServer, StreamableHttpTransport } from "mcp-lite";
+
+type EffectSchema = ReturnType<typeof Schema.standardSchemaV1>;
 
 const mcp = new McpServer({
-    name: "echo-server",
-    version: "1.0.0",
-    schemaAdapter: (schema) => JSONSchema.make(schema) // TODO: this is red squiggly idk why
+  name: "echo-server",
+  version: "1.0.0",
+  schemaAdapter: (schema) => JSONSchema.make(schema as EffectSchema),
 });
 
 const EchoSchema = Schema.Struct({
-    message: Schema.String
+  message: Schema.String,
 });
 
 // Add a tool
 mcp.tool("echo", {
-    description: "Echoes the input message",
-    inputSchema: Schema.standardSchemaV1(EchoSchema),
-    handler: (args) => ({
-        // args is automatically typed as { message: string }
-        content: [{ type: "text", text: args.message }],
-    }),
+  description: "Echoes the input message",
+  inputSchema: Schema.standardSchemaV1(EchoSchema),
+  handler: (args) => ({
+    // args is automatically typed as { message: string }
+    content: [{ type: "text", text: args.message }],
+  }),
 });
 
 // Create HTTP transport
@@ -31,13 +33,13 @@ const app = new Hono();
 
 // Add MCP endpoint
 app.all("/mcp", async (c) => {
-    const response = await httpHandler(c.req.raw);
-    return response;
+  const response = await httpHandler(c.req.raw);
+  return response;
 });
 
 // Root endpoint
 app.get("/", (c) => {
-    return c.text("Echo MCP Server - MCP endpoint available at /mcp");
+  return c.text("Echo MCP Server - MCP endpoint available at /mcp");
 });
 
 export default app;
