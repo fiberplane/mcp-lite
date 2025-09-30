@@ -1,9 +1,14 @@
 # mcp-lite
 
+## 0.3.0
+
+### Minor Changes
+
+- fdb714c: Breaking change: `eventStore` is replaced by `sessionStore` with a generic `SessionStore` interface that allows for combined MCP session management. Default `InMemorySessionStore` is provided.
+
 ## 0.2.3
 
 thank you @jacksteamdev for the quality of life bump!
-
 
 ### Patch Changes
 
