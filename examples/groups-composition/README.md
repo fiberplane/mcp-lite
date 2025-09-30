@@ -4,10 +4,10 @@ This example demonstrates how to use the `.group()` method to compose multiple M
 
 ## Features
 
-- **Namespaced mounting**: Tools and prompts are namespaced with a prefix (e.g., `git/clone`, `fs/read`)
-- **Flat mounting**: Mount child servers without a prefix
-- **Middleware composition**: Parent and child middlewares execute in order
-- **Keep-first semantics**: First registered tool/prompt wins if there are duplicates
+- **Namespaced mounting**: Tools are namespaced with prefixes (`validate/*`, `transform/*`, `format/*`)
+- **Middleware composition**: Parent middleware tracks timing for all requests
+- **Pure JavaScript**: Works in any environment (Node.js, Bun, Cloudflare Workers, Deno)
+- **Clear separation of concerns**: Each server handles a specific domain
 
 ## Running the Example
 
@@ -29,30 +29,24 @@ bunx @modelcontextprotocol/inspector
 
 This example creates three specialized child servers:
 
-1. **Git Server** - Tools for git operations (clone, status)
-2. **Filesystem Server** - Tools for file operations (read, write)
-3. **Database Server** - Tools for database operations (query)
+### Validate Server (`validate/*`)
 
-These are composed into a parent server using `.group()`:
+- `validate/email` - Check if string is valid email
+- `validate/url` - Check if string is valid URL
+- `validate/json` - Check if string is valid JSON
 
-```typescript
-const app = new McpServer({ name: "app", version: "1.0.0" })
-  .group("git", gitServer)
-  .group("fs", fsServer)
-  .group(dbServer); // flat mount without prefix
+### Transform Server (`transform/*`)
 
-// Tools are now available as:
-// - git/clone
-// - git/status
-// - fs/read
-// - fs/write
-// - query (flat mounted)
-```
+- `transform/camelCase` - Convert string to camelCase
+- `transform/snakeCase` - Convert string to snake_case
+- `transform/base64Encode` - Encode string to base64
+- `transform/base64Decode` - Decode base64 string
 
-## Middleware Composition
+### Format Server (`format/*`)
 
-The example also demonstrates middleware composition:
+- `format/json` - Pretty-print JSON with indentation
+- `format/bytes` - Format bytes to human-readable size (KB, MB, GB)
 
-- Parent middleware logs all requests
-- Git child middleware adds git-specific logging
-- Execution order: Parent pre → Child pre → Handler → Child post → Parent post
+### Parent Server
+
+The parent server composes all three child servers with namespacing and adds middleware to track request timing.
