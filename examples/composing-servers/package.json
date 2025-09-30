@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-lite-examples/groups-composition",
+  "name": "@mcp-lite-examples/composing-servers",
   "version": "1.0.0",
   "description": "MCP server example using mcp-lite with server composition via .group()",
   "type": "module",
@@ -22,8 +22,7 @@
     "mcp",
     "mcp-lite",
     "model-context-protocol",
-    "server-composition",
-    "groups"
+    "server-composition"
   ],
   "author": "Fiberplane <info@fiberplane.com>",
   "license": "MIT"

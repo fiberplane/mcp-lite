@@ -16,7 +16,7 @@
       "path": "./examples/auth-clerk"
     },
     {
-      "path": "./examples/groups-composition"
+      "path": "./examples/composing-servers"
     },
     {
       "path": "./examples/cloudflare-worker-kv-r2"

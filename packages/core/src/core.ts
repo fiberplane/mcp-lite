@@ -752,7 +752,7 @@ export class McpServer {
    * ```
    *
    * @example Complete example
-   * See examples/groups-composition for a full working example with multiple
+   * See examples/composing-servers for a full working example with multiple
    * child servers, middleware composition, and real-world patterns.
    */
   group(child: McpServer): this;
@@ -777,7 +777,7 @@ export class McpServer {
    * ```
    *
    * @example Complete example
-   * See examples/groups-composition for a full working example with multiple
+   * See examples/composing-servers for a full working example with multiple
    * child servers, middleware composition, and real-world patterns.
    */
   group(prefix: string, child: McpServer): this;
