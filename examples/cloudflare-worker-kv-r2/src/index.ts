@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-import { httpHandler as mcpHandler } from "./mcp";
+import { httpHandler as mcpHandler } from "./mcp/mcp";
 
 // Create a Hono app to serve our api routes
 const app = new Hono<{ Bindings: CloudflareBindings }>();

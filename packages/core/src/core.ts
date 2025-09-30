@@ -69,8 +69,6 @@ async function runMiddlewares(
   await dispatch(0);
 }
 
-// progress token extraction now lives in context.ts
-
 export interface McpServerOptions {
   name: string;
   version: string;
@@ -222,6 +220,12 @@ export class McpServer {
     notification: { method: string; params?: unknown },
     options?: { relatedRequestId?: string },
   ) => Promise<void> | void;
+
+  private clientRequestSender?: (
+    sessionId: string | undefined,
+    request: JsonRpcReq,
+    options?: { relatedRequestId?: string | number; timeout_ms?: number },
+  ) => Promise<JsonRpcRes>;
 
   /**
    * Create a new MCP server instance.
@@ -693,6 +697,20 @@ export class McpServer {
     this.notificationSender = sender;
   }
 
+  /**
+   * Set the client request sender for elicitation and other client requests.
+   * This is called by the transport to wire up client request delivery.
+   */
+  _setClientRequestSender(
+    sender: (
+      sessionId: string | undefined,
+      request: JsonRpcReq,
+      options?: { relatedRequestId?: string | number; timeout_ms?: number },
+    ) => Promise<JsonRpcRes>,
+  ): void {
+    this.clientRequestSender = sender;
+  }
+
   async _dispatch(
     message: JsonRpcReq | JsonRpcNotification,
     contextOptions: CreateContextOptions = {},
@@ -724,6 +742,9 @@ export class McpServer {
       progressToken,
       progressSender,
       authInfo: contextOptions.authInfo,
+      clientCapabilities: contextOptions.clientCapabilities,
+      schemaAdapter: this.schemaAdapter,
+      clientRequestSender: this.clientRequestSender,
     });
 
     const method = (message as JsonRpcMessage).method;

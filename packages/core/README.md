@@ -301,6 +301,106 @@ mcp.prompt("summarize", {
 });
 ```
 
+## Elicitation
+
+Elicitation enables MCP servers to request input from the client on behalf of the user during tool execution. This allows tools to gather additional information, confirm sensitive operations, or present choices to users through the connected AI application.
+
+### Usage Example
+
+```typescript
+import { z } from "zod";
+
+const DeleteRecordSchema = z.object({
+  recordId: z.string(),
+  tableName: z.string(),
+});
+
+mcp.tool("delete_database_record", {
+  description: "Delete a database record with user confirmation",
+  inputSchema: DeleteRecordSchema,
+  handler: async (args, ctx) => {
+    // Check if client supports elicitation
+    if (!ctx.client.supports("elicitation")) {
+      throw new Error("This tool requires a client that supports elicitation");
+    }
+
+    // Request user confirmation through elicitation
+    const response = await ctx.elicit({
+      message: `Are you sure you want to delete record "${args.recordId}" from table "${args.tableName}"? This action cannot be undone.`,
+      schema: z.object({
+        confirmed: z.boolean(),
+      }),
+    });
+
+    // Handle different response types
+    switch (response.type) {
+
+      // Accept means the response came back, but we still need to check the value of "confirmed"
+      case "accept": {
+        if (response.content.confirmed) {
+          // User confirmed - proceed with deletion
+          await deleteFromDatabase(args.tableName, args.recordId);
+          return {
+            content: [{ 
+              type: "text", 
+              text: `Record "${args.recordId}" has been deleted from "${args.tableName}".` 
+            }],
+          };
+        }
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: "Record deletion declined by user." 
+          }],
+        };
+      }
+      
+      case "decline":
+        return {
+          content: [{ 
+            type: "text", 
+            text: "Record deletion cancelled by user." 
+          }],
+        };
+      
+      case "cancel":
+        throw new Error("Operation was cancelled");
+      
+      default:
+        throw new Error("Unexpected elicitation response");
+    }
+  },
+});
+```
+
+### Setup Instructions
+
+To use elicitation, configure your transport with a `ClientRequestAdapter` alongside your `SessionAdapter`:
+
+```typescript
+import { 
+  StreamableHttpTransport, 
+  InMemorySessionAdapter, 
+  InMemoryClientRequestAdapter 
+} from "mcp-lite";
+
+const transport = new StreamableHttpTransport({
+  sessionAdapter: new InMemorySessionAdapter({
+    maxEventBufferSize: 1024
+  }),
+  clientRequestAdapter: new InMemoryClientRequestAdapter({
+    defaultTimeoutMs: 30000  // 30 second timeout for server-to-client requests
+  })
+});
+
+const httpHandler = transport.bind(mcp);
+```
+
+The `ClientRequestAdapter` manages pending server-to-client requests (such as elicitation), storing them temporarily while waiting for client responses. This enables the server to pause execution, send a request to the client, and resume once the client provides a response.
+
+For an example using Cloudflare KV as the `ClientRequestAdapter` see the [Elicitation README](./packages/core/README.elicitation.md).
+
 ## Middleware
 
 Basic middleware pattern for logging, authentication, or request processing:

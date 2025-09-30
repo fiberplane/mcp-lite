@@ -34,5 +34,12 @@
       }
     }
   ],
-  "files": { "includes": ["**", "!**/dist", "!**/worker-configuration.d.ts"] }
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/worker-configuration.d.ts",
+      "!**/.wrangler"
+    ]
+  }
 }
