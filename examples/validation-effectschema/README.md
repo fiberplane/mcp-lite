@@ -15,7 +15,7 @@ bun start
 The mcp server runs on `http://localhost:3000/mcp`, and you can inspect it at that endpoint with the mcp inspector package:
 
 ```bash
-bunx @modelcontextprotocol/inspect
+bunx @modelcontextprotocol/inspector
 ```
 
 ## How Effect Schema connects to mcp-lite
