@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/complexity/useLiteralKeys: testing a private property */
+
 import { describe, expect, it } from "bun:test";
 import { METHODS } from "../../src/constants.js";
 import { McpServer } from "../../src/core.js";
@@ -26,7 +28,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group("git", child);
 
-      const toolsList = await parent.handleToolsList(
+      const toolsList = await parent["handleToolsList"](
         {},
         {} as MCPServerContext,
       );
@@ -55,7 +57,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group("git", child);
 
-      const promptsList = await parent.handlePromptsList(
+      const promptsList = await parent["handlePromptsList"](
         {},
         {} as MCPServerContext,
       );
@@ -68,7 +70,7 @@ describe("McpServer.group()", () => {
         "file://{path}",
         { description: "Read a file" },
         async (uri) => ({
-          contents: [{ uri: uri.href, text: "file content" }],
+          contents: [{ uri: uri.href, type: "text", text: "file content" }],
         }),
       );
 
@@ -77,7 +79,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group("fs", child);
 
-      const templatesList = await parent.handleResourceTemplatesList(
+      const templatesList = await parent["handleResourceTemplatesList"](
         {},
         {} as MCPServerContext,
       );
@@ -100,7 +102,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group({ suffix: "claude" }, child);
 
-      const toolsList = await parent.handleToolsList(
+      const toolsList = await parent["handleToolsList"](
         {},
         {} as MCPServerContext,
       );
@@ -121,7 +123,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group({ prefix: "ai", suffix: "claude" }, child);
 
-      const toolsList = await parent.handleToolsList(
+      const toolsList = await parent["handleToolsList"](
         {},
         {} as MCPServerContext,
       );
@@ -144,7 +146,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group(child);
 
-      const toolsList = await parent.handleToolsList(
+      const toolsList = await parent["handleToolsList"](
         {},
         {} as MCPServerContext,
       );
@@ -175,10 +177,12 @@ describe("McpServer.group()", () => {
 
       parent.group(child);
 
-      const result = await parent.handleToolsCall(
+      const result = await parent["handleToolsCall"](
         { name: "clone", arguments: {} },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      expect((result as ToolCallResult).content[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect((result as ToolCallResult).content[0]?.text).toBe("v1");
     });
 
@@ -205,10 +209,12 @@ describe("McpServer.group()", () => {
         .group("git", child1)
         .group("git", child2);
 
-      const result = await parent.handleToolsCall(
+      const result = await parent["handleToolsCall"](
         { name: "git/clone", arguments: {} },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      expect((result as ToolCallResult).content[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect((result as ToolCallResult).content[0]?.text).toBe("child1");
     });
 
@@ -220,7 +226,7 @@ describe("McpServer.group()", () => {
         "file://{path}",
         { description: "Parent file" },
         async (uri) => ({
-          contents: [{ uri: uri.href, text: "parent" }],
+          contents: [{ uri: uri.href, type: "text", text: "parent" }],
         }),
       );
 
@@ -228,16 +234,19 @@ describe("McpServer.group()", () => {
         "file://{path}",
         { description: "Child file" },
         async (uri) => ({
-          contents: [{ uri: uri.href, text: "child" }],
+          contents: [{ uri: uri.href, type: "text", text: "child" }],
         }),
       );
 
       parent.group(child);
 
-      const result = await parent.handleResourcesRead(
+      const result = await parent["handleResourcesRead"](
         { uri: "file://test.txt" },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      // @ts-expect-error - type is not present on BlobResourceContents
+      expect(result.contents[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect(result.contents[0]?.text).toBe("parent");
     });
 
@@ -456,7 +465,14 @@ describe("McpServer.group()", () => {
         "file://config.json",
         { description: "Config file" },
         async (uri) => ({
-          contents: [{ uri: uri.href, text: '{"key":"value"}' }],
+          contents: [
+            {
+              uri: uri.href,
+              type: "text",
+              text: '{"key":"value"}',
+              mimeType: "application/json",
+            },
+          ],
         }),
       );
 
@@ -465,7 +481,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group(child);
 
-      const resourcesList = await parent.handleResourcesList(
+      const resourcesList = await parent["handleResourcesList"](
         {},
         {} as MCPServerContext,
       );
@@ -478,7 +494,9 @@ describe("McpServer.group()", () => {
         "github://repos/{owner}/{repo}",
         { description: "GitHub repo" },
         async (uri, vars) => ({
-          contents: [{ uri: uri.href, text: `${vars.owner}/${vars.repo}` }],
+          contents: [
+            { uri: uri.href, type: "text", text: `${vars.owner}/${vars.repo}` },
+          ],
         }),
       );
 
@@ -487,7 +505,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group(child);
 
-      const templatesList = await parent.handleResourceTemplatesList(
+      const templatesList = await parent["handleResourceTemplatesList"](
         {},
         {} as MCPServerContext,
       );
@@ -496,10 +514,13 @@ describe("McpServer.group()", () => {
         "github://repos/{owner}/{repo}",
       );
 
-      const result = await parent.handleResourcesRead(
+      const result = await parent["handleResourcesRead"](
         { uri: "github://repos/foo/bar" },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      // @ts-expect-error - type is not present on BlobResourceContents
+      expect(result.contents[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect(result.contents[0]?.text).toBe("foo/bar");
     });
   });
@@ -621,7 +642,10 @@ describe("McpServer.group()", () => {
         .group("fs", fs)
         .group("db", db);
 
-      const toolsList = await app.handleToolsList({}, {} as MCPServerContext);
+      const toolsList = await app["handleToolsList"](
+        {},
+        {} as MCPServerContext,
+      );
       expect(toolsList.tools).toHaveLength(3);
       expect(toolsList.tools.map((t) => t.name).sort()).toEqual([
         "db/query",
@@ -629,24 +653,30 @@ describe("McpServer.group()", () => {
         "git/clone",
       ]);
 
-      const gitResult = await app.handleToolsCall(
+      const gitResult = await app["handleToolsCall"](
         { name: "git/clone", arguments: {} },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      expect((gitResult as ToolCallResult).content[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect((gitResult as ToolCallResult).content[0]?.text).toBe("cloned");
 
-      const fsResult = await app.handleToolsCall(
+      const fsResult = await app["handleToolsCall"](
         { name: "fs/readFile", arguments: {} },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      expect((fsResult as ToolCallResult).content[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect((fsResult as ToolCallResult).content[0]?.text).toBe(
         "file content",
       );
 
-      const dbResult = await app.handleToolsCall(
+      const dbResult = await app["handleToolsCall"](
         { name: "db/query", arguments: {} },
-        { validate: () => ({}) } as MCPServerContext,
+        { validate: () => ({}) } as unknown as MCPServerContext,
       );
+      expect((dbResult as ToolCallResult).content[0]?.type).toBe("text");
+      // @ts-expect-error - text is the expected property of TextContent, but not present on other Content types
       expect((dbResult as ToolCallResult).content[0]?.text).toBe(
         "query result",
       );
