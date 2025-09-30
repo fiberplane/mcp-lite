@@ -429,11 +429,6 @@ export type Content =
   | ResourceLink
   | EmbeddedResource;
 
-export interface ToolCallParams {
-  name: string;
-  arguments?: unknown;
-}
-
 export interface PromptGetParams {
   name: string;
   arguments?: unknown;
