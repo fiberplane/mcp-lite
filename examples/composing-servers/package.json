@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run src/index.ts",
+    "inspect": "bunx @modelcontextprotocol/inspector",
     "start": "bun run src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"

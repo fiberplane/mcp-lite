@@ -5,6 +5,11 @@ export const validateServer = new McpServer({
   name: "validate",
   version: "1.0.0",
 })
+  // This middleware will only run for the validate server
+  .use(async (ctx, next) => {
+    console.log("[validate] Request:", ctx.request.method);
+    await next();
+  })
   .tool("email", {
     description: "Check if string is valid email",
     inputSchema: {
