@@ -421,7 +421,7 @@ export class StreamableHttpTransport {
           };
           const sessionMeta: SessionMeta = {
             protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
-            clientInfo: initParams.clientInfo || initParams, // Keep existing behavior
+            clientInfo: initParams.clientInfo,
             clientCapabilities: initParams.capabilities, // Store capabilities
           };
           await this.sessionAdapter.create(sessionId, sessionMeta);
