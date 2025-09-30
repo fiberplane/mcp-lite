@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { METHODS } from "../../src/constants.js";
 import { McpServer } from "../../src/core.js";
 import type { MCPServerContext, ToolCallResult } from "../../src/types.js";
@@ -26,7 +26,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group("git", child);
 
-      const toolsList = await parent["handleToolsList"](
+      const toolsList = await parent.handleToolsList(
         {},
         {} as MCPServerContext,
       );
@@ -55,7 +55,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group("git", child);
 
-      const promptsList = await parent["handlePromptsList"](
+      const promptsList = await parent.handlePromptsList(
         {},
         {} as MCPServerContext,
       );
@@ -77,7 +77,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group("fs", child);
 
-      const templatesList = await parent["handleResourceTemplatesList"](
+      const templatesList = await parent.handleResourceTemplatesList(
         {},
         {} as MCPServerContext,
       );
@@ -100,7 +100,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group({ suffix: "claude" }, child);
 
-      const toolsList = await parent["handleToolsList"](
+      const toolsList = await parent.handleToolsList(
         {},
         {} as MCPServerContext,
       );
@@ -121,7 +121,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group({ prefix: "ai", suffix: "claude" }, child);
 
-      const toolsList = await parent["handleToolsList"](
+      const toolsList = await parent.handleToolsList(
         {},
         {} as MCPServerContext,
       );
@@ -144,7 +144,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group(child);
 
-      const toolsList = await parent["handleToolsList"](
+      const toolsList = await parent.handleToolsList(
         {},
         {} as MCPServerContext,
       );
@@ -175,7 +175,7 @@ describe("McpServer.group()", () => {
 
       parent.group(child);
 
-      const result = await parent["handleToolsCall"](
+      const result = await parent.handleToolsCall(
         { name: "clone", arguments: {} },
         { validate: () => ({}) } as MCPServerContext,
       );
@@ -205,7 +205,7 @@ describe("McpServer.group()", () => {
         .group("git", child1)
         .group("git", child2);
 
-      const result = await parent["handleToolsCall"](
+      const result = await parent.handleToolsCall(
         { name: "git/clone", arguments: {} },
         { validate: () => ({}) } as MCPServerContext,
       );
@@ -234,7 +234,7 @@ describe("McpServer.group()", () => {
 
       parent.group(child);
 
-      const result = await parent["handleResourcesRead"](
+      const result = await parent.handleResourcesRead(
         { uri: "file://test.txt" },
         { validate: () => ({}) } as MCPServerContext,
       );
@@ -375,7 +375,7 @@ describe("McpServer.group()", () => {
 
       parent.group(child);
 
-      await parent["_dispatch"]({
+      await parent._dispatch({
         jsonrpc: "2.0",
         id: "1",
         method: METHODS.TOOLS.CALL,
@@ -422,7 +422,7 @@ describe("McpServer.group()", () => {
 
       parent.group(child);
 
-      await parent["_dispatch"]({
+      await parent._dispatch({
         jsonrpc: "2.0",
         id: "1",
         method: METHODS.TOOLS.CALL,
@@ -433,7 +433,7 @@ describe("McpServer.group()", () => {
 
       log.length = 0;
 
-      await parent["_dispatch"]({
+      await parent._dispatch({
         jsonrpc: "2.0",
         id: "2",
         method: METHODS.TOOLS.CALL,
@@ -465,7 +465,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group(child);
 
-      const resourcesList = await parent["handleResourcesList"](
+      const resourcesList = await parent.handleResourcesList(
         {},
         {} as MCPServerContext,
       );
@@ -487,7 +487,7 @@ describe("McpServer.group()", () => {
         version: "1.0.0",
       }).group(child);
 
-      const templatesList = await parent["handleResourceTemplatesList"](
+      const templatesList = await parent.handleResourceTemplatesList(
         {},
         {} as MCPServerContext,
       );
@@ -496,7 +496,7 @@ describe("McpServer.group()", () => {
         "github://repos/{owner}/{repo}",
       );
 
-      const result = await parent["handleResourcesRead"](
+      const result = await parent.handleResourcesRead(
         { uri: "github://repos/foo/bar" },
         { validate: () => ({}) } as MCPServerContext,
       );
@@ -533,7 +533,7 @@ describe("McpServer.group()", () => {
         notifications.push(notification);
       });
 
-      await parent["_dispatch"]({
+      await parent._dispatch({
         jsonrpc: "2.0",
         id: "1",
         method: METHODS.INITIALIZE,
@@ -567,7 +567,7 @@ describe("McpServer.group()", () => {
         notifications.push(notification);
       });
 
-      await parent["_dispatch"]({
+      await parent._dispatch({
         jsonrpc: "2.0",
         id: "1",
         method: METHODS.INITIALIZE,
@@ -621,10 +621,7 @@ describe("McpServer.group()", () => {
         .group("fs", fs)
         .group("db", db);
 
-      const toolsList = await app["handleToolsList"](
-        {},
-        {} as MCPServerContext,
-      );
+      const toolsList = await app.handleToolsList({}, {} as MCPServerContext);
       expect(toolsList.tools).toHaveLength(3);
       expect(toolsList.tools.map((t) => t.name).sort()).toEqual([
         "db/query",
@@ -632,13 +629,13 @@ describe("McpServer.group()", () => {
         "git/clone",
       ]);
 
-      const gitResult = await app["handleToolsCall"](
+      const gitResult = await app.handleToolsCall(
         { name: "git/clone", arguments: {} },
         { validate: () => ({}) } as MCPServerContext,
       );
       expect((gitResult as ToolCallResult).content[0]?.text).toBe("cloned");
 
-      const fsResult = await app["handleToolsCall"](
+      const fsResult = await app.handleToolsCall(
         { name: "fs/readFile", arguments: {} },
         { validate: () => ({}) } as MCPServerContext,
       );
@@ -646,7 +643,7 @@ describe("McpServer.group()", () => {
         "file content",
       );
 
-      const dbResult = await app["handleToolsCall"](
+      const dbResult = await app.handleToolsCall(
         { name: "db/query", arguments: {} },
         { validate: () => ({}) } as MCPServerContext,
       );

@@ -803,7 +803,10 @@ export class McpServer {
   group(options: { prefix?: string; suffix?: string }, child: McpServer): this;
 
   group(
-    prefixOrOptionsOrChild: string | { prefix?: string; suffix?: string } | McpServer,
+    prefixOrOptionsOrChild:
+      | string
+      | { prefix?: string; suffix?: string }
+      | McpServer,
     child?: McpServer,
   ): this {
     let prefix = "";

@@ -5,7 +5,7 @@ import type { MCPServerContext } from "../../src/types.js";
 describe("Logger", () => {
   it("should use console as default logger", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
-    expect(server["logger"]).toBe(console);
+    expect(server.logger).toBe(console);
   });
 
   it("should use custom logger when provided", () => {
@@ -23,7 +23,7 @@ describe("Logger", () => {
       logger: customLogger,
     });
 
-    expect(server["logger"]).toBe(customLogger);
+    expect(server.logger).toBe(customLogger);
   });
 
   it("should log error when child middleware doesn't call next()", async () => {
@@ -52,11 +52,11 @@ describe("Logger", () => {
     parent.group(child);
 
     try {
-      await parent["handleToolsCall"]({ name: "test", arguments: {} }, {
+      await parent.handleToolsCall({ name: "test", arguments: {} }, {
         validate: () => ({}),
       } as MCPServerContext);
       expect(true).toBe(false); // Should not reach here
-    } catch (error) {
+    } catch (_error) {
       // Should throw error
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain("Handler was not executed");
@@ -95,11 +95,11 @@ describe("Logger", () => {
     parent.group(child);
 
     try {
-      await parent["handleResourcesRead"]({ uri: "file://test.txt" }, {
+      await parent.handleResourcesRead({ uri: "file://test.txt" }, {
         validate: () => ({}),
       } as MCPServerContext);
       expect(true).toBe(false); // Should not reach here
-    } catch (error) {
+    } catch (_error) {
       // Should throw error
       expect(logs).toHaveLength(1);
       expect(logs[0]).toContain("Resource handler was not executed");
@@ -133,7 +133,7 @@ describe("Logger", () => {
 
     // Should not throw during test setup, just when calling the tool
     try {
-      await parent["handleToolsCall"]({ name: "test", arguments: {} }, {
+      await parent.handleToolsCall({ name: "test", arguments: {} }, {
         validate: () => ({}),
       } as MCPServerContext);
     } catch (error) {

@@ -166,7 +166,9 @@ const formatServer = new McpServer({ name: "format", version: "1.0.0" })
       }
 
       return {
-        content: [{ type: "text", text: `${size.toFixed(2)} ${units[unitIndex]}` }],
+        content: [
+          { type: "text", text: `${size.toFixed(2)} ${units[unitIndex]}` },
+        ],
       };
     },
   });
