@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.5.0
+
+### Minor Changes
+
+- fb90e31: - Add `.group()` method for composing multiple MCP servers into a parent server with flexible namespacing (prefix, suffix, or both). Enables modular server architectures with middleware composition and proper notification handling. Per Anthropic's research, prefix vs suffix namespacing can have measurable effects on tool-use accuracy depending on the LLM.
+
 ## 0.4.0
 
 ### Minor Changes
