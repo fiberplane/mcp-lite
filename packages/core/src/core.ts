@@ -954,11 +954,14 @@ export class McpServer {
    * @internal
    */
   private mountChild(prefix: string, suffix: string, child: McpServer): void {
-    const qualify = (n: string) => {
-      let qualified = n;
-      if (prefix) qualified = `${prefix}/${qualified}`;
-      if (suffix) qualified = `${qualified}_${suffix}`;
-      return qualified;
+    /**
+     * Adds prefix or suffix to a tool name before mounting
+     */
+    const buildScopedName = (originalName: string) => {
+      let scopedName = originalName;
+      if (prefix) scopedName = `${prefix}/${scopedName}`;
+      if (suffix) scopedName = `${scopedName}_${suffix}`;
+      return scopedName;
     };
     const regs = child._exportRegistries();
     const childMWs = child._exportMiddlewares();
@@ -967,7 +970,7 @@ export class McpServer {
     let addedResources = 0;
 
     for (const { name, entry } of regs.tools) {
-      const qualifiedName = qualify(name);
+      const qualifiedName = buildScopedName(name);
       if (!this.tools.has(qualifiedName)) {
         const wrappedHandler =
           childMWs.length > 0
@@ -991,7 +994,7 @@ export class McpServer {
     }
 
     for (const { name, entry } of regs.prompts) {
-      const qualifiedName = qualify(name);
+      const qualifiedName = buildScopedName(name);
       if (!this.prompts.has(qualifiedName)) {
         const wrappedHandler =
           childMWs.length > 0
