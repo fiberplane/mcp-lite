@@ -22,10 +22,7 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false,
-
-    // Effect Schema recommendation
-    "exactOptionalPropertyTypes": true
+    "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
