@@ -25,9 +25,11 @@ The key is the `schemaAdapter` in the server setup:
 ```typescript
 import { JSONSchema, Schema } from "effect";
 
+type EffectSchema = ReturnType<typeof Schema.standardSchemaV1>;
+
 const mcp = new McpServer({
   name: "echo-server",
   version: "1.0.0",
-  schemaAdapter: (schema) => JSONSchema.make(schema),
+  schemaAdapter: (schema) => JSONSchema.make(schema as EffectSchema),
 });
 ```
