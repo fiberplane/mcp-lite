@@ -87,6 +87,48 @@ describe("McpServer.group()", () => {
       );
     });
 
+    it("should namespace tools with suffix", async () => {
+      const child = new McpServer({ name: "child", version: "1.0.0" }).tool(
+        "generateText",
+        {
+          handler: () => ({ content: [{ type: "text", text: "generated" }] }),
+        },
+      );
+
+      const parent = new McpServer({
+        name: "parent",
+        version: "1.0.0",
+      }).group({ suffix: "claude" }, child);
+
+      const toolsList = await parent["handleToolsList"](
+        {},
+        {} as MCPServerContext,
+      );
+      expect(toolsList.tools).toHaveLength(1);
+      expect(toolsList.tools[0]?.name).toBe("generateText_claude");
+    });
+
+    it("should namespace tools with both prefix and suffix", async () => {
+      const child = new McpServer({ name: "child", version: "1.0.0" }).tool(
+        "generateText",
+        {
+          handler: () => ({ content: [{ type: "text", text: "generated" }] }),
+        },
+      );
+
+      const parent = new McpServer({
+        name: "parent",
+        version: "1.0.0",
+      }).group({ prefix: "ai", suffix: "claude" }, child);
+
+      const toolsList = await parent["handleToolsList"](
+        {},
+        {} as MCPServerContext,
+      );
+      expect(toolsList.tools).toHaveLength(1);
+      expect(toolsList.tools[0]?.name).toBe("ai/generateText_claude");
+    });
+
     it("should mount flat without prefix", async () => {
       const child = new McpServer({ name: "child", version: "1.0.0" }).tool(
         "echo",

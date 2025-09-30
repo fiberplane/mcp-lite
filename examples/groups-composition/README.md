@@ -4,10 +4,12 @@ This example demonstrates how to use the `.group()` method to compose multiple M
 
 ## Features
 
-- **Namespaced mounting**: Tools are namespaced with prefixes (`validate/*`, `transform/*`, `format/*`)
+- **Flexible namespacing**: Tools support prefix (`validate/email`), suffix (`email_validate`), or both namespacing patterns
 - **Middleware composition**: Parent middleware tracks timing for all requests
 - **Pure JavaScript**: Works in any environment (Node.js, Bun, Cloudflare Workers, Deno)
 - **Clear separation of concerns**: Each server handles a specific domain
+
+> **Note**: Per [Anthropic's research](https://www.anthropic.com/engineering/writing-tools-for-agents), choosing between prefix and suffix namespacing can have measurable effects on tool-use accuracy. Test both approaches with your specific LLM.
 
 ## Running the Example
 
@@ -50,3 +52,19 @@ This example creates three specialized child servers:
 ### Parent Server
 
 The parent server composes all three child servers with namespacing and adds middleware to track request timing.
+
+```typescript
+const mcp = new McpServer({ name: "data-utils", version: "1.0.0" })
+  .group("validate", validateServer)      // Prefix: validate/email
+  .group("transform", transformServer)    // Prefix: transform/camelCase
+  .group("format", formatServer);         // Prefix: format/json
+```
+
+**Alternative suffix namespacing** (following Anthropic's research):
+
+```typescript
+const mcp = new McpServer({ name: "data-utils", version: "1.0.0" })
+  .group({ suffix: "validate" }, validateServer)   // Suffix: email_validate
+  .group({ suffix: "transform" }, transformServer) // Suffix: camelCase_transform
+  .group({ suffix: "format" }, formatServer);      // Suffix: json_format
+```

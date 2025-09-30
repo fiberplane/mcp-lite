@@ -761,17 +761,13 @@ export class McpServer {
    * @see {@link Logger} For configuring logging to track duplicate warnings
    * @see {@link Middleware} For middleware composition behavior
    *
-   * @example Namespaced mounting
+   * @example Prefix namespacing
    * ```typescript
    * const git = new McpServer({ name: 'git', version: '1.0.0' })
-   *   .tool('clone', { handler: cloneHandler })
-   *   .resource('github://repos/{owner}/{repo}', { description: 'Repo' }, readRepo);
+   *   .tool('clone', { handler: cloneHandler });
    *
    * const app = new McpServer({ name: 'app', version: '1.0.0' })
-   *   .group('git', git);
-   *
-   * // tools/list shows 'git/clone'
-   * // resources/list shows 'github://repos/{owner}/{repo}' (unchanged)
+   *   .group('git', git);  // tools/list shows 'git/clone'
    * ```
    *
    * @example Complete example
@@ -781,33 +777,54 @@ export class McpServer {
   group(prefix: string, child: McpServer): this;
 
   /**
-   * Mount a child server with namespaced tools and prompts (suffix variant).
+   * Mount a child server with flexible namespacing options.
    *
+   * @param options - Namespacing configuration
    * @param child - Child server to mount
-   * @param suffix - Namespace suffix
    * @returns This server instance for chaining
+   *
+   * @see {@link Logger} For configuring logging to track duplicate warnings
+   * @see {@link Middleware} For middleware composition behavior
+   *
+   * @example Suffix namespacing
+   * ```typescript
+   * const claude = new McpServer({ name: 'claude', version: '1.0.0' })
+   *   .tool('generateText', { handler: claudeHandler });
+   *
+   * const app = new McpServer({ name: 'app', version: '1.0.0' })
+   *   .group({ suffix: 'claude' }, claude);  // tools/list shows 'generateText_claude'
+   * ```
+   *
+   * @example Both prefix and suffix
+   * ```typescript
+   * .group({ prefix: 'ai', suffix: 'v2' }, server);  // 'ai/generateText_v2'
+   * ```
    */
-  group(child: McpServer, suffix: string): this;
+  group(options: { prefix?: string; suffix?: string }, child: McpServer): this;
 
   group(
-    prefixOrChild: string | McpServer,
-    childOrSuffix?: McpServer | string,
+    prefixOrOptionsOrChild: string | { prefix?: string; suffix?: string } | McpServer,
+    child?: McpServer,
   ): this {
     let prefix = "";
-    let child: McpServer;
+    let suffix = "";
+    let childServer: McpServer;
 
-    if (typeof prefixOrChild === "string") {
-      prefix = prefixOrChild;
-      child = childOrSuffix as McpServer;
-    } else if (typeof childOrSuffix === "string") {
-      child = prefixOrChild;
-      prefix = childOrSuffix;
+    if (typeof prefixOrOptionsOrChild === "string") {
+      // .group("prefix", child)
+      prefix = prefixOrOptionsOrChild;
+      childServer = child as McpServer;
+    } else if (prefixOrOptionsOrChild instanceof McpServer) {
+      // .group(child)
+      childServer = prefixOrOptionsOrChild;
     } else {
-      child = prefixOrChild;
-      prefix = "";
+      // .group({ prefix?, suffix? }, child)
+      prefix = prefixOrOptionsOrChild.prefix || "";
+      suffix = prefixOrOptionsOrChild.suffix || "";
+      childServer = child as McpServer;
     }
 
-    this.mountChild(prefix, child);
+    this.mountChild(prefix, suffix, childServer);
     return this;
   }
 
@@ -927,8 +944,13 @@ export class McpServer {
    * duplicates are silently skipped.
    * @internal
    */
-  private mountChild(prefix: string, child: McpServer): void {
-    const qualify = (n: string) => (prefix ? `${prefix}/${n}` : n);
+  private mountChild(prefix: string, suffix: string, child: McpServer): void {
+    const qualify = (n: string) => {
+      let qualified = n;
+      if (prefix) qualified = `${prefix}/${qualified}`;
+      if (suffix) qualified = `${qualified}_${suffix}`;
+      return qualified;
+    };
     const regs = child._exportRegistries();
     const childMWs = child._exportMiddlewares();
     let addedTools = 0;
