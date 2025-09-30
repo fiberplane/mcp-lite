@@ -12,17 +12,24 @@ type ClientRequestEntry = {
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
   pollInterval?: ReturnType<typeof setInterval>;
+  missingStartTime?: number;
 };
 
 export interface CloudflareKVClientRequestAdapterOptions {
   defaultTimeoutMs?: number;
   pollIntervalMs?: number;
+  /**
+   * The threshold for how long to wait before failing a request that is missing *any* data in the KV store.
+   * Used to account for eventual consistency of the KV store.
+   */
+  missingDataThresholdMs?: number;
 }
 
 export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
   private localPending = new Map<string, ClientRequestEntry>();
   private defaultTimeoutMs: number;
   private pollIntervalMs: number;
+  private missingDataThresholdMs: number;
 
   constructor(
     private kv: KVNamespace,
@@ -30,6 +37,7 @@ export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
   ) {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 30000;
     this.pollIntervalMs = options.pollIntervalMs ?? 1000;
+    this.missingDataThresholdMs = options.missingDataThresholdMs ?? 10000;
   }
 
   createPending(
@@ -72,8 +80,20 @@ export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
         )) as PendingRequest | null;
 
         if (!stored) {
-          // Request was cleaned up, likely timed out
-          this.cleanupLocal(key, new Error("Request not found"));
+          // Don't immediately fail, but track how long we've been missing data
+          // We need to account for eventual consistency of the KV store.
+          if (!localEntry.missingStartTime) {
+            localEntry.missingStartTime = Date.now();
+          } else if (
+            Date.now() - localEntry.missingStartTime >
+            this.missingDataThresholdMs
+          ) {
+            // Only fail after data has been missing past our threshold
+            this.cleanupLocal(
+              key,
+              new Error("Request not found after extended polling"),
+            );
+          }
           return;
         }
 
