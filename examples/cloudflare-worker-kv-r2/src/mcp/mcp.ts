@@ -62,17 +62,24 @@ mcpServer.tool("delete-kv", {
       }),
     });
 
-    if (response.action === "decline") {
-      return {
-        content: [{ type: "text", text: "Value not deleted" }],
-      };
-    }
+    const shouldDelete =
+      response.action === "accept" && response.content?.confirmed;
 
-    if (response.action === "accept") {
+    if (shouldDelete) {
       await env.KV.delete(args.key);
 
       return {
         content: [{ type: "text", text: "Value deleted" }],
+      };
+    }
+
+    const shouldNotDelete =
+      response.action === "decline" ||
+      (response.action === "accept" && !response.content?.confirmed);
+
+    if (shouldNotDelete) {
+      return {
+        content: [{ type: "text", text: "Value not deleted" }],
       };
     }
 

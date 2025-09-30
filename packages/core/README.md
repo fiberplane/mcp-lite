@@ -326,24 +326,35 @@ mcp.tool("delete_database_record", {
 
     // Request user confirmation through elicitation
     const response = await ctx.elicit({
-      type: "confirmation",
-      title: "Confirm Record Deletion",
-      description: `Are you sure you want to delete record "${args.recordId}" from table "${args.tableName}"? This action cannot be undone.`,
-      confirmationText: "Delete Record",
-      cancelText: "Cancel"
+      message: `Are you sure you want to delete record "${args.recordId}" from table "${args.tableName}"? This action cannot be undone.`,
+      schema: z.object({
+        confirmed: z.boolean(),
+      }),
     });
 
     // Handle different response types
     switch (response.type) {
-      case "accept":
-        // User confirmed - proceed with deletion
-        await deleteFromDatabase(args.tableName, args.recordId);
+
+      // Accept means the response came back, but we still need to check the value of "confirmed"
+      case "accept": {
+        if (response.content.confirmed) {
+          // User confirmed - proceed with deletion
+          await deleteFromDatabase(args.tableName, args.recordId);
+          return {
+            content: [{ 
+              type: "text", 
+              text: `Record "${args.recordId}" has been deleted from "${args.tableName}".` 
+            }],
+          };
+        }
+        
         return {
           content: [{ 
             type: "text", 
-            text: `Record "${args.recordId}" has been deleted from "${args.tableName}".` 
+            text: "Record deletion declined by user." 
           }],
         };
+      }
       
       case "decline":
         return {
