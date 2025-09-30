@@ -63,6 +63,7 @@ export class CloudflareKVClientRequestAdapter implements ClientRequestAdapter {
       status: "pending",
     };
 
+    // NOTE - This creates a subtle race condition with the first few polls, but it's acceptable
     this.kv.put(`pending:${key}`, JSON.stringify(pendingRequest), {
       expirationTtl: Math.ceil(timeoutMs / 1000) + 60, // Extra buffer for cleanup
     });
