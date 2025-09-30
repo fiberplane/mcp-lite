@@ -4,6 +4,12 @@ export type SessionId = string;
 export interface SessionMeta {
   protocolVersion: string;
   clientInfo?: unknown;
+  clientCapabilities?: {
+    elicitation?: Record<string, never>;
+    roots?: Record<string, never>;
+    sampling?: Record<string, never>;
+    [key: string]: unknown;
+  };
 }
 
 export interface StreamData {
@@ -65,6 +71,11 @@ export interface SessionAdapter {
   delete(id: SessionId): Promise<void> | void;
 }
 
+/**
+ * InMemorySessionAdapter is a simple session adapter that stores sessions in memory.
+ * It is useful for testing and development.
+ * It is not recommended for production use, unless you are running a small, simple, single, and long-lived MCP server instance.
+ */
 export class InMemorySessionAdapter implements SessionAdapter {
   #sessions = new Map<SessionId, SessionData>();
   maxEventBufferSize: number;
