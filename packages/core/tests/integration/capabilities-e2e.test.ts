@@ -2,7 +2,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { collectSseEventsCount } from "../../../test-utils/src/sse.js";
 import {
   InMemoryClientRequestAdapter,
   InMemorySessionAdapter,
