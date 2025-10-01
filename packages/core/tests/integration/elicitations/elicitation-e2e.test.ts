@@ -3,7 +3,17 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { collectSseEventsCount } from "../../../../test-utils/src/sse.js";
-import { createStatefulTestServer } from "../../utils.js";
+import {
+  buildInitializeRequest,
+  createStatefulTestServer,
+} from "../../utils.js";
+
+const buildElicitatationInit = () =>
+  buildInitializeRequest({
+    capabilities: {
+      elicitation: {},
+    },
+  });
 
 describe("Elicitation E2E Tests", () => {
   // FIXME - this does not actually test ctx.elicit
@@ -29,28 +39,8 @@ describe("Elicitation E2E Tests", () => {
     });
 
     // Initialize session WITH elicitation capability
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {
-          elicitation: {}, // Include elicitation capability
-        },
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
+    const initializeRequest = buildElicitatationInit();
+    const initResponse = await handler(initializeRequest);
 
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
@@ -108,26 +98,8 @@ describe("Elicitation E2E Tests", () => {
     });
 
     // Initialize session WITHOUT elicitation capability
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {}, // No elicitation capability
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
+    const initializeRequest = buildInitializeRequest();
+    const initResponse = await handler(initializeRequest);
 
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
