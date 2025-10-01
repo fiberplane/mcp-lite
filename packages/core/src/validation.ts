@@ -2,7 +2,7 @@ import { RpcError } from "./errors.js";
 import type { PromptArgumentDef, SchemaAdapter } from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
-export function resolveToolSchema(
+export function resolveSchema(
   inputSchema?: unknown,
   schemaAdapter?: SchemaAdapter,
 ): {
@@ -110,7 +110,7 @@ export function toElicitationRequestedSchema(
   // Handle Standard Schema inputs by converting to JSON Schema first
   if (isStandardSchema(schema)) {
     throw new Error(
-      "Standard Schema inputs must be converted via resolveToolSchema first",
+      "Standard Schema inputs must be converted via resolveSchema first",
     );
   }
 

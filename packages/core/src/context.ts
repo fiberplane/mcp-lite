@@ -16,7 +16,7 @@ import { JSON_RPC_ERROR_CODES } from "./types.js";
 import { isObject, objectWithKey } from "./utils.js";
 import {
   createValidationFunction,
-  resolveToolSchema,
+  resolveSchema,
   toElicitationRequestedSchema,
 } from "./validation.js";
 
@@ -102,7 +102,7 @@ export function createContext(
       }
 
       // 2. Convert schema to JSON Schema if needed
-      const { mcpInputSchema } = resolveToolSchema(
+      const { mcpInputSchema } = resolveSchema(
         params.schema,
         options.schemaAdapter,
       );

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type } from "arktype";
 import { z } from "zod";
 import {
-  resolveToolSchema,
+  resolveSchema,
   toElicitationRequestedSchema,
 } from "../../src/validation.js";
 
@@ -358,11 +358,11 @@ describe("toElicitationRequestedSchema", () => {
       };
 
       expect(() => toElicitationRequestedSchema(standardSchema)).toThrow(
-        "Standard Schema inputs must be converted via resolveToolSchema first",
+        "Standard Schema inputs must be converted via resolveSchema first",
       );
     });
 
-    test("works with Zod schemas via resolveToolSchema", () => {
+    test("works with Zod schemas via resolveSchema", () => {
       const zodSchema = z.object({
         email: z.string().email().min(5).max(100),
         age: z.number().min(0).max(150),
@@ -375,7 +375,7 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
-      const { mcpInputSchema } = resolveToolSchema(zodSchema, schemaAdapter);
+      const { mcpInputSchema } = resolveSchema(zodSchema, schemaAdapter);
       const result = toElicitationRequestedSchema(mcpInputSchema);
 
       expect(result.type).toBe("object");
@@ -409,7 +409,7 @@ describe("toElicitationRequestedSchema", () => {
       expect(result.required).toEqual(["email", "age", "agree", "role"]);
     });
 
-    test("works with ArkType schemas via resolveToolSchema", () => {
+    test("works with ArkType schemas via resolveSchema", () => {
       const arkSchema = type({
         email: "string.email",
         age: "number>=0",
@@ -424,7 +424,7 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => schema.toJsonSchema();
 
-      const { mcpInputSchema } = resolveToolSchema(arkSchema, schemaAdapter);
+      const { mcpInputSchema } = resolveSchema(arkSchema, schemaAdapter);
       const result = toElicitationRequestedSchema(mcpInputSchema);
 
       // The exact structure depends on ArkType's JSON Schema output
@@ -469,7 +469,7 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
-      const { mcpInputSchema } = resolveToolSchema(
+      const { mcpInputSchema } = resolveSchema(
         complexSchema,
         schemaAdapter,
       );
@@ -522,8 +522,8 @@ describe("toElicitationRequestedSchema", () => {
     });
   });
 
-  describe("resolveToolSchema integration", () => {
-    test("works with resolved JSON Schema from resolveToolSchema", () => {
+  describe("resolveSchema integration", () => {
+    test("works with resolved JSON Schema from resolveSchema", () => {
       const jsonSchema = {
         type: "object",
         properties: {
@@ -533,7 +533,7 @@ describe("toElicitationRequestedSchema", () => {
         required: ["name"],
       };
 
-      const { mcpInputSchema } = resolveToolSchema(jsonSchema);
+      const { mcpInputSchema } = resolveSchema(jsonSchema);
       const result = toElicitationRequestedSchema(mcpInputSchema);
 
       expect(result).toEqual({
@@ -546,8 +546,8 @@ describe("toElicitationRequestedSchema", () => {
       });
     });
 
-    test("works with undefined schema via resolveToolSchema", () => {
-      const { mcpInputSchema } = resolveToolSchema();
+    test("works with undefined schema via resolveSchema", () => {
+      const { mcpInputSchema } = resolveSchema();
       const result = toElicitationRequestedSchema(mcpInputSchema);
 
       expect(result).toEqual({

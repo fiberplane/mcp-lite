@@ -118,45 +118,76 @@ mcp.tool("multiply", {
   },
 });
 
-const weatherSchema = z.object({
+// ===== STRUCTURED CONTENT EXAMPLE =====
+const weatherInputSchema = z.object({
   location: z.string().min(1, "Location is required"),
   unit: z.enum(["celsius", "fahrenheit", "kelvin"]).default("celsius"),
   includeHumidity: z.boolean().optional().default(false),
 });
 
+const weatherOutputSchema = z.object({
+  location: z.string(),
+  temperature: z.number(),
+  unit: z.string(),
+  conditions: z.enum(["sunny", "cloudy", "rainy", "snowy"]),
+  humidity: z.number().optional(),
+  timestamp: z.string(),
+});
+
 mcp.tool("getWeather", {
-  description: "Gets weather information for a location",
-  inputSchema: weatherSchema,
+  description:
+    "Gets weather information for a location with structured output (demonstrates outputSchema and structuredContent)",
+  inputSchema: weatherInputSchema,
+  outputSchema: weatherOutputSchema,
   handler: (args) => {
     const baseTemp = Math.floor(Math.random() * 30) + 10;
     let temp = baseTemp;
-    let unit = "°C";
+    let unitSymbol = "°C";
+    let unitName = "celsius";
 
     if (args.unit === "fahrenheit") {
       temp = Math.round((baseTemp * 9) / 5 + 32);
-      unit = "°F";
+      unitSymbol = "°F";
+      unitName = "fahrenheit";
     } else if (args.unit === "kelvin") {
       temp = Math.round(baseTemp + 273.15);
-      unit = "K";
+      unitSymbol = "K";
+      unitName = "kelvin";
     }
 
     const conditions = ["sunny", "cloudy", "rainy", "snowy"][
       Math.floor(Math.random() * 4)
-    ];
-    let response = `Weather in ${args.location}: ${temp}${unit}, ${conditions}`;
+    ] as "sunny" | "cloudy" | "rainy" | "snowy";
 
-    if (args.includeHumidity) {
-      const humidity = Math.floor(Math.random() * 100);
-      response += `, humidity: ${humidity}%`;
+    const humidity = args.includeHumidity
+      ? Math.floor(Math.random() * 100)
+      : undefined;
+
+    // Human-readable text content
+    let textResponse = `Weather in ${args.location}: ${temp}${unitSymbol}, ${conditions}`;
+    if (humidity !== undefined) {
+      textResponse += `, humidity: ${humidity}%`;
     }
+
+    // Machine-readable structured content (validated against outputSchema)
+    const structuredData = {
+      location: args.location,
+      temperature: temp,
+      unit: unitName,
+      conditions,
+      humidity,
+      timestamp: new Date().toISOString(),
+    };
 
     return {
       content: [
         {
           type: "text",
-          text: response,
+          text: textResponse,
         },
       ],
+      // ✨ Structured content with full type safety and validation!
+      structuredContent: structuredData,
     };
   },
 });
