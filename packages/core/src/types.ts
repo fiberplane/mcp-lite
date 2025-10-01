@@ -7,6 +7,7 @@ import {
   isObject,
   isString,
   objectWithDefinedKey,
+  objectWithKeyAndValue,
   objectWithKeyOfType,
 } from "./utils.js";
 
@@ -558,7 +559,7 @@ export type SamplingParams = {
 
 type SamplingTextContent = {
   type: "text";
-  text: "string";
+  text: string;
 };
 
 type SamplingImageContent = {
@@ -577,19 +578,50 @@ type SamplingAudioContent = {
   mimeType?: string;
 };
 
-export type SamplingSuccess = {
-  result?: {
-    role: "assistant";
-    content: SamplingTextContent | SamplingImageContent | SamplingAudioContent;
-    model: string;
-    /** @example - "endTurn" */
-    stopReason: string;
-  };
+export type SamplingResult = {
+  role: "assistant";
+  content: SamplingTextContent | SamplingImageContent | SamplingAudioContent;
+  model: string;
+  /** @example - "endTurn" */
+  stopReason?: string;
 };
 
-export type SamplingError = {
-  code: string;
-  message: string;
-};
+/**
+ * Type guard for a sampling result
+ *
+ * @note - This only verifies the content property.
+ *         Since sampling is so loosely specified, and no clients implement it,
+ *        it seems best to only validate the bare minimum here
+ */
+export function isSamplingResult(o: unknown): o is SamplingResult {
+  return objectWithKeyOfType(o, "content", isSamplingContent);
+}
 
-export type SamplingResult = SamplingError | SamplingSuccess;
+function isSamplingContent(o: unknown): o is SamplingResult["content"] {
+  return (
+    isSamplingTextContent(o) ||
+    isSamplingImageContent(o) ||
+    isSamplingAudioContent(o)
+  );
+}
+
+function isSamplingTextContent(o: unknown): o is SamplingTextContent {
+  return (
+    objectWithKeyAndValue(o, "type", "text") &&
+    objectWithKeyOfType(o, "text", isString)
+  );
+}
+
+function isSamplingImageContent(o: unknown): o is SamplingImageContent {
+  return (
+    objectWithKeyAndValue(o, "type", "image") &&
+    objectWithKeyOfType(o, "data", isString)
+  );
+}
+
+function isSamplingAudioContent(o: unknown): o is SamplingAudioContent {
+  return (
+    objectWithKeyAndValue(o, "type", "audio") &&
+    objectWithKeyOfType(o, "data", isString)
+  );
+}

@@ -197,7 +197,7 @@ describe("Sampling E2E Tests", () => {
     );
   });
 
-  test.skip("E2E: full sampling flow with client accept response", async () => {
+  test("E2E: full sampling flow with client accept response", async () => {
     // This test verifies the complete sampling flow:
     // 1. Tool calls ctx.sample() with proper schema
     // 2. Server sends sampling/createMessage request via SSE
@@ -223,27 +223,27 @@ describe("Sampling E2E Tests", () => {
 
     const handler = transport.bind(server);
 
-    server.tool("full-elicitation", {
-      description: "Test complete elicitation flow",
+    server.tool("full-sampling", {
+      description: "Test complete sampling flow",
       inputSchema: z.object({}),
       handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
+        if (!ctx.client.supports("sampling")) {
           return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
+            content: [{ type: "text", text: "Sampling not supported" }],
           };
         }
 
         try {
           const result = await ctx.sample({
-            message: "Please provide your name",
-            schema: z.object({ name: z.string() }),
+            prompt: "Some prompt hi",
           });
 
           return {
             content: [
               {
                 type: "text",
-                text: `Hello, ${result.content?.name || "Unknown"}!`,
+                // @ts-expect-error - .text only available on text responses (not image or audio)
+                text: `Interesting, ${result.content?.text || "Unknown"}!`,
               },
             ],
           };
@@ -269,7 +269,7 @@ describe("Sampling E2E Tests", () => {
         clientInfo: { name: "test-client", version: "1.0.0" },
         protocolVersion: "2025-06-18",
         capabilities: {
-          elicitation: {}, // Include elicitation capability
+          sampling: {}, // Include elicitation capability
         },
       },
     };
@@ -318,7 +318,7 @@ describe("Sampling E2E Tests", () => {
           id: "tool-call-1",
           method: "tools/call",
           params: {
-            name: "full-elicitation",
+            name: "full-sampling",
             arguments: {},
           },
         }),
@@ -330,9 +330,14 @@ describe("Sampling E2E Tests", () => {
     expect(events).toHaveLength(2); // ping + elicitation
 
     // First event is ping, second is elicitation
-    const elicitationData = events[1].data as any;
-    expect(elicitationData.method).toBe("elicitation/create");
-    expect(elicitationData.params.message).toBe("Please provide your name");
+    const samplingData = events[1].data as any;
+    expect(samplingData.method).toBe("sampling/createMessage");
+    // We only send a single user message for now
+    expect(samplingData.params.messages).toHaveLength(1);
+    expect(samplingData.params.messages[0].role).toBe("user");
+    // We only send a single text prompt for now
+    expect(samplingData.params.messages[0].content.type).toBe("text");
+    expect(samplingData.params.messages[0].content.text).toBe("Some prompt hi");
 
     // Send client response
     const clientResponse = await handler(
@@ -345,10 +350,14 @@ describe("Sampling E2E Tests", () => {
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: elicitationData.id,
+          id: samplingData.id,
           result: {
-            action: "accept",
-            content: { name: "Alice" },
+            role: "assistant",
+            model: "boots-llm",
+            content: {
+              type: "text",
+              text: "Some LLM response",
+            },
           },
         }),
       }),
@@ -359,7 +368,9 @@ describe("Sampling E2E Tests", () => {
     const toolResponse = await toolPromise;
     expect(toolResponse.status).toBe(200);
     const toolResult = await toolResponse.json();
-    expect(toolResult.result.content[0].text).toBe("Hello, Alice!");
+    expect(toolResult.result.content[0].text).toBe(
+      "Interesting, Some LLM response!",
+    );
   });
 
   test.skip("E2E: full sampling flow with client decline", async () => {
