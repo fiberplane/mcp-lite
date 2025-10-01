@@ -112,6 +112,10 @@ export interface MCPServerContext {
     params: { message: string; schema: unknown },
     options?: { timeout_ms?: number; strict?: boolean },
   ): Promise<ElicitationResult<T>>;
+  sample(
+    params: SamplingParams,
+    options?: { timeout_ms?: number },
+  ): Promise<SamplingResult>;
 }
 
 export interface MCPClientFeatures {
@@ -531,3 +535,61 @@ export interface ElicitationResult<TContent = Record<string, unknown>> {
   action: ElicitationAction;
   content?: TContent; // present on "accept"
 }
+
+export type SamplingParams = {
+  /** Prompt to forward to the llm for generation */
+  prompt: string; // TODO - Support a messages array as indicated in the spec?
+  /** The system prompt to give the LLM */
+  systemPrompt?: string;
+  /** The maximum number of tokens the LLM should generate */
+  maxTokens?: number;
+  /** Preference hints for the client when forwarding request to LLM - note that the mcp client makes final decision on model selection */
+  modelPreferences?: {
+    /** A hint of which model to use, e.g., "claude" would allow any model from the claude fam */
+    hints?: Array<{ name: string }>;
+    /** A number 0-1, where 1 prefers more intelligent models */
+    intelligencePriority?: number;
+    /** A number 0-1, where 1 prefers faster models */
+    speedPriority?: number;
+    /** A number 0-1, where 1 prefers cheaper models */
+    costPriority?: number;
+  };
+};
+
+type SamplingTextContent = {
+  type: "text";
+  text: "string";
+};
+
+type SamplingImageContent = {
+  type: "image";
+  /** base64 encoded image data */
+  data: string;
+  /** mimetype of the image (e.g., "image/jpeg") */
+  mimeType?: string;
+};
+
+type SamplingAudioContent = {
+  type: "audio";
+  /** base64 encoded audio data */
+  data: string;
+  /** mimetype of the audio (e.g., "audio/wav") */
+  mimeType?: string;
+};
+
+export type SamplingSuccess = {
+  result?: {
+    role: "assistant";
+    content: SamplingTextContent | SamplingImageContent | SamplingAudioContent;
+    model: string;
+    /** @example - "endTurn" */
+    stopReason: string;
+  };
+};
+
+export type SamplingError = {
+  code: string;
+  message: string;
+};
+
+export type SamplingResult = SamplingError | SamplingSuccess;

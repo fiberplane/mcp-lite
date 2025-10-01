@@ -10,6 +10,7 @@ import type {
   MCPServerContext,
   ProgressToken,
   ProgressUpdate,
+  SamplingParams,
   SchemaAdapter,
 } from "./types.js";
 import { JSON_RPC_ERROR_CODES } from "./types.js";
@@ -92,6 +93,69 @@ export function createContext(
     elicit: async (
       params: { message: string; schema: unknown },
       elicitOptions?: { timeout_ms?: number; strict?: boolean },
+    ): Promise<ElicitationResult> => {
+      // 1. Guard: check elicitation support
+      if (!context.client.supports("elicitation")) {
+        throw new RpcError(
+          JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
+          "Elicitation not supported by client",
+        );
+      }
+
+      // 2. Convert schema to JSON Schema if needed
+      const { mcpInputSchema } = resolveToolSchema(
+        params.schema,
+        options.schemaAdapter,
+      );
+
+      // 3. Project to elicitation-compatible schema
+      const requestedSchema = toElicitationRequestedSchema(
+        mcpInputSchema,
+        elicitOptions?.strict,
+      );
+
+      // 4. Build JSON-RPC request
+      const elicitRequest: JsonRpcReq = {
+        jsonrpc: "2.0",
+        id: Math.random().toString(36).substring(7),
+        method: METHODS.ELICITATION.CREATE,
+        params: {
+          message: params.message,
+          requestedSchema,
+        },
+      };
+
+      // 5. Send request to client
+      if (!options.clientRequestSender) {
+        throw new RpcError(
+          JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+          "Client request sender not configured",
+        );
+      }
+
+      const response = await options.clientRequestSender(
+        context.session?.id,
+        elicitRequest,
+        {
+          relatedRequestId: requestId as string | number,
+          timeout_ms: elicitOptions?.timeout_ms,
+        },
+      );
+
+      // 6. Validate and return response
+      if (response.error) {
+        throw new RpcError(
+          response.error.code,
+          response.error.message,
+          response.error.data,
+        );
+      }
+
+      return response.result as ElicitationResult;
+    },
+    sample: async (
+      params: SamplingParams,
+      options?: { timeout_ms: number },
     ): Promise<ElicitationResult> => {
       // 1. Guard: check elicitation support
       if (!context.client.supports("elicitation")) {
