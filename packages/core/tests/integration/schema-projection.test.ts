@@ -469,10 +469,7 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
-      const { mcpInputSchema } = resolveSchema(
-        complexSchema,
-        schemaAdapter,
-      );
+      const { mcpInputSchema } = resolveSchema(complexSchema, schemaAdapter);
       const result = toElicitationRequestedSchema(mcpInputSchema);
 
       expect(result.type).toBe("object");

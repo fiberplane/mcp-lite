@@ -157,7 +157,11 @@ describe("Structured Content Support", () => {
     expect(result.error).toBeUndefined();
     expect(result.result).toBeDefined();
 
-    const tools = (result.result as { tools: Array<{ name: string; outputSchema?: unknown }> }).tools;
+    const tools = (
+      result.result as {
+        tools: Array<{ name: string; outputSchema?: unknown }>;
+      }
+    ).tools;
     const weatherTool = tools.find((t) => t.name === "getWeather");
     const dataTool = tools.find((t) => t.name === "getData");
     const echoTool = tools.find((t) => t.name === "echo");
@@ -317,6 +321,9 @@ describe("Structured Content Support", () => {
 
     expect(result.error).toBeUndefined();
     const toolResult = result.result as { structuredContent?: unknown };
-    expect(toolResult.structuredContent).toEqual({ anything: "goes", here: 123 });
+    expect(toolResult.structuredContent).toEqual({
+      anything: "goes",
+      here: 123,
+    });
   });
 });

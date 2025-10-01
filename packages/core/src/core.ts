@@ -453,7 +453,7 @@ export class McpServer {
   // Overload 1: Both input and output are Standard Schema (full type inference)
   tool<
     SInput extends StandardSchemaV1<unknown, unknown>,
-    SOutput extends StandardSchemaV1<unknown, unknown>
+    SOutput extends StandardSchemaV1<unknown, unknown>,
   >(
     name: string,
     def: {
@@ -463,7 +463,9 @@ export class McpServer {
       handler: (
         args: InferOutput<SInput>,
         ctx: MCPServerContext,
-      ) => Promise<ToolCallResult<InferOutput<SOutput>>> | ToolCallResult<InferOutput<SOutput>>;
+      ) =>
+        | Promise<ToolCallResult<InferOutput<SOutput>>>
+        | ToolCallResult<InferOutput<SOutput>>;
     },
   ): this;
 
@@ -491,7 +493,9 @@ export class McpServer {
       handler: (
         args: unknown,
         ctx: MCPServerContext,
-      ) => Promise<ToolCallResult<InferOutput<S>>> | ToolCallResult<InferOutput<S>>;
+      ) =>
+        | Promise<ToolCallResult<InferOutput<S>>>
+        | ToolCallResult<InferOutput<S>>;
     },
   ): this;
 
@@ -743,8 +747,10 @@ export class McpServer {
       if (Array.isArray(def.arguments)) {
         argumentDefs = def.arguments as PromptArgumentDef[];
       } else {
-        const { mcpInputSchema, validator: schemaValidator } =
-          resolveSchema(def.arguments, this.schemaAdapter);
+        const { mcpInputSchema, validator: schemaValidator } = resolveSchema(
+          def.arguments,
+          this.schemaAdapter,
+        );
         validator = schemaValidator;
         argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
       }
