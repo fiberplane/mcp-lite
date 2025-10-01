@@ -3,34 +3,19 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { collectSseEventsCount } from "../../../test-utils/src/sse.js";
-import {
-  InMemoryClientRequestAdapter,
-  InMemorySessionAdapter,
-  McpServer,
-  StreamableHttpTransport,
-} from "../../src/index.js";
-import { createStatefulTestServer } from "../utils.js";
+import { buildInitializeRequest, createStatefulTestServer } from "../utils.js";
+
+const buildSamplingInit = () =>
+  buildInitializeRequest({
+    capabilities: {
+      sampling: {},
+    },
+  });
 
 describe("Sampling E2E Tests", () => {
   // FIXME - This does not actually test ctx.sample
   test("E2E: ctx.sample() does not throw when client has sampling capability", async () => {
-    const server = new McpServer({
-      name: "sampling-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("with-sampling", {
       description: "Test sampling support",
@@ -51,28 +36,8 @@ describe("Sampling E2E Tests", () => {
     });
 
     // Initialize session WITH sampling capability
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {
-          sampling: {}, // Include sampling capability
-        },
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
+    const initializeRequest = buildSamplingInit();
+    const initResponse = await handler(initializeRequest);
 
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
@@ -104,23 +69,7 @@ describe("Sampling E2E Tests", () => {
   });
 
   test("E2E: ctx.sample() throws when client lacks sampling capability", async () => {
-    const server = new McpServer({
-      name: "sampling-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("no-sampling", {
       description: "Test no sampling support",
@@ -145,26 +94,8 @@ describe("Sampling E2E Tests", () => {
     });
 
     // Initialize session WITHOUT sampling capability
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {}, // No sampling capability
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
+    const initializeRequest = buildInitializeRequest();
+    const initResponse = await handler(initializeRequest);
 
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
@@ -206,23 +137,7 @@ describe("Sampling E2E Tests", () => {
     // 4. Server resolves the sampling promise with the result
     // 5. Tool completes with the sampling data
 
-    const server = new McpServer({
-      name: "sampling-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("full-sampling", {
       description: "Test complete sampling flow",
