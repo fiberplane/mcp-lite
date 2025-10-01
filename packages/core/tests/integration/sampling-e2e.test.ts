@@ -9,6 +9,7 @@ import {
   McpServer,
   StreamableHttpTransport,
 } from "../../src/index.js";
+import { createStatefulTestServer } from "../utils.js";
 
 describe("Sampling E2E Tests", () => {
   // FIXME - This does not actually test ctx.sample
@@ -374,23 +375,7 @@ describe("Sampling E2E Tests", () => {
   });
 
   test.skip("E2E: full sampling flow with client decline", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("decline-elicitation", {
       description: "Test elicitation decline flow",
@@ -525,23 +510,7 @@ describe("Sampling E2E Tests", () => {
   });
 
   test.skip("E2E: full sampling flow with client cancel", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("cancel-elicitation", {
       description: "Test elicitation cancel flow",
@@ -673,23 +642,7 @@ describe("Sampling E2E Tests", () => {
   });
 
   test.skip("E2E: sampling timeout when client doesn't respond", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("timeout-elicitation", {
       description: "Test elicitation timeout",
@@ -793,23 +746,7 @@ describe("Sampling E2E Tests", () => {
   });
 
   test.skip("E2E: sampling with invalid client response data", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("invalid-response-elicitation", {
       description: "Test elicitation with invalid response",
@@ -948,23 +885,7 @@ describe("Sampling E2E Tests", () => {
   });
 
   test.skip("E2E: sampling with client error response", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("error-response-elicitation", {
       description: "Test elicitation with client error",
@@ -1102,23 +1023,7 @@ describe("Sampling E2E Tests", () => {
     // The test expects both elicitation requests to be available simultaneously,
     // but sequential await calls mean the second elicitation doesn't start until
     // the first one completes. This requires more sophisticated event handling.
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("sequential-elicitations", {
       description: "Test multiple sequential elicitations",
