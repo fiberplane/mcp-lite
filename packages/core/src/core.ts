@@ -1043,6 +1043,7 @@ export class McpServer {
           metadata: { ...entry.metadata, name: qualifiedName },
           handler: wrappedHandler,
           validator: entry.validator,
+          outputValidator: entry.outputValidator,
         };
 
         this.tools.set(qualifiedName, wrappedEntry);
