@@ -375,8 +375,8 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
-      const { mcpInputSchema } = resolveSchema(zodSchema, schemaAdapter);
-      const result = toElicitationRequestedSchema(mcpInputSchema);
+      const { resolvedSchema } = resolveSchema(zodSchema, schemaAdapter);
+      const result = toElicitationRequestedSchema(resolvedSchema);
 
       expect(result.type).toBe("object");
       expect(result.properties).toBeDefined();
@@ -424,8 +424,8 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => schema.toJsonSchema();
 
-      const { mcpInputSchema } = resolveSchema(arkSchema, schemaAdapter);
-      const result = toElicitationRequestedSchema(mcpInputSchema);
+      const { resolvedSchema } = resolveSchema(arkSchema, schemaAdapter);
+      const result = toElicitationRequestedSchema(resolvedSchema);
 
       // The exact structure depends on ArkType's JSON Schema output
       expect(result.type).toBe("object");
@@ -469,8 +469,8 @@ describe("toElicitationRequestedSchema", () => {
       // biome-ignore lint/suspicious/noExplicitAny: tests
       const schemaAdapter = (schema: any) => z.toJSONSchema(schema);
 
-      const { mcpInputSchema } = resolveSchema(complexSchema, schemaAdapter);
-      const result = toElicitationRequestedSchema(mcpInputSchema);
+      const { resolvedSchema } = resolveSchema(complexSchema, schemaAdapter);
+      const result = toElicitationRequestedSchema(resolvedSchema);
 
       expect(result.type).toBe("object");
       expect(result.properties).toBeDefined();
@@ -530,8 +530,8 @@ describe("toElicitationRequestedSchema", () => {
         required: ["name"],
       };
 
-      const { mcpInputSchema } = resolveSchema(jsonSchema);
-      const result = toElicitationRequestedSchema(mcpInputSchema);
+      const { resolvedSchema } = resolveSchema(jsonSchema);
+      const result = toElicitationRequestedSchema(resolvedSchema);
 
       expect(result).toEqual({
         type: "object",
@@ -544,8 +544,8 @@ describe("toElicitationRequestedSchema", () => {
     });
 
     test("works with undefined schema via resolveSchema", () => {
-      const { mcpInputSchema } = resolveSchema();
-      const result = toElicitationRequestedSchema(mcpInputSchema);
+      const { resolvedSchema } = resolveSchema();
+      const result = toElicitationRequestedSchema(resolvedSchema);
 
       expect(result).toEqual({
         type: "object",

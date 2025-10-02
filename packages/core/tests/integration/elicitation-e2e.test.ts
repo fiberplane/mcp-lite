@@ -219,12 +219,12 @@ describe("Elicitation E2E Tests", () => {
     );
 
     // Test schema resolution
-    const { mcpInputSchema } = resolveSchema(testSchema, (s) =>
+    const { resolvedSchema } = resolveSchema(testSchema, (s) =>
       z.toJSONSchema(s as z.ZodType),
     );
 
     // Test elicitation schema projection
-    const requestedSchema = toElicitationRequestedSchema(mcpInputSchema);
+    const requestedSchema = toElicitationRequestedSchema(resolvedSchema);
 
     // Verify the schema projection is correct
     expect(requestedSchema.type).toBe("object");
@@ -283,10 +283,10 @@ describe("Elicitation E2E Tests", () => {
     };
 
     // Test schema resolution with plain JSON Schema
-    const { mcpInputSchema } = resolveSchema(jsonSchema, undefined);
+    const { resolvedSchema } = resolveSchema(jsonSchema, undefined);
 
     // Test elicitation schema projection
-    const requestedSchema = toElicitationRequestedSchema(mcpInputSchema);
+    const requestedSchema = toElicitationRequestedSchema(resolvedSchema);
 
     // Verify schema is projected correctly from JSON Schema input
     expect(requestedSchema).toMatchObject({

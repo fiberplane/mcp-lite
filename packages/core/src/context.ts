@@ -102,14 +102,14 @@ export function createContext(
       }
 
       // 2. Convert schema to JSON Schema if needed
-      const { mcpInputSchema } = resolveSchema(
+      const { resolvedSchema } = resolveSchema(
         params.schema,
         options.schemaAdapter,
       );
 
       // 3. Project to elicitation-compatible schema
       const requestedSchema = toElicitationRequestedSchema(
-        mcpInputSchema,
+        resolvedSchema,
         elicitOptions?.strict,
       );
 

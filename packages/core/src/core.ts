@@ -530,7 +530,7 @@ export class McpServer {
       this.capabilities.tools = { listChanged: true };
     }
 
-    const { mcpInputSchema, validator } = resolveSchema(
+    const { resolvedSchema, validator } = resolveSchema(
       def.inputSchema,
       this.schemaAdapter,
     );
@@ -542,13 +542,13 @@ export class McpServer {
 
     const metadata: Tool = {
       name,
-      inputSchema: mcpInputSchema,
+      inputSchema: resolvedSchema,
     };
     if (def.description) {
       metadata.description = def.description;
     }
-    if (outputSchemaResolved.mcpInputSchema && def.outputSchema) {
-      metadata.outputSchema = outputSchemaResolved.mcpInputSchema;
+    if (outputSchemaResolved.resolvedSchema && def.outputSchema) {
+      metadata.outputSchema = outputSchemaResolved.resolvedSchema;
     }
 
     const entry: ToolEntry = {
@@ -747,20 +747,20 @@ export class McpServer {
       if (Array.isArray(def.arguments)) {
         argumentDefs = def.arguments as PromptArgumentDef[];
       } else {
-        const { mcpInputSchema, validator: schemaValidator } = resolveSchema(
+        const { resolvedSchema, validator: schemaValidator } = resolveSchema(
           def.arguments,
           this.schemaAdapter,
         );
         validator = schemaValidator;
-        argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
+        argumentDefs = extractArgumentsFromSchema(resolvedSchema);
       }
     } else if (def.inputSchema) {
-      const { mcpInputSchema, validator: schemaValidator } = resolveSchema(
+      const { resolvedSchema, validator: schemaValidator } = resolveSchema(
         def.inputSchema,
         this.schemaAdapter,
       );
       validator = schemaValidator;
-      argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
+      argumentDefs = extractArgumentsFromSchema(resolvedSchema);
     }
 
     const metadata: PromptMetadata = {
