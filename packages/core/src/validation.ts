@@ -3,28 +3,28 @@ import type { PromptArgumentDef, SchemaAdapter } from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
 export function resolveSchema(
-  inputSchema?: unknown,
+  schema?: unknown,
   schemaAdapter?: SchemaAdapter,
 ): {
-  mcpInputSchema: unknown;
+  resolvedSchema: unknown;
   validator?: unknown;
 } {
-  if (!inputSchema) return { mcpInputSchema: { type: "object" } };
+  if (!schema) return { resolvedSchema: { type: "object" } };
 
-  if (isStandardSchema(inputSchema)) {
+  if (isStandardSchema(schema)) {
     if (!schemaAdapter) {
-      const vendor = inputSchema["~standard"].vendor;
+      const vendor = schema["~standard"].vendor;
       throw new Error(
         `Cannot use Standard Schema (vendor: "${vendor}") without a schema adapter. ` +
           `Configure a schema adapter when creating McpServer.`,
       );
     }
 
-    const jsonSchema = schemaAdapter(inputSchema);
-    return { mcpInputSchema: jsonSchema, validator: inputSchema };
+    const jsonSchema = schemaAdapter(schema);
+    return { resolvedSchema: jsonSchema, validator: schema };
   }
 
-  return { mcpInputSchema: inputSchema };
+  return { resolvedSchema: schema };
 }
 
 export function createValidationFunction<T>(
