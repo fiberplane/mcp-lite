@@ -1305,20 +1305,20 @@ export class McpServer {
       validatedArgs = ctx.validate(entry.validator, callParams.arguments);
     }
 
-    const result = await entry.handler(validatedArgs, ctx);
+    const result = (await entry.handler(validatedArgs, ctx)) as ToolCallResult;
 
     // Validate structured content if outputSchema provided
     if (
       entry.outputValidator &&
-      (result as ToolCallResult).structuredContent &&
-      !(result as ToolCallResult).isError
+      "structuredContent" in result &&
+      !result.isError
     ) {
       try {
         const validated = createValidationFunction(
           entry.outputValidator,
-          (result as ToolCallResult).structuredContent,
+          result.structuredContent,
         );
-        (result as ToolCallResult).structuredContent = validated;
+        result.structuredContent = validated;
       } catch (validationError) {
         throw new RpcError(
           JSON_RPC_ERROR_CODES.INVALID_PARAMS,
@@ -1331,7 +1331,7 @@ export class McpServer {
       }
     }
 
-    return result as ToolCallResult;
+    return result;
   }
 
   private async handlePromptsList(
