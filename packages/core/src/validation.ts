@@ -2,29 +2,29 @@ import { RpcError } from "./errors.js";
 import type { PromptArgumentDef, SchemaAdapter } from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
 
-export function resolveToolSchema(
-  inputSchema?: unknown,
+export function resolveSchema(
+  schema?: unknown,
   schemaAdapter?: SchemaAdapter,
 ): {
-  mcpInputSchema: unknown;
+  resolvedSchema: unknown;
   validator?: unknown;
 } {
-  if (!inputSchema) return { mcpInputSchema: { type: "object" } };
+  if (!schema) return { resolvedSchema: { type: "object" } };
 
-  if (isStandardSchema(inputSchema)) {
+  if (isStandardSchema(schema)) {
     if (!schemaAdapter) {
-      const vendor = inputSchema["~standard"].vendor;
+      const vendor = schema["~standard"].vendor;
       throw new Error(
         `Cannot use Standard Schema (vendor: "${vendor}") without a schema adapter. ` +
           `Configure a schema adapter when creating McpServer.`,
       );
     }
 
-    const jsonSchema = schemaAdapter(inputSchema);
-    return { mcpInputSchema: jsonSchema, validator: inputSchema };
+    const jsonSchema = schemaAdapter(schema);
+    return { resolvedSchema: jsonSchema, validator: schema };
   }
 
-  return { mcpInputSchema: inputSchema };
+  return { resolvedSchema: schema };
 }
 
 export function createValidationFunction<T>(
@@ -110,7 +110,7 @@ export function toElicitationRequestedSchema(
   // Handle Standard Schema inputs by converting to JSON Schema first
   if (isStandardSchema(schema)) {
     throw new Error(
-      "Standard Schema inputs must be converted via resolveToolSchema first",
+      "Standard Schema inputs must be converted via resolveSchema first",
     );
   }
 

@@ -276,6 +276,7 @@ export interface Tool {
   name: string;
   description?: string;
   inputSchema: unknown;
+  outputSchema?: unknown;
 }
 
 export interface Prompt {
@@ -331,6 +332,7 @@ export interface ToolEntry {
   metadata: Tool;
   handler: MethodHandler;
   validator?: unknown;
+  outputValidator?: unknown;
 }
 
 export interface ResourceEntry {
@@ -442,9 +444,10 @@ export interface ResourceSubscribeParams {
   uri: string;
 }
 
-export interface ToolCallResult {
+export interface ToolCallResult<TStructuredContent = unknown> {
   content: Content[];
   isError?: boolean;
+  structuredContent?: TStructuredContent;
 }
 
 export interface PromptGetResult {
