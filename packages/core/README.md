@@ -37,18 +37,32 @@ const mcp = new McpServer({
   schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
 });
 
-// Define schema
-const EchoSchema = z.object({
-  message: z.string(),
+// Define schemas for input and output
+const WeatherInputSchema = z.object({
+  location: z.string(),
 });
 
-// Add a tool
-mcp.tool("echo", {
-  description: "Echoes the input message",
-  inputSchema: EchoSchema,
+const WeatherOutputSchema = z.object({
+  temperature: z.number(),
+  conditions: z.string(),
+});
+
+// Add a tool with structured output
+mcp.tool("getWeather", {
+  description: "Gets weather information for a location",
+  inputSchema: WeatherInputSchema,
+  outputSchema: WeatherOutputSchema,
   handler: (args) => ({
-    // args is automatically typed as { message: string }
-    content: [{ type: "text", text: args.message }],
+    // args is automatically typed as { location: string }
+    content: [{
+      type: "text",
+      text: `Weather in ${args.location}: 22°C, sunny`
+    }],
+    // structuredContent value is typed and validated
+    structuredContent: {
+      temperature: 22,
+      conditions: "sunny",
+    },
   }),
 });
 
@@ -184,8 +198,16 @@ mcp.tool("add", {
     },
     required: ["a", "b"],
   },
+  outputSchema: {
+    type: "object",
+    properties: {
+      result: { type: "number" },
+    },
+    required: ["result"],
+  },
   handler: (args: { a: number; b: number }) => ({
     content: [{ type: "text", text: String(args.a + args.b) }],
+    structuredContent: { result: args.a + args.b },
   }),
 });
 ```
@@ -195,16 +217,22 @@ mcp.tool("add", {
 ```typescript
 import { z } from "zod";
 
-const AddSchema = z.object({
+const AddInputSchema = z.object({
   a: z.number(),
   b: z.number(),
 });
 
+const AddOutputSchema = z.object({
+  result: z.number(),
+});
+
 mcp.tool("add", {
-  description: "Adds two numbers",
-  inputSchema: AddSchema,
-  handler: (args: z.infer<typeof AddSchema>) => ({
+  description: "Adds two numbers with structured output",
+  inputSchema: AddInputSchema,
+  outputSchema: AddOutputSchema,
+  handler: (args) => ({
     content: [{ type: "text", text: String(args.a + args.b) }],
+    structuredContent: { result: args.a + args.b },
   }),
 });
 ```
