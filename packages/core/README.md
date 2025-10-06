@@ -9,19 +9,21 @@ You get:
 - Opt-in adapters for sessions and client calls so you can start without state and add storage when you need it.
 - Plain TypeScript APIs that line up with the MCP spec and stay close to the wire format.
 
+## Quick Start
+
+Spin up a minimal MCP server with Hono and Zod:
+
 ```typescript
 import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
 
-// Create MCP server with Zod schema adapter
 const mcp = new McpServer({
   name: "example-server",
   version: "1.0.0",
   schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
 });
 
-// Define schemas for input and output
 const WeatherInputSchema = z.object({
   location: z.string(),
 });
@@ -31,18 +33,15 @@ const WeatherOutputSchema = z.object({
   conditions: z.string(),
 });
 
-// Add a tool with structured output
 mcp.tool("getWeather", {
   description: "Gets weather information for a location",
   inputSchema: WeatherInputSchema,
   outputSchema: WeatherOutputSchema,
   handler: (args) => ({
-    // args is automatically typed as { location: string }
     content: [{
       type: "text",
       text: `Weather in ${args.location}: 22°C, sunny`
     }],
-    // structuredContent value is typed and validated
     structuredContent: {
       temperature: 22,
       conditions: "sunny",
@@ -50,11 +49,9 @@ mcp.tool("getWeather", {
   }),
 });
 
-// Create HTTP transport
 const transport = new StreamableHttpTransport();
 const httpHandler = transport.bind(mcp);
 
-// Integrate with HTTP framework
 const app = new Hono();
 app.all("/mcp", async (c) => {
   const response = await httpHandler(c.req.raw);
@@ -71,9 +68,9 @@ app.all("/mcp", async (c) => {
 - No runtime dependencies and a single TypeScript entrypoint.
 - Type-safe tool definitions with Standard Schema (Zod, Valibot, Effect, ArkType).
 - Structured outputs with runtime validation and schema exposure via `tools/list`.
-- HTTP + SSE transport built on the Fetch API (no stdio wrapper required).
-- Adapter interfaces for sessions, client requests, and persistence when you outgrow stateless mode.
-- Middleware hooks and server composition via `.group()` for modular setups.
+- HTTP + SSE transport built on the Fetch API.
+- Adapter interfaces for sessions, server-to-client requests, and persistence when you outgrow stateless mode.
+- Middleware hooks and server composition via `.group()` for modular setups and namespacing.
 
 ## Installation
 
@@ -116,6 +113,8 @@ server.tool("search", {
 ### Structured Outputs
 
 Tools can return both human-readable content and machine-readable structured data. Use `outputSchema` to define the shape of `structuredContent`:
+
+See the [MCP structured content spec](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content) for the protocol details.
 
 ```typescript
 const WeatherOutputSchema = z.object({
@@ -164,25 +163,6 @@ handler: (args, ctx) => {
 }
 ```
 
-### Multiple Validation Libraries
-
-Use different validation libraries in the same server:
-
-```typescript
-import { z } from "zod"
-import * as v from "valibot"
-import { Schema } from "@effect/schema"
-
-server
-  .tool("zod-tool", { inputSchema: z.object({ ... }), handler: ... })
-  .tool("valibot-tool", { inputSchema: v.object({ ... }), handler: ... })
-  .tool("effect-tool", { inputSchema: Schema.struct({ ... }), handler: ... })
-  .tool("json-schema-tool", {
-    inputSchema: { type: "object", properties: { ... } },
-    handler: (args: MyType) => ...
-  })
-```
-
 ## Scaling with Adapters
 
 You can begin with a single file server and add state only when you need it. Adapters let you swap in storage or queueing code without touching tools or handlers.
@@ -190,8 +170,8 @@ You can begin with a single file server and add state only when you need it. Ada
 ### Scaling playbook
 
 - **Local prototyping:** run the transport with no adapters. Every request is stateless and there is nothing to clean up.
-- **Single server:** add `InMemorySessionAdapter` (and optionally `InMemoryClientRequestAdapter`) to keep progress events and elicitations alive across multiple requests from the same client.
-- **Distributed or serverless:** implement the adapter interfaces against Redis, KV, Durable Objects, or queues. See the Cloudflare Workers example for a working KV-backed adapter.
+- **Single server:** add `InMemorySessionAdapter` (and optionally `InMemoryClientRequestAdapter`) so progress notifications and elicitations can span multiple requests from the same client.
+- **Distributed or serverless:** implement the adapters against shared infrastructure (Redis, SQL, message queues, Durable Objects, etc.). See the Cloudflare Workers example for a KV-backed implementation.
 
 ### Deployment Patterns
 
@@ -200,7 +180,7 @@ You can begin with a single file server and add state only when you need it. Ada
 | Development | None | N/A | `StreamableHttpTransport()` |
 | Single server | In-memory | In-memory | `InMemorySessionAdapter` |
 | Distributed | Redis/KV | Redis/KV | Custom adapters |
-| Serverless | KV/R2 | Durable Objects | See examples below |
+| Serverless | KV store | KV store + Durable Object | KV-backed adapters with a coordination primitive |
 
 ### Adapter Configuration
 
@@ -231,7 +211,7 @@ The server can send JSON-RPC requests back to the MCP client (for example when y
 - To make sure an elicitation response is delivered even when the original POST is finished.
 - To back the pending requests with shared storage in a multi-instance deployment.
 
-The in-memory adapter covers local runs. For production you can implement `ClientRequestAdapter` using Redis, D1, Durable Objects, or any queue that can look up pending requests by session and request id.
+The in-memory adapter covers local runs. For production you can implement `ClientRequestAdapter` using Redis, a SQL store, Durable Objects, or any queue that can look up pending requests by session and request id.
 
 ### Custom Adapters
 
@@ -255,169 +235,97 @@ interface ClientRequestAdapter {
 }
 ```
 
-See [examples/cloudflare-worker-kv-r2](./examples/cloudflare-worker-kv-r2) for a production implementation using Cloudflare KV.
+See [examples/cloudflare-worker-kv](./examples/cloudflare-worker-kv) for a production implementation using Cloudflare KV.
 
 ## Runtime Environments
 
-`StreamableHttpTransport` runs anywhere the Fetch API is built in:
+`StreamableHttpTransport` runs anywhere the Fetch API is available:
 - Node.js 18+, Bun, and Deno.
 - Cloudflare Workers and other service-worker runtimes.
 - Browser extensions or Service Workers that expose Fetch.
 
 For Node.js 16 or earlier, install a Fetch polyfill before creating the transport.
 
-## Quick Start
+## Other Runtimes
 
-The snippets below show how to host the same server across different runtimes.
+Same server, different hosts:
 
-### Hono + Bun
+- **Hono + Bun**
 
-Run a stateless server on Bun using the Hono router.
+  ```typescript
+  import { Hono } from "hono"
+  import { McpServer, StreamableHttpTransport } from "mcp-lite"
+  import { z } from "zod"
 
-```typescript
-import { Hono } from "hono"
-import { McpServer, StreamableHttpTransport } from "mcp-lite"
-import { z } from "zod"
-
-const server = new McpServer({
-  name: "my-server",
-  version: "1.0.0",
-  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
-})
-  .tool("echo", {
+  const server = new McpServer({
+    name: "my-server",
+    version: "1.0.0",
+    schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+  }).tool("echo", {
     inputSchema: z.object({ message: z.string() }),
-    handler: (args) => ({
-      content: [{ type: "text", text: args.message }]
-    })
+    handler: (args) => ({ content: [{ type: "text", text: args.message }] })
   })
 
-const transport = new StreamableHttpTransport()
-const handler = transport.bind(server)
+  const transport = new StreamableHttpTransport()
+  const handler = transport.bind(server)
+  const app = new Hono()
+  app.all("/mcp", (c) => handler(c.req.raw))
+  export default app
+  ```
 
-const app = new Hono()
-app.all("/mcp", async (c) => await handler(c.req.raw))
+- **Cloudflare Workers** (stateless starter; plug adapters into KV / Durable Objects for production)
 
-export default app
-```
+  ```typescript
+  import { McpServer, StreamableHttpTransport } from "mcp-lite"
+  import { z } from "zod"
 
-Run: `bun run index.ts`
-
-### Cloudflare Workers
-
-Deploy the same server on Cloudflare Workers with in-memory sessions to keep progress events.
-
-```typescript
-import { McpServer, StreamableHttpTransport, InMemorySessionAdapter } from "mcp-lite"
-import { z } from "zod"
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const server = new McpServer({
-      name: "worker-server",
-      version: "1.0.0",
-      schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
-    })
-      .tool("echo", {
+  export default {
+    async fetch(request: Request): Promise<Response> {
+      const server = new McpServer({
+        name: "worker-server",
+        version: "1.0.0",
+        schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+      }).tool("echo", {
         inputSchema: z.object({ message: z.string() }),
-        handler: (args) => ({
-          content: [{ type: "text", text: args.message }]
-        })
+        handler: (args) => ({ content: [{ type: "text", text: args.message }] })
       })
 
-    const transport = new StreamableHttpTransport({
-      sessionAdapter: new InMemorySessionAdapter({ maxEventBufferSize: 1024 })
-    })
-    const handler = transport.bind(server)
-
-    return handler(request)
+      const transport = new StreamableHttpTransport()
+      return transport.bind(server)(request)
+    }
   }
-}
-```
+  ```
 
-Deploy: `wrangler deploy`
+- **Next.js App Router**
 
-### Next.js App Router
+  ```typescript
+  import { McpServer, StreamableHttpTransport } from "mcp-lite"
+  import { z } from "zod"
 
-Expose MCP over the Next.js App Router without writing custom request plumbing.
-
-```typescript
-// app/api/mcp/route.ts
-import { McpServer, StreamableHttpTransport } from "mcp-lite"
-import { z } from "zod"
-
-const server = new McpServer({
-  name: "nextjs-server",
-  version: "1.0.0",
-  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
-})
-  .tool("echo", {
+  const server = new McpServer({
+    name: "nextjs-server",
+    version: "1.0.0",
+    schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+  }).tool("echo", {
     inputSchema: z.object({ message: z.string() }),
-    handler: (args) => ({
-      content: [{ type: "text", text: args.message }]
-    })
+    handler: (args) => ({ content: [{ type: "text", text: args.message }] })
   })
 
-const transport = new StreamableHttpTransport()
-const handler = transport.bind(server)
+  const handler = new StreamableHttpTransport().bind(server)
 
-export async function POST(request: Request) {
-  return handler(request)
-}
-
-export async function GET(request: Request) {
-  return handler(request)
-}
-
-export async function DELETE(request: Request) {
-  return handler(request)
-}
-```
-
-### Express
-
-Bridge the transport into an existing Express application.
-
-```typescript
-import express from "express"
-import { McpServer, StreamableHttpTransport } from "mcp-lite"
-import { z } from "zod"
-
-const server = new McpServer({
-  name: "express-server",
-  version: "1.0.0",
-  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
-})
-  .tool("echo", {
-    inputSchema: z.object({ message: z.string() }),
-    handler: (args) => ({
-      content: [{ type: "text", text: args.message }]
-    })
-  })
-
-const transport = new StreamableHttpTransport()
-const handler = transport.bind(server)
-
-const app = express()
-app.all("/mcp", async (req, res) => {
-  const response = await handler(req)
-  res.status(response.status)
-  response.headers.forEach((value, key) => res.setHeader(key, value))
-  res.send(await response.text())
-})
-
-app.listen(3000)
-```
+  export const POST = handler
+  export const GET = handler
+  ```
 
 ## Examples
 
 The repo includes runnable samples that show different adapters and runtimes:
-- `examples/cloudflare-worker-kv-r2` – Workers runtime with KV and R2-backed adapters.
+- `examples/cloudflare-worker-kv` – Workers runtime with Cloudflare KV adapters.
 - `examples/composing-servers` – Multiple servers grouped behind one transport.
 - `examples/validation-arktype` – Standard Schema via ArkType.
 - `examples/validation-valibot` – Validation using Valibot.
 - `examples/validation-effectschema` – Validation with Effect Schema.
 - `examples/validation-zod` – Validation with Zod.
-- `playground/minimal-server.ts` – Small Bun server for local testing.
 - `examples/auth-clerk` – Adds Clerk auth middleware and guards.
 
 ## MCP Concepts
@@ -631,13 +539,13 @@ const transport = new StreamableHttpTransport({
 });
 ```
 
-See [packages/core/README.elicitation.md](./packages/core/README.elicitation.md) for distributed implementations.
+See [packages/core/README.elicitation.md](./packages/core/README.elicitation.md) for an implementation that uses an external KV store.
 
 ## `mcp-lite` Features
 
 ### Middleware
 
-`mcp-lite` lets you apply Express-style middleware to every request before it reaches a tool or prompt handler:
+`mcp-lite` lets you apply Hono-style middleware to every request before it reaches a tool or prompt handler:
 
 ```typescript
 // Logging
