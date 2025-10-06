@@ -13,7 +13,6 @@ const buildSamplingInit = () =>
   });
 
 describe("Sampling E2E Tests", () => {
-  // FIXME - This does not actually test ctx.sample
   test("E2E: ctx.sample() does not throw when client has sampling capability", async () => {
     const { server, handler } = createStatefulTestServer();
 
@@ -129,11 +128,11 @@ describe("Sampling E2E Tests", () => {
     );
   });
 
-  test("E2E: full sampling flow with client accept response", async () => {
+  test("E2E: full sampling flow with client text response", async () => {
     // This test verifies the complete sampling flow:
-    // 1. Tool calls ctx.sample() with proper schema
+    // 1. Tool calls ctx.sample() with proper params
     // 2. Server sends sampling/createMessage request via SSE
-    // 3. Client responds with accept + data via HTTP POST
+    // 3. Client responds with LLM-generated text via HTTP POST
     // 4. Server resolves the sampling promise with the result
     // 5. Tool completes with the sampling data
 
@@ -151,7 +150,9 @@ describe("Sampling E2E Tests", () => {
 
         try {
           const result = await ctx.sample({
-            prompt: "Some prompt hi",
+            prompt: "Generate a creative greeting",
+            systemPrompt: "You are a friendly assistant",
+            maxTokens: 100,
           });
 
           return {
@@ -159,7 +160,7 @@ describe("Sampling E2E Tests", () => {
               {
                 type: "text",
                 // @ts-expect-error - .text only available on text responses (not image or audio)
-                text: `Interesting, ${result.content?.text || "Unknown"}!`,
+                text: `LLM said: ${result.content?.text || "Unknown"}`,
               },
             ],
           };
@@ -176,7 +177,7 @@ describe("Sampling E2E Tests", () => {
       },
     });
 
-    // Initialize session WITH elicitation capability
+    // Initialize session WITH sampling capability
     const initializeRequest = {
       jsonrpc: "2.0",
       id: 1,
@@ -185,7 +186,7 @@ describe("Sampling E2E Tests", () => {
         clientInfo: { name: "test-client", version: "1.0.0" },
         protocolVersion: "2025-06-18",
         capabilities: {
-          sampling: {}, // Include elicitation capability
+          sampling: {},
         },
       },
     };
@@ -243,19 +244,24 @@ describe("Sampling E2E Tests", () => {
 
     // Wait for events from SSE stream
     const events = await sseEventPromise;
-    expect(events).toHaveLength(2); // ping + elicitation
+    expect(events).toHaveLength(2); // ping + sampling
 
-    // First event is ping, second is elicitation
+    // First event is ping, second is sampling
     const samplingData = events[1].data as any;
     expect(samplingData.method).toBe("sampling/createMessage");
-    // We only send a single user message for now
+    // We send a single user message
     expect(samplingData.params.messages).toHaveLength(1);
     expect(samplingData.params.messages[0].role).toBe("user");
-    // We only send a single text prompt for now
     expect(samplingData.params.messages[0].content.type).toBe("text");
-    expect(samplingData.params.messages[0].content.text).toBe("Some prompt hi");
+    expect(samplingData.params.messages[0].content.text).toBe(
+      "Generate a creative greeting",
+    );
+    expect(samplingData.params.systemPrompt).toBe(
+      "You are a friendly assistant",
+    );
+    expect(samplingData.params.maxTokens).toBe(100);
 
-    // Send client response
+    // Send client response with text content
     const clientResponse = await handler(
       new Request("http://localhost:3000/", {
         method: "POST",
@@ -269,10 +275,10 @@ describe("Sampling E2E Tests", () => {
           id: samplingData.id,
           result: {
             role: "assistant",
-            model: "boots-llm",
+            model: "gpt-4",
             content: {
               type: "text",
-              text: "Some LLM response",
+              text: "Hello! How can I help you today?",
             },
           },
         }),
@@ -285,34 +291,44 @@ describe("Sampling E2E Tests", () => {
     expect(toolResponse.status).toBe(200);
     const toolResult = await toolResponse.json();
     expect(toolResult.result.content[0].text).toBe(
-      "Interesting, Some LLM response!",
+      "LLM said: Hello! How can I help you today?",
     );
   });
 
-  test.skip("E2E: full sampling flow with client decline", async () => {
+  test("E2E: sampling with image response", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    server.tool("decline-elicitation", {
-      description: "Test elicitation decline flow",
+    server.tool("image-sampling", {
+      description: "Test sampling with image response",
       inputSchema: z.object({}),
       handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
+        if (!ctx.client.supports("sampling")) {
           return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
+            content: [{ type: "text", text: "Sampling not supported" }],
           };
         }
 
         try {
-          const result = await ctx.elicit({
-            message: "Please provide your age",
-            schema: z.object({ age: z.number() }),
+          const result = await ctx.sample({
+            prompt: "Generate an image of a cat",
           });
+
+          if (result.content.type === "image") {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Received an image response",
+                },
+              ],
+            };
+          }
 
           return {
             content: [
               {
                 type: "text",
-                text: `Action was: ${result.action}`,
+                text: `Unexpected type: ${result.content.type}`,
               },
             ],
           };
@@ -329,7 +345,6 @@ describe("Sampling E2E Tests", () => {
       },
     });
 
-    // Initialize session with elicitation capability
     const initResponse = await handler(
       new Request("http://localhost:3000/", {
         method: "POST",
@@ -344,7 +359,7 @@ describe("Sampling E2E Tests", () => {
           params: {
             clientInfo: { name: "test-client", version: "1.0.0" },
             protocolVersion: "2025-06-18",
-            capabilities: { elicitation: {} },
+            capabilities: { sampling: {} },
           },
         }),
       }),
@@ -353,7 +368,6 @@ describe("Sampling E2E Tests", () => {
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
 
-    // Open SSE stream
     const sseResponse = await handler(
       new Request("http://localhost:3000/", {
         method: "GET",
@@ -366,10 +380,8 @@ describe("Sampling E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    // Start collecting SSE events (ping + elicitation = 2 events)
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
 
-    // Start tool call
     const toolPromise = handler(
       new Request("http://localhost:3000/", {
         method: "POST",
@@ -383,24 +395,18 @@ describe("Sampling E2E Tests", () => {
           id: "tool-call-1",
           method: "tools/call",
           params: {
-            name: "decline-elicitation",
+            name: "image-sampling",
             arguments: {},
           },
         }),
       }),
     );
 
-    // Wait for elicitation request via SSE
-    const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    const events = await sseEventPromise;
+    const samplingData = events[1].data as any;
 
-    // First event is ping, second is elicitation
-    const elicitationData = events[1].data as any;
-    expect(elicitationData.method).toBe("elicitation/create");
-    expect(elicitationData.params.message).toBe("Please provide your age");
-
-    // Respond with decline (no content field)
-    const declineResponse = await handler(
+    // Send response with image content
+    await handler(
       new Request("http://localhost:3000/", {
         method: "POST",
         headers: {
@@ -410,170 +416,45 @@ describe("Sampling E2E Tests", () => {
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: elicitationData.id,
-          result: { action: "decline" },
-        }),
-      }),
-    );
-    expect(declineResponse.status).toBe(202);
-
-    // Check final tool response
-    const toolResponse = await toolPromise;
-    expect(toolResponse.status).toBe(200);
-    const toolResult = await toolResponse.json();
-    expect(toolResult.result.content[0].text).toBe("Action was: decline");
-  });
-
-  test.skip("E2E: full sampling flow with client cancel", async () => {
-    const { server, handler } = createStatefulTestServer();
-
-    server.tool("cancel-elicitation", {
-      description: "Test elicitation cancel flow",
-      inputSchema: z.object({}),
-      handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
-          return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
-          };
-        }
-
-        try {
-          const result = await ctx.elicit({
-            message: "Please provide your name",
-            schema: z.object({ name: z.string() }),
-          });
-
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Action was: ${result.action}`,
-              },
-            ],
-          };
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-              },
-            ],
-          };
-        }
-      },
-    });
-
-    // Initialize session
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            clientInfo: { name: "test-client", version: "1.0.0" },
-            protocolVersion: "2025-06-18",
-            capabilities: { elicitation: {} },
+          id: samplingData.id,
+          result: {
+            role: "assistant",
+            model: "dall-e-3",
+            content: {
+              type: "image",
+              data: "base64encodedimagedata",
+              mimeType: "image/png",
+            },
           },
         }),
       }),
     );
 
-    expect(initResponse.status).toBe(200);
-    const sessionId = initResponse.headers.get("mcp-session-id")!;
-
-    // Open SSE stream
-    const sseResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "GET",
-        headers: {
-          Accept: "text/event-stream",
-          "MCP-Protocol-Version": "2025-06-18",
-          "MCP-Session-Id": sessionId,
-        },
-      }),
-    );
-    expect(sseResponse.status).toBe(200);
-
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
-
-    // Start tool call
-    const toolPromise = handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-          "MCP-Session-Id": sessionId,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "tool-call-1",
-          method: "tools/call",
-          params: {
-            name: "cancel-elicitation",
-            arguments: {},
-          },
-        }),
-      }),
-    );
-
-    // Get elicitation request from SSE
-    const events = await ssePromise;
-    expect(events).toHaveLength(2);
-
-    const elicitationData = events[1].data as any;
-    expect(elicitationData.method).toBe("elicitation/create");
-
-    // Respond with cancel
-    const cancelResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18",
-          "MCP-Session-Id": sessionId,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: elicitationData.id,
-          result: { action: "cancel" },
-        }),
-      }),
-    );
-    expect(cancelResponse.status).toBe(202);
-
-    // Verify tool response
     const toolResponse = await toolPromise;
     expect(toolResponse.status).toBe(200);
     const toolResult = await toolResponse.json();
-    expect(toolResult.result.content[0].text).toBe("Action was: cancel");
+    expect(toolResult.result.content[0].text).toBe(
+      "Received an image response",
+    );
   });
 
-  test.skip("E2E: sampling timeout when client doesn't respond", async () => {
+  test("E2E: sampling timeout when client doesn't respond", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    server.tool("timeout-elicitation", {
-      description: "Test elicitation timeout",
+    server.tool("timeout-sampling", {
+      description: "Test sampling timeout",
       inputSchema: z.object({}),
       handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
+        if (!ctx.client.supports("sampling")) {
           return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
+            content: [{ type: "text", text: "Sampling not supported" }],
           };
         }
 
         try {
-          await ctx.elicit(
+          await ctx.sample(
             {
-              message: "Please provide data",
-              schema: z.object({ data: z.string() }),
+              prompt: "This will timeout",
             },
             { timeout_ms: 100 }, // Very short timeout
           );
@@ -609,7 +490,7 @@ describe("Sampling E2E Tests", () => {
           params: {
             clientInfo: { name: "test-client", version: "1.0.0" },
             protocolVersion: "2025-06-18",
-            capabilities: { elicitation: {} },
+            capabilities: { sampling: {} },
           },
         }),
       }),
@@ -618,7 +499,7 @@ describe("Sampling E2E Tests", () => {
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
 
-    // Open SSE stream but don't respond to elicitation
+    // Open SSE stream but don't respond to sampling
     const sseResponse = await handler(
       new Request("http://localhost:3000/", {
         method: "GET",
@@ -645,7 +526,7 @@ describe("Sampling E2E Tests", () => {
           id: "tool-call-1",
           method: "tools/call",
           params: {
-            name: "timeout-elicitation",
+            name: "timeout-sampling",
             arguments: {},
           },
         }),
@@ -660,32 +541,26 @@ describe("Sampling E2E Tests", () => {
     sseResponse.body?.cancel();
   });
 
-  test.skip("E2E: sampling with invalid client response data", async () => {
+  test("E2E: sampling with invalid client response format", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    server.tool("invalid-response-elicitation", {
-      description: "Test elicitation with invalid response",
+    server.tool("invalid-response-sampling", {
+      description: "Test sampling with invalid response",
       inputSchema: z.object({}),
       handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
+        if (!ctx.client.supports("sampling")) {
           return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
+            content: [{ type: "text", text: "Sampling not supported" }],
           };
         }
 
         try {
-          const result = await ctx.elicit({
-            message: "Please provide your age as a number",
-            schema: z.object({ age: z.number() }),
+          await ctx.sample({
+            prompt: "Say hello",
           });
 
           return {
-            content: [
-              {
-                type: "text",
-                text: `Received: ${JSON.stringify(result)}`,
-              },
-            ],
+            content: [{ type: "text", text: "Should not reach here" }],
           };
         } catch (error) {
           return {
@@ -715,7 +590,7 @@ describe("Sampling E2E Tests", () => {
           params: {
             clientInfo: { name: "test-client", version: "1.0.0" },
             protocolVersion: "2025-06-18",
-            capabilities: { elicitation: {} },
+            capabilities: { sampling: {} },
           },
         }),
       }),
@@ -753,21 +628,21 @@ describe("Sampling E2E Tests", () => {
           id: "tool-call-1",
           method: "tools/call",
           params: {
-            name: "invalid-response-elicitation",
+            name: "invalid-response-sampling",
             arguments: {},
           },
         }),
       }),
     );
 
-    // Get elicitation request
+    // Get sampling request
     const events = await ssePromise;
     expect(events).toHaveLength(2);
 
-    const elicitationData = events[1].data as any;
-    expect(elicitationData.method).toBe("elicitation/create");
+    const samplingData = events[1].data as any;
+    expect(samplingData.method).toBe("sampling/createMessage");
 
-    // Respond with invalid data (string instead of number for age)
+    // Respond with invalid data (missing required content field)
     const invalidResponse = await handler(
       new Request("http://localhost:3000/", {
         method: "POST",
@@ -778,44 +653,41 @@ describe("Sampling E2E Tests", () => {
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: elicitationData.id,
+          id: samplingData.id,
           result: {
-            action: "accept",
-            content: { age: "not a number" }, // Invalid data type
+            role: "assistant",
+            model: "gpt-4",
+            // Missing content field!
           },
         }),
       }),
     );
     expect(invalidResponse.status).toBe(202);
 
-    // The system should handle this gracefully
+    // The system should handle this with a validation error
     const toolResponse = await toolPromise;
     expect(toolResponse.status).toBe(200);
     const toolResult = await toolResponse.json();
-
-    // System should either accept the invalid data or show validation error
-    expect(toolResult.result.content[0].text).toMatch(
-      /(Received:|Validation error:)/,
-    );
+    expect(toolResult.result.content[0].text).toContain("Validation error");
+    expect(toolResult.result.content[0].text).toContain("response format");
   });
 
-  test.skip("E2E: sampling with client error response", async () => {
+  test("E2E: sampling with client error response", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    server.tool("error-response-elicitation", {
-      description: "Test elicitation with client error",
+    server.tool("error-response-sampling", {
+      description: "Test sampling with client error",
       inputSchema: z.object({}),
       handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
+        if (!ctx.client.supports("sampling")) {
           return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
+            content: [{ type: "text", text: "Sampling not supported" }],
           };
         }
 
         try {
-          await ctx.elicit({
-            message: "This will cause client error",
-            schema: z.object({ data: z.string() }),
+          await ctx.sample({
+            prompt: "This will cause client error",
           });
 
           return {
@@ -849,7 +721,7 @@ describe("Sampling E2E Tests", () => {
           params: {
             clientInfo: { name: "test-client", version: "1.0.0" },
             protocolVersion: "2025-06-18",
-            capabilities: { elicitation: {} },
+            capabilities: { sampling: {} },
           },
         }),
       }),
@@ -887,19 +759,19 @@ describe("Sampling E2E Tests", () => {
           id: "tool-call-1",
           method: "tools/call",
           params: {
-            name: "error-response-elicitation",
+            name: "error-response-sampling",
             arguments: {},
           },
         }),
       }),
     );
 
-    // Get elicitation request
+    // Get sampling request
     const events = await ssePromise;
     expect(events).toHaveLength(2);
 
-    const elicitationData = events[1].data as any;
-    expect(elicitationData.method).toBe("elicitation/create");
+    const samplingData = events[1].data as any;
+    expect(samplingData.method).toBe("sampling/createMessage");
 
     // Respond with JSON-RPC error instead of result
     const errorResponse = await handler(
@@ -912,11 +784,11 @@ describe("Sampling E2E Tests", () => {
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: elicitationData.id,
+          id: samplingData.id,
           error: {
             code: -32000,
-            message: "Client encountered an error",
-            data: { details: "Something went wrong" },
+            message: "Model is overloaded",
+            data: { details: "Please try again later" },
           },
         }),
       }),
@@ -928,60 +800,40 @@ describe("Sampling E2E Tests", () => {
     expect(toolResponse.status).toBe(200);
     const toolResult = await toolResponse.json();
     expect(toolResult.result.content[0].text).toContain("Client error:");
-    expect(toolResult.result.content[0].text).toContain(
-      "Client encountered an error",
-    );
+    expect(toolResult.result.content[0].text).toContain("Model is overloaded");
   });
 
-  test.skip("E2E: multiple sequential sampling requests in one tool", async () => {
-    // TODO: This test has complex async timing issues with sequential elicitations
-    // The test expects both elicitation requests to be available simultaneously,
-    // but sequential await calls mean the second elicitation doesn't start until
-    // the first one completes. This requires more sophisticated event handling.
+  test("E2E: multiple sequential sampling requests in one tool", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    server.tool("sequential-elicitations", {
-      description: "Test multiple sequential elicitations",
+    server.tool("sequential-sampling", {
+      description: "Test multiple sequential sampling requests",
       inputSchema: z.object({}),
       handler: async (_, ctx) => {
-        if (!ctx.client.supports("elicitation")) {
+        if (!ctx.client.supports("sampling")) {
           return {
-            content: [{ type: "text", text: "Elicitation not supported" }],
+            content: [{ type: "text", text: "Sampling not supported" }],
           };
         }
 
         try {
-          const result1 = await ctx.elicit({
-            message: "What is your name?",
-            schema: z.object({ name: z.string() }),
+          const result1 = await ctx.sample({
+            prompt: "Generate a topic",
           });
 
-          if (result1.action !== "accept") {
-            return {
-              content: [
-                { type: "text", text: `First request was ${result1.action}` },
-              ],
-            };
-          }
+          // @ts-expect-error - .text only available on text responses
+          const topic = result1.content.text;
 
-          const result2 = await ctx.elicit({
-            message: "What is your age?",
-            schema: z.object({ age: z.number() }),
+          const result2 = await ctx.sample({
+            prompt: `Write a haiku about ${topic}`,
           });
-
-          if (result2.action !== "accept") {
-            return {
-              content: [
-                { type: "text", text: `Second request was ${result2.action}` },
-              ],
-            };
-          }
 
           return {
             content: [
               {
                 type: "text",
-                text: `Hello ${result1.content?.name}, you are ${result2.content?.age} years old!`,
+                // @ts-expect-error - .text only available on text responses
+                text: `Topic: ${topic}\nHaiku: ${result2.content.text}`,
               },
             ],
           };
@@ -1013,7 +865,7 @@ describe("Sampling E2E Tests", () => {
           params: {
             clientInfo: { name: "test-client", version: "1.0.0" },
             protocolVersion: "2025-06-18",
-            capabilities: { elicitation: {} },
+            capabilities: { sampling: {} },
           },
         }),
       }),
@@ -1022,10 +874,8 @@ describe("Sampling E2E Tests", () => {
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
 
-    // For sequential elicitations, we'll collect events as they come
-    // and respond to each one individually
-    let elicitationCount = 0;
-    const elicitationResponses: Array<{ id: string; message: string }> = [];
+    let samplingCount = 0;
+    const samplingResponses: Array<{ id: string; prompt: string }> = [];
 
     // Open SSE stream and start event collection
     const sseResponse = await handler(
@@ -1063,18 +913,19 @@ describe("Sampling E2E Tests", () => {
               if (line.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(line.slice(6));
-                  if (data.method === "elicitation/create") {
-                    elicitationCount++;
-                    elicitationResponses.push({
+                  if (data.method === "sampling/createMessage") {
+                    samplingCount++;
+                    const prompt = data.params.messages[0].content.text;
+                    samplingResponses.push({
                       id: data.id,
-                      message: data.params.message,
+                      prompt,
                     });
 
-                    // Respond immediately to each elicitation
-                    const responseData =
-                      data.params.message === "What is your name?"
-                        ? { name: "Alice" }
-                        : { age: 30 };
+                    // Respond immediately to each sampling request
+                    const responseText =
+                      prompt === "Generate a topic"
+                        ? "cats"
+                        : "Soft furry friend\nPurring in the afternoon\nPeaceful lazy nap";
 
                     await handler(
                       new Request("http://localhost:3000/", {
@@ -1088,15 +939,19 @@ describe("Sampling E2E Tests", () => {
                           jsonrpc: "2.0",
                           id: data.id,
                           result: {
-                            action: "accept",
-                            content: responseData,
+                            role: "assistant",
+                            model: "gpt-4",
+                            content: {
+                              type: "text",
+                              text: responseText,
+                            },
                           },
                         }),
                       }),
                     );
 
-                    // Stop after handling 2 elicitations
-                    if (elicitationCount >= 2) {
+                    // Stop after handling 2 sampling requests
+                    if (samplingCount >= 2) {
                       resolve();
                       return;
                     }
@@ -1129,14 +984,14 @@ describe("Sampling E2E Tests", () => {
           id: "tool-call-1",
           method: "tools/call",
           params: {
-            name: "sequential-elicitations",
+            name: "sequential-sampling",
             arguments: {},
           },
         }),
       }),
     );
 
-    // Wait for all elicitations to be handled (with timeout)
+    // Wait for all sampling requests to be handled (with timeout)
     await Promise.race([
       sseEventHandler,
       new Promise((_, reject) =>
@@ -1144,17 +999,160 @@ describe("Sampling E2E Tests", () => {
       ),
     ]);
 
-    // Verify we got both elicitations
-    expect(elicitationCount).toBe(2);
-    expect(elicitationResponses[0].message).toBe("What is your name?");
-    expect(elicitationResponses[1].message).toBe("What is your age?");
+    // Verify we got both sampling requests
+    expect(samplingCount).toBe(2);
+    expect(samplingResponses[0].prompt).toBe("Generate a topic");
+    expect(samplingResponses[1].prompt).toBe("Write a haiku about cats");
 
     // Verify final tool result
     const toolResponse = await toolPromise;
     expect(toolResponse.status).toBe(200);
     const toolResult = await toolResponse.json();
+    expect(toolResult.result.content[0].text).toContain("Topic: cats");
+    expect(toolResult.result.content[0].text).toContain("Soft furry friend");
+  });
+
+  test("E2E: sampling with model preferences", async () => {
+    const { server, handler } = createStatefulTestServer();
+
+    server.tool("sampling-with-preferences", {
+      description: "Test sampling with model preferences",
+      inputSchema: z.object({}),
+      handler: async (_, ctx) => {
+        if (!ctx.client.supports("sampling")) {
+          return {
+            content: [{ type: "text", text: "Sampling not supported" }],
+          };
+        }
+
+        try {
+          const result = await ctx.sample({
+            prompt: "Say hello",
+            modelPreferences: {
+              hints: [{ name: "gpt-4" }, { name: "claude-3" }],
+              intelligencePriority: 0.9,
+              speedPriority: 0.3,
+            },
+          });
+
+          return {
+            content: [
+              {
+                type: "text",
+                // @ts-expect-error - .text only available on text responses
+                text: `Response: ${result.content.text}, Model: ${result.model}`,
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+              },
+            ],
+          };
+        }
+      },
+    });
+
+    const initResponse = await handler(
+      new Request("http://localhost:3000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            clientInfo: { name: "test-client", version: "1.0.0" },
+            protocolVersion: "2025-06-18",
+            capabilities: { sampling: {} },
+          },
+        }),
+      }),
+    );
+
+    expect(initResponse.status).toBe(200);
+    const sessionId = initResponse.headers.get("mcp-session-id")!;
+
+    const sseResponse = await handler(
+      new Request("http://localhost:3000/", {
+        method: "GET",
+        headers: {
+          Accept: "text/event-stream",
+          "MCP-Protocol-Version": "2025-06-18",
+          "MCP-Session-Id": sessionId,
+        },
+      }),
+    );
+    expect(sseResponse.status).toBe(200);
+
+    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+
+    const toolPromise = handler(
+      new Request("http://localhost:3000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+          "MCP-Session-Id": sessionId,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "tool-call-1",
+          method: "tools/call",
+          params: {
+            name: "sampling-with-preferences",
+            arguments: {},
+          },
+        }),
+      }),
+    );
+
+    const events = await sseEventPromise;
+    const samplingData = events[1].data as any;
+
+    // Verify model preferences were passed through
+    expect(samplingData.params.modelPreferences).toBeDefined();
+    expect(samplingData.params.modelPreferences.hints).toHaveLength(2);
+    expect(samplingData.params.modelPreferences.hints[0].name).toBe("gpt-4");
+    expect(samplingData.params.modelPreferences.intelligencePriority).toBe(0.9);
+    expect(samplingData.params.modelPreferences.speedPriority).toBe(0.3);
+
+    // Send response
+    await handler(
+      new Request("http://localhost:3000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+          "MCP-Session-Id": sessionId,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: samplingData.id,
+          result: {
+            role: "assistant",
+            model: "gpt-4",
+            content: {
+              type: "text",
+              text: "Hello there!",
+            },
+          },
+        }),
+      }),
+    );
+
+    const toolResponse = await toolPromise;
+    expect(toolResponse.status).toBe(200);
+    const toolResult = await toolResponse.json();
     expect(toolResult.result.content[0].text).toBe(
-      "Hello Alice, you are 30 years old!",
+      "Response: Hello there!, Model: gpt-4",
     );
   });
 });
