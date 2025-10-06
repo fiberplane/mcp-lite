@@ -215,6 +215,10 @@ export function createContext(
 
       if (!isSamplingResult(response.result)) {
         // TODO - use logger once we put it on context
+        console.error(
+          "Unexpected sampling response format from client",
+          JSON.stringify(response.result, null, 2),
+        );
         // TODO - Tighten up this RPC Error
         throw new RpcError(
           -32602, // Invalid params (investigate another error code)
