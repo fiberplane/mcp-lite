@@ -19,7 +19,7 @@
       "path": "./examples/composing-servers"
     },
     {
-      "path": "./examples/cloudflare-worker-kv-r2"
+      "path": "./examples/cloudflare-worker-kv"
     },
     {
       "path": "./examples/validation-arktype"
