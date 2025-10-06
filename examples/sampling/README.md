@@ -43,15 +43,3 @@ const response = await ctx.sample({
 // Use the generated content
 const textContent = response.content.text;
 ```
-
-The example also uses ArkType for input validation via the `schemaAdapter`:
-
-```typescript
-import { type Type, type } from "arktype";
-
-const mcp = new McpServer({
-  name: "sampling-server",
-  version: "1.0.0",
-  schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
-});
-```
