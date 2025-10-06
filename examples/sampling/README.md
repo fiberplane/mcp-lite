@@ -1,6 +1,6 @@
-# ArkType + mcp-lite Example
+# `mcp-lite` Sampling Example
 
-A simple MCP server that shows how to use ArkType schemas for input validation with mcp-lite.
+A simple MCP server demonstrating the sampling capability, where your server can request the LLM to generate content on its behalf.
 
 To run the example:
 
@@ -12,21 +12,45 @@ bun install
 bun start
 ```
 
-The mcp server runs on `http://localhost:3000/mcp`, and you can inspect it at that endpoint with the mcp inspector package:
+The mcp server runs on `http://localhost:3001/mcp`, and you can inspect it at that endpoint with the mcp inspector package:
 
 ```bash
 bunx @modelcontextprotocol/inspector
 ```
 
-## How ArkType connects to mcp-lite
+## How Sampling Works
 
-The key is the `schemaAdapter` in the server setup:
+The `craft_wonky_prompt` tool checks if the client supports sampling, then uses `ctx.sample()` to request LLM completions:
+
+```typescript
+// Check capability
+if (!ctx.client.supports("sampling")) {
+  throw new Error("This tool requires a client that supports sampling");
+}
+
+// Request completion
+const response = await ctx.sample({
+  prompt: `Craft absolutely unhinged prose on the topic of ${args.theme}`,
+  modelPreferences: {
+    hints: [{ name: "claude-4.5-sonnet" }],
+    intelligencePriority: 0.8,
+    speedPriority: 0.5,
+  },
+  systemPrompt: "You are a wonky assistant.",
+  maxTokens: 100,
+});
+
+// Use the generated content
+const textContent = response.content.text;
+```
+
+The example also uses ArkType for input validation via the `schemaAdapter`:
 
 ```typescript
 import { type Type, type } from "arktype";
 
 const mcp = new McpServer({
-  name: "echo-server",
+  name: "sampling-server",
   version: "1.0.0",
   schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
 });

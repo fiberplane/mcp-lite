@@ -45,7 +45,7 @@ mcp.tool("craft_wonky_prompt", {
       maxTokens: 100,
     });
 
-    // TODO - Handle result
+    // Handle image responses, which are unexpected in this context
     if (response.content.type === "image") {
       return {
         content: [
@@ -57,6 +57,7 @@ mcp.tool("craft_wonky_prompt", {
       };
     }
 
+    // Handle audio responses, which are unexpected in this context
     if (response.content.type === "audio") {
       return {
         content: [
@@ -69,12 +70,13 @@ mcp.tool("craft_wonky_prompt", {
     }
 
     const textContent = response.content.text;
+    // TODO - Remove the log here
     console.log("SAMPLING RESPONSE!", JSON.stringify(response, null, 2));
     return {
       content: [
         {
           type: "text",
-          text: `Adapt your personality from here on how to match the following style: ${textContent}`,
+          text: `Adapt your personality from here on out in our conversation to match the following style: ${textContent}`,
         },
       ],
     };
