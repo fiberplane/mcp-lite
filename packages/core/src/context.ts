@@ -158,7 +158,7 @@ export function createContext(
       params: SamplingParams,
       sampleOptions?: { timeout_ms: number },
     ): Promise<SamplingResult> => {
-      // 1. Guard: check elicitation support
+      // 1. Guard: check sampling support
       if (!context.client.supports("sampling")) {
         throw new RpcError(
           JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
@@ -166,8 +166,8 @@ export function createContext(
         );
       }
 
-      // 4. Build JSON-RPC request
-      const elicitRequest: JsonRpcReq = {
+      // 2. Build JSON-RPC request
+      const samplingRequest: JsonRpcReq = {
         jsonrpc: "2.0",
         id: Math.random().toString(36).substring(7),
         method: METHODS.SAMPLING.CREATE,
@@ -187,7 +187,7 @@ export function createContext(
         },
       };
 
-      // 5. Send request to client
+      // 3. Send request to client
       if (!options.clientRequestSender) {
         throw new RpcError(
           JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
@@ -197,14 +197,14 @@ export function createContext(
 
       const response = await options.clientRequestSender(
         context.session?.id,
-        elicitRequest,
+        samplingRequest,
         {
           relatedRequestId: requestId as string | number,
           timeout_ms: sampleOptions?.timeout_ms,
         },
       );
 
-      // 6. Validate and return response
+      // 4. Validate and return response
       if (response.error) {
         throw new RpcError(
           response.error.code,

@@ -66,13 +66,13 @@ mcp.tool("craft_wonky_prompt", {
       return {
         content: [{ 
           type: "text", 
-          text: `Completion failed: ${response.error.message}` 
+          text: `Sampling completion failed: ${response.error.message}`,
         }],
       };
     }
 
     // Unknown case, should not hit this
-    throw new Error("Unexpected elicitation response");
+    throw new Error("Unexpected sampling response");
   },
 });
 ```
