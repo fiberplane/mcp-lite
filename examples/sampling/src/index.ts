@@ -45,7 +45,8 @@ mcp.tool("craft_wonky_prompt", {
       maxTokens: 100,
     });
 
-    // Handle image responses, which are unexpected in this context
+    // Handle image responses, which are unexpected here
+    // (Including this case for illustrative purposes)
     if (response.content.type === "image") {
       return {
         content: [
@@ -57,7 +58,8 @@ mcp.tool("craft_wonky_prompt", {
       };
     }
 
-    // Handle audio responses, which are unexpected in this context
+    // Handle audio responses, which are unexpected here
+    // (Including this case for illustrative purposes)
     if (response.content.type === "audio") {
       return {
         content: [
@@ -70,8 +72,7 @@ mcp.tool("craft_wonky_prompt", {
     }
 
     const textContent = response.content.text;
-    // TODO - Remove the log here
-    console.log("SAMPLING RESPONSE!", JSON.stringify(response, null, 2));
+
     return {
       content: [
         {
