@@ -11,6 +11,10 @@ You get:
 
 ## Quick Start
 
+```bash
+npm install mcp-lite
+```
+
 Spin up a minimal MCP server with Hono and Zod:
 
 ```typescript
@@ -72,15 +76,6 @@ app.all("/mcp", async (c) => {
 - Adapter interfaces for sessions, server-to-client requests, and persistence when you outgrow stateless mode.
 - Middleware hooks and server composition via `.group()` for modular setups and namespacing.
 
-## Installation
-
-```bash
-npm install mcp-lite
-# or
-bun add mcp-lite
-# or
-pnpm add mcp-lite
-```
 
 ## Type Safety
 
@@ -180,7 +175,6 @@ You can begin with a single file server and add state only when you need it. Ada
 | Development | None | N/A | `StreamableHttpTransport()` |
 | Single server | In-memory | In-memory | `InMemorySessionAdapter` |
 | Distributed | Redis/KV | Redis/KV | Custom adapters |
-| Serverless | KV store | KV store + Durable Object | KV-backed adapters with a coordination primitive |
 
 ### Adapter Configuration
 
