@@ -233,16 +233,9 @@ See [examples/cloudflare-worker-kv](./examples/cloudflare-worker-kv) for a produ
 
 ## Runtime Environments
 
-`StreamableHttpTransport` runs anywhere the Fetch API is available:
-- Node.js 18+, Bun, and Deno.
-- Cloudflare Workers and other service-worker runtimes.
-- Browser extensions or Service Workers that expose Fetch.
+## Other Runtimes and Frameworks
 
-For Node.js 16 or earlier, install a Fetch polyfill before creating the transport.
-
-## Other Runtimes
-
-Same server, different hosts:
+`StreamableHttpTransport` runs anywhere the Fetch API is available.
 
 - **Hono + Bun**
 
