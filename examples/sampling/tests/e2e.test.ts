@@ -1,107 +1,235 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
   createExampleServer,
-  createJsonRpcClient,
+  createMcpClient,
   type TestServer,
 } from "@internal/test-utils";
 
 describe("Sampling Example", () => {
   let server: TestServer;
-  let request: ReturnType<typeof createJsonRpcClient>;
 
   beforeAll(async () => {
     // Start the example server
     server = await createExampleServer(() => import("../src/index.ts"));
-    request = createJsonRpcClient(server.url);
-
-    // Initialize the server
-    await request("initialize", {
-      protocolVersion: "2025-06-18",
-      clientInfo: {
-        name: "test-client",
-        version: "1.0.0",
-      },
-    });
   });
 
   afterAll(async () => {
     await server?.stop();
   });
 
-  describe("ArkType schema adapter integration", () => {
-    it("should convert ArkType schema to JSON Schema in tools/list", async () => {
-      const response = await request("tools/list");
+  describe("craft_wonky_prompt Tool", () => {
+    it("should expose the craft_wonky_prompt tool", async () => {
+      // Initialize with sampling capability
+      const initResponse = await fetch(server.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "init",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            clientInfo: {
+              name: "test-client",
+              version: "1.0.0",
+            },
+            capabilities: {
+              sampling: {},
+            },
+          },
+        }),
+      });
+
+      const sessionId = initResponse.headers.get("MCP-Session-Id");
+      expect(sessionId).toBeDefined();
+
+      const client = createMcpClient({
+        baseUrl: server.url,
+        sessionId: sessionId as string,
+      });
+
+      const response = await client.request("tools/list");
 
       expect(response.error).toBeUndefined();
       // biome-ignore lint/suspicious/noExplicitAny: tests
-      expect((response.result as any).tools).toHaveLength(1);
+      const tools = (response.result as any).tools;
+      expect(tools).toHaveLength(1);
 
-      // biome-ignore lint/suspicious/noExplicitAny: tests
-      const echoTool = (response.result as any).tools[0];
-      expect(echoTool.name).toBe("echo");
-      expect(echoTool.description).toBe("Echoes the input message");
+      const craftTool = tools[0];
+      expect(craftTool.name).toBe("craft_wonky_prompt");
+      expect(craftTool.description).toContain("wonky prompt");
 
-      // Verify that the ArkType schema was converted to JSON Schema
-      expect(echoTool.inputSchema).toMatchObject({
+      // Verify input schema
+      expect(craftTool.inputSchema).toMatchObject({
         type: "object",
         properties: {
-          message: { type: "string" },
+          theme: { type: "string" },
         },
-        required: ["message"],
+        required: ["theme"],
       });
+    });
+
+    it("should reject calls without sampling capability", async () => {
+      // Initialize WITHOUT sampling capability
+      const initResponse = await fetch(server.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "init",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            clientInfo: {
+              name: "test-client",
+              version: "1.0.0",
+            },
+            capabilities: {}, // No sampling capability
+          },
+        }),
+      });
+
+      const sessionId = initResponse.headers.get("MCP-Session-Id");
+      const client = createMcpClient({
+        baseUrl: server.url,
+        sessionId: sessionId as string,
+      });
+
+      // Call the tool - should fail with internal error
+      try {
+        await client.request("tools/call", {
+          name: "craft_wonky_prompt",
+          arguments: {
+            theme: "rubber ducks",
+          },
+        });
+        throw new Error("Expected request to throw");
+      } catch (error) {
+        // biome-ignore lint/suspicious/noExplicitAny: tests
+        const err = error as any;
+        // The error gets wrapped as "Internal error" with details in data
+        expect(err.message).toContain("Internal error");
+        expect(err.data?.message).toContain(
+          "requires a client that supports sampling",
+        );
+      }
+    });
+
+    it("should validate input schema", async () => {
+      // Initialize with sampling capability
+      const initResponse = await fetch(server.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "init",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            clientInfo: {
+              name: "test-client",
+              version: "1.0.0",
+            },
+            capabilities: {
+              sampling: {},
+            },
+          },
+        }),
+      });
+
+      const sessionId = initResponse.headers.get("MCP-Session-Id");
+      const client = createMcpClient({
+        baseUrl: server.url,
+        sessionId: sessionId as string,
+      });
+
+      // Missing required field
+      await expect(
+        client.request("tools/call", {
+          name: "craft_wonky_prompt",
+          arguments: {},
+        }),
+      ).rejects.toThrow("JSON-RPC Error");
+
+      // Wrong type
+      await expect(
+        client.request("tools/call", {
+          name: "craft_wonky_prompt",
+          arguments: {
+            theme: 123, // Should be string
+          },
+        }),
+      ).rejects.toThrow("JSON-RPC Error");
     });
   });
 
-  describe("ArkType schema validation", () => {
-    it("should accept valid input that matches ArkType schema", async () => {
-      const response = await request("tools/call", {
-        name: "echo",
-        arguments: {
-          message: "Hello, ArkType!",
+  describe("Sampling Integration", () => {
+    it("should initiate sampling flow when called with valid input", async () => {
+      // Initialize with sampling capability
+      const initResponse = await fetch(server.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MCP-Protocol-Version": "2025-06-18",
         },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "init",
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            clientInfo: {
+              name: "test-client",
+              version: "1.0.0",
+            },
+            capabilities: {
+              sampling: {},
+            },
+          },
+        }),
       });
 
-      expect(response.error).toBeUndefined();
-      expect(response.result).toEqual({
-        content: [
-          {
-            type: "text",
-            text: "Hello, ArkType!",
-          },
-        ],
+      const sessionId = initResponse.headers.get("MCP-Session-Id");
+      expect(sessionId).toBeDefined();
+
+      const client = createMcpClient({
+        baseUrl: server.url,
+        sessionId: sessionId as string,
       });
-    });
 
-    it("should reject input missing required field", async () => {
-      await expect(
-        request("tools/call", {
-          name: "echo",
-          arguments: {}, // Missing required 'message' field
-        }),
-      ).rejects.toThrow("JSON-RPC Error");
-    });
-
-    it("should reject input with wrong type", async () => {
-      await expect(
-        request("tools/call", {
-          name: "echo",
+      // Open SSE stream to receive sampling request
+      const stream = await client.openRequestStream(
+        "tools/call",
+        {
+          name: "craft_wonky_prompt",
           arguments: {
-            message: 123, // Should be string, not number
+            theme: "existential rubber ducks",
           },
-        }),
-      ).rejects.toThrow("JSON-RPC Error");
-    });
+        },
+        "test-call-1",
+      );
 
-    it("should reject input with wrong field name", async () => {
-      // ArkType should reject this because 'message' is required but 'kewlMessagee' was provided
-      expect(
-        request("tools/call", {
-          name: "echo",
-          arguments: {
-            kewlMessagee: "Hello", // Should be 'message', not 'kewlMessagee'
-          },
-        }),
-      ).rejects.toThrow("JSON-RPC Error");
+      // Read the first event from the stream
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      const { value } = await reader.read();
+      const chunk = decoder.decode(value);
+
+      // Should receive a sampling/createMessage request
+      expect(chunk).toContain("sampling/createMessage");
+      expect(chunk).toContain("existential rubber ducks");
+
+      // Clean up
+      reader.releaseLock();
     });
   });
 });

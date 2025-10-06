@@ -103,8 +103,10 @@ app.all("/mcp", async (c) => {
 
 // Root endpoint
 app.get("/", (c) => {
-  return c.text("Echo MCP Server - MCP endpoint available at /mcp");
+  return c.text("Sampling MCP Server - MCP endpoint available at /mcp");
 });
+
+export default app;
 
 // If running directly (not imported), start the server
 if (import.meta.main) {
