@@ -1,29 +1,6 @@
-# `mcp-lite`
+# mcp-lite
 
-A small, simple, web-first framework for building MCP servers.
-
-> [!TIP]
->
-> The Model Context Protocol (MCP) is an open standard that enables secure connections between host applications and external data sources and tools, allowing AI assistants to reason over information and execute functions with user permission.
-
-## Features
-- Lightweight and zero dependencies
-- Supports Streamable HTTP transport
-- Composable middleware system
-- Standard Schema validation (Zod, Valibot, etc.)
-- Type-safe tool, resource, and prompt registration
-
-## Installation
-
-```bash
-npm install mcp-lite
-# or
-bun add mcp-lite
-# or
-pnpm add mcp-lite
-```
-
-## Quick Start
+A lightweight, web-first framework for building MCP servers.
 
 ```typescript
 import { Hono } from "hono";
@@ -78,117 +55,324 @@ app.all("/mcp", async (c) => {
 });
 ```
 
-## Creating an MCP Server
+> [!TIP]
+>
+> The Model Context Protocol (MCP) is an open standard that enables secure connections between host applications and external data sources and tools, allowing AI assistants to reason over information and execute functions with user permission.
 
-Basic constructor usage:
+## Features
 
-```typescript
-import { McpServer } from "mcp-lite";
+- Zero dependencies
+- Type-safe tool definitions with Standard Schema (Zod, Valibot, Effect, ArkType)
+- HTTP/SSE transport (not stdio)
+- Adapter pattern for sessions and state management
+- Middleware support
+- Server composition via `.group()`
 
-const server = new McpServer({
-  name: "my-server",
-  version: "1.0.0",
-});
+## Installation
+
+```bash
+npm install mcp-lite
+# or
+bun add mcp-lite
+# or
+pnpm add mcp-lite
 ```
 
-### Using a Schema Adapter
+## Type Safety
 
-Schema adapters are needed when using Standard Schema validators (like Zod or Valibot) to convert them to JSON Schema format that MCP clients can understand.
+### Automatic Type Inference
 
-#### With Zod schema adapter:
+Standard Schema validators provide automatic type inference:
+
 ```typescript
 import { z } from "zod";
 
-const server = new McpServer({
-  name: "my-server",
-  version: "1.0.0",
-  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType),
-});
-```
-
-#### Without schema adapter (JSON Schema only):
-```typescript
-const server = new McpServer({
-  name: "my-server",
-  version: "1.0.0",
-});
-```
-
-## Connecting with Hono
-
-```typescript
-import { Hono } from "hono";
-import { StreamableHttpTransport } from "mcp-lite";
-
-// Create transport and bind server
-const transport = new StreamableHttpTransport();
-const httpHandler = transport.bind(mcp);
-
-// Setup Hono app with MCP endpoint
-const app = new Hono();
-app.all("/mcp", async (c) => {
-  const response = await httpHandler(c.req.raw);
-  return response;
-});
-```
-
-## Sessions, SSE, and Session Adapters
-
-Streamable HTTP transport supports two operational modes:
-
-### Stateless Mode (Default)
-No session support, no GET endpoint for SSE streaming.
-
-```typescript
-import { StreamableHttpTransport } from "mcp-lite";
-
-// Stateless mode - no session management
-const transport = new StreamableHttpTransport();
-const httpHandler = transport.bind(mcp);
-```
-
-### Stateful Mode with Sessions
-Enable sessions and SSE streaming by providing a `SessionAdapter`:
-
-```typescript
-import { StreamableHttpTransport, InMemorySessionAdapter } from "mcp-lite";
-
-// Stateful mode with sessions and SSE support
-const transport = new StreamableHttpTransport({
-  sessionAdapter: new InMemorySessionAdapter({
-    maxEventBufferSize: 1024  
-  })
+const SearchSchema = z.object({
+  query: z.string(),
+  limit: z.number().optional(),
+  filters: z.array(z.string()).optional()
 });
 
-const httpHandler = transport.bind(mcp);
-```
+server.tool("search", {
+  inputSchema: SearchSchema,
+  handler: (args) => {
+    // args is typed as { query: string, limit?: number, filters?: string[] }
+    args.query.toLowerCase()
+    args.limit ?? 10
+    args.filters?.map(f => f.trim())
 
-### Custom Session Adapters
-Implement the `SessionAdapter` interface for custom session storage:
-
-```typescript
-import type { SessionAdapter, SessionMeta, SessionData, EventId } from "mcp-lite";
-
-class CustomSessionAdapter implements SessionAdapter {
-  generateSessionId(): string {
-    return crypto.randomUUID();
+    return { content: [{ type: "text", text: "..." }] }
   }
+})
+```
 
-  // Implement session storage methods...
-  async create(id: string, meta: SessionMeta): Promise<SessionData> { /* ... */ }
-  async has(id: string): Promise<boolean> { /* ... */ }
-  async get(id: string): Promise<SessionData | undefined> { /* ... */ }
-  async appendEvent(id: string, streamId: string, message: unknown): Promise<EventId | undefined> { /* ... */ }
-  async replay(id: string, lastEventId: EventId, write: (eventId: EventId, message: unknown) => Promise<void> | void): Promise<void> { /* ... */ }
-  async delete(id: string): Promise<void> { /* ... */ }
+### Structured Outputs
+
+Tools can return both human-readable content and machine-readable structured data. Use `outputSchema` to define the shape of `structuredContent`:
+
+```typescript
+const WeatherOutputSchema = z.object({
+  temperature: z.number(),
+  conditions: z.string(),
+});
+
+server.tool("getWeather", {
+  inputSchema: z.object({ location: z.string() }),
+  outputSchema: WeatherOutputSchema,
+  handler: (args) => ({
+    content: [{
+      type: "text",
+      text: `Weather in ${args.location}: 22°C, sunny`
+    }],
+    // structuredContent is typed and validated at runtime
+    structuredContent: {
+      temperature: 22,
+      conditions: "sunny",
+    }
+  })
+})
+```
+
+The `outputSchema` provides runtime validation and type inference for `structuredContent`.
+
+### Context API
+
+The handler context provides typed access to session data, authentication, and client capabilities:
+
+```typescript
+handler: (args, ctx) => {
+  ctx.progress?.({ progress: 50, total: 100 })
+  ctx.session?.id
+  ctx.authInfo?.userId
+  ctx.state.myCustomData = "..."
+
+  const validated = ctx.validate(MySchema, data)
+
+  if (ctx.client.supports("elicitation")) {
+    const result = await ctx.elicit({
+      message: "Confirm action?",
+      schema: z.object({ confirmed: z.boolean() })
+    })
+  }
 }
 ```
+
+### Multiple Validation Libraries
+
+Use different validation libraries in the same server:
+
+```typescript
+import { z } from "zod"
+import * as v from "valibot"
+import { Schema } from "@effect/schema"
+
+server
+  .tool("zod-tool", { inputSchema: z.object({ ... }), handler: ... })
+  .tool("valibot-tool", { inputSchema: v.object({ ... }), handler: ... })
+  .tool("effect-tool", { inputSchema: Schema.struct({ ... }), handler: ... })
+  .tool("json-schema-tool", {
+    inputSchema: { type: "object", properties: { ... } },
+    handler: (args: MyType) => ...
+  })
+```
+
+## Scaling with Adapters
+
+The framework uses adapters for sessions and state, allowing you to scale from development to production without changing your core logic.
+
+### Deployment Patterns
+
+| Environment | Session Storage | State Storage | Transport Configuration |
+|-------------|----------------|---------------|------------------------|
+| Development | None | N/A | `StreamableHttpTransport()` |
+| Single server | In-memory | In-memory | `InMemorySessionAdapter` |
+| Distributed | Redis/KV | Redis/KV | Custom adapters |
+| Serverless | KV/R2 | Durable Objects | See examples below |
+
+### Adapter Configuration
+
+```typescript
+// Development: stateless
+const transport = new StreamableHttpTransport()
+
+// Production: with sessions and client requests
+const transport = new StreamableHttpTransport({
+  sessionAdapter: new InMemorySessionAdapter({
+    maxEventBufferSize: 1024
+  }),
+  clientRequestAdapter: new InMemoryClientRequestAdapter({
+    defaultTimeoutMs: 30000
+  })
+})
+```
+
+### Built-in Adapters
+
+- `InMemorySessionAdapter` - Session storage in memory
+- `InMemoryClientRequestAdapter` - Client request tracking in memory
+
+### Custom Adapters
+
+Implement these interfaces for custom storage:
+
+```typescript
+interface SessionAdapter {
+  generateSessionId(): string
+  create(id: string, meta: SessionMeta): Promise<SessionData>
+  has(id: string): Promise<boolean>
+  get(id: string): Promise<SessionData | undefined>
+  appendEvent(id: string, streamId: string, message: unknown): Promise<EventId>
+  replay(id: string, lastEventId: EventId, write: WriteFunction): Promise<void>
+  delete(id: string): Promise<void>
+}
+
+interface ClientRequestAdapter {
+  createPending(sessionId: string, requestId: string, options): { promise: Promise<Response> }
+  resolvePending(sessionId: string, requestId: string, response: Response): boolean
+  rejectPending(sessionId: string, requestId: string, error: Error): boolean
+}
+```
+
+See [examples/cloudflare-worker-kv-r2](./examples/cloudflare-worker-kv-r2) for a production implementation using Cloudflare KV.
+
+## Quick Start
+
+### Hono + Bun
+
+```typescript
+import { Hono } from "hono"
+import { McpServer, StreamableHttpTransport } from "mcp-lite"
+import { z } from "zod"
+
+const server = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+})
+  .tool("echo", {
+    inputSchema: z.object({ message: z.string() }),
+    handler: (args) => ({
+      content: [{ type: "text", text: args.message }]
+    })
+  })
+
+const transport = new StreamableHttpTransport()
+const handler = transport.bind(server)
+
+const app = new Hono()
+app.all("/mcp", async (c) => await handler(c.req.raw))
+
+export default app
+```
+
+Run: `bun run index.ts`
+
+### Cloudflare Workers
+
+```typescript
+import { McpServer, StreamableHttpTransport, InMemorySessionAdapter } from "mcp-lite"
+import { z } from "zod"
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const server = new McpServer({
+      name: "worker-server",
+      version: "1.0.0",
+      schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+    })
+      .tool("echo", {
+        inputSchema: z.object({ message: z.string() }),
+        handler: (args) => ({
+          content: [{ type: "text", text: args.message }]
+        })
+      })
+
+    const transport = new StreamableHttpTransport({
+      sessionAdapter: new InMemorySessionAdapter({ maxEventBufferSize: 1024 })
+    })
+    const handler = transport.bind(server)
+
+    return handler(request)
+  }
+}
+```
+
+Deploy: `wrangler deploy`
+
+### Next.js App Router
+
+```typescript
+// app/api/mcp/route.ts
+import { McpServer, StreamableHttpTransport } from "mcp-lite"
+import { z } from "zod"
+
+const server = new McpServer({
+  name: "nextjs-server",
+  version: "1.0.0",
+  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+})
+  .tool("echo", {
+    inputSchema: z.object({ message: z.string() }),
+    handler: (args) => ({
+      content: [{ type: "text", text: args.message }]
+    })
+  })
+
+const transport = new StreamableHttpTransport()
+const handler = transport.bind(server)
+
+export async function POST(request: Request) {
+  return handler(request)
+}
+
+export async function GET(request: Request) {
+  return handler(request)
+}
+
+export async function DELETE(request: Request) {
+  return handler(request)
+}
+```
+
+### Express
+
+```typescript
+import express from "express"
+import { McpServer, StreamableHttpTransport } from "mcp-lite"
+import { z } from "zod"
+
+const server = new McpServer({
+  name: "express-server",
+  version: "1.0.0",
+  schemaAdapter: (schema) => z.toJSONSchema(schema as z.ZodType)
+})
+  .tool("echo", {
+    inputSchema: z.object({ message: z.string() }),
+    handler: (args) => ({
+      content: [{ type: "text", text: args.message }]
+    })
+  })
+
+const transport = new StreamableHttpTransport()
+const handler = transport.bind(server)
+
+const app = express()
+app.all("/mcp", async (req, res) => {
+  const response = await handler(req)
+  res.status(response.status)
+  response.headers.forEach((value, key) => res.setHeader(key, value))
+  res.send(await response.text())
+})
+
+app.listen(3000)
+```
+
 ## Tools
 
 ### Basic Tool with JSON Schema
 
 ```typescript
-mcp.tool("add", {
+server.tool("add", {
   description: "Adds two numbers",
   inputSchema: {
     type: "object",
@@ -226,7 +410,7 @@ const AddOutputSchema = z.object({
   result: z.number(),
 });
 
-mcp.tool("add", {
+server.tool("add", {
   description: "Adds two numbers with structured output",
   inputSchema: AddInputSchema,
   outputSchema: AddOutputSchema,
@@ -240,7 +424,7 @@ mcp.tool("add", {
 ### Tool without Schema
 
 ```typescript
-mcp.tool("status", {
+server.tool("status", {
   description: "Returns server status",
   handler: () => ({
     content: [{ type: "text", text: "Server is running" }],
@@ -250,10 +434,12 @@ mcp.tool("status", {
 
 ## Resources
 
+Resources are URI-identified content.
+
 ### Static Resource
 
 ```typescript
-mcp.resource(
+server.resource(
   "file://config.json",
   {
     name: "App Configuration",
@@ -271,16 +457,16 @@ mcp.resource(
 );
 ```
 
-### Templated Resource with URI Patterns
+### Templated Resource
 
 ```typescript
-mcp.resource(
+server.resource(
   "github://repos/{owner}/{repo}",
   { description: "GitHub repository" },
   async (uri, { owner, repo }) => ({
     contents: [{
       uri: uri.href,
-      type: "text", 
+      type: "text",
       text: `Repository: ${owner}/${repo}`,
     }],
   })
@@ -289,21 +475,23 @@ mcp.resource(
 
 ## Prompts
 
+Prompts generate message sequences for LLM conversations.
+
 ### Basic Prompt
 
 ```typescript
-mcp.prompt("greet", {
-  description: "Generate a greeting message",
+server.prompt("greet", {
+  description: "Generate a greeting",
   handler: () => ({
     messages: [{
       role: "user",
       content: { type: "text", text: "Hello, how are you?" }
     }]
-  }),
+  })
 });
 ```
 
-### Prompt with Arguments and Schema
+### With Arguments
 
 ```typescript
 import { z } from "zod";
@@ -313,171 +501,191 @@ const SummarySchema = z.object({
   length: z.enum(["short", "medium", "long"]).optional(),
 });
 
-mcp.prompt("summarize", {
+server.prompt("summarize", {
   description: "Create a summary prompt",
   arguments: SummarySchema,
-  handler: (args: z.infer<typeof SummarySchema>) => ({
+  handler: (args) => ({
     description: "Summarization prompt",
     messages: [{
       role: "user",
       content: {
         type: "text",
-        text: `Please summarize: ${args.text}`
+        text: `Please summarize this text in ${args.length || "medium"} length:\n\n${args.text}`
       }
     }]
-  }),
+  })
 });
 ```
 
+## Middleware
+
+Middleware functions run before request handlers:
+
+```typescript
+// Logging
+server.use(async (ctx, next) => {
+  const start = Date.now();
+  await next();
+  console.log(`${ctx.request.method} took ${Date.now() - start}ms`);
+});
+
+// Authentication
+server.use(async (ctx, next) => {
+  const token = ctx.request.headers?.get?.("Authorization");
+  if (!token) throw new Error("Unauthorized");
+  ctx.state.user = await validateToken(token);
+  await next();
+});
+
+// Rate limiting
+server.use(async (ctx, next) => {
+  const userId = ctx.state.user?.id;
+  if (await isRateLimited(userId)) {
+    throw new Error("Rate limit exceeded");
+  }
+  await next();
+});
+```
+
+## Server Composition
+
+Mount child servers to create modular architectures:
+
+```typescript
+const gitServer = new McpServer({ name: "git", version: "1.0.0" })
+  .tool("clone", { /* ... */ })
+  .tool("commit", { /* ... */ });
+
+const dbServer = new McpServer({ name: "database", version: "1.0.0" })
+  .tool("query", { /* ... */ })
+  .tool("migrate", { /* ... */ });
+
+// With namespacing
+const app = new McpServer({ name: "app", version: "1.0.0" })
+  .group("git", gitServer)      // Registers: git/clone, git/commit
+  .group("db", dbServer);        // Registers: db/query, db/migrate
+
+// Without namespacing
+const app2 = new McpServer({ name: "app", version: "1.0.0" })
+  .group(gitServer)              // Registers: clone, commit
+  .group(dbServer);              // Registers: query, migrate
+```
+
+See [examples/composing-servers](./examples/composing-servers) for details.
+
 ## Elicitation
 
-Elicitation enables MCP servers to request input from the client on behalf of the user during tool execution. This allows tools to gather additional information, confirm sensitive operations, or present choices to users through the connected AI application.
-
-### Usage Example
+Elicitation allows servers to request input from users during tool execution:
 
 ```typescript
 import { z } from "zod";
 
-const DeleteRecordSchema = z.object({
-  recordId: z.string(),
-  tableName: z.string(),
-});
-
-mcp.tool("delete_database_record", {
-  description: "Delete a database record with user confirmation",
-  inputSchema: DeleteRecordSchema,
+server.tool("delete_record", {
+  inputSchema: z.object({
+    recordId: z.string(),
+    tableName: z.string(),
+  }),
   handler: async (args, ctx) => {
-    // Check if client supports elicitation
     if (!ctx.client.supports("elicitation")) {
-      throw new Error("This tool requires a client that supports elicitation");
+      throw new Error("Elicitation not supported");
     }
 
-    // Request user confirmation through elicitation
     const response = await ctx.elicit({
-      message: `Are you sure you want to delete record "${args.recordId}" from table "${args.tableName}"? This action cannot be undone.`,
-      schema: z.object({
-        confirmed: z.boolean(),
-      }),
+      message: `Delete record "${args.recordId}" from "${args.tableName}"?`,
+      schema: z.object({ confirmed: z.boolean() })
     });
 
-    // Handle different response types
-    switch (response.type) {
-
-      // Accept means the response came back, but we still need to check the value of "confirmed"
-      case "accept": {
-        if (response.content.confirmed) {
-          // User confirmed - proceed with deletion
-          await deleteFromDatabase(args.tableName, args.recordId);
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Record "${args.recordId}" has been deleted from "${args.tableName}".` 
-            }],
-          };
-        }
-        
-        return {
-          content: [{ 
-            type: "text", 
-            text: "Record deletion declined by user." 
-          }],
-        };
-      }
-      
-      case "decline":
-        return {
-          content: [{ 
-            type: "text", 
-            text: "Record deletion cancelled by user." 
-          }],
-        };
-      
-      case "cancel":
-        throw new Error("Operation was cancelled");
-      
-      default:
-        throw new Error("Unexpected elicitation response");
+    if (response.action === "accept" && response.content.confirmed) {
+      await deleteFromDatabase(args.tableName, args.recordId);
+      return { content: [{ type: "text", text: "Record deleted" }] };
     }
-  },
+
+    return { content: [{ type: "text", text: "Deletion cancelled" }] };
+  }
 });
 ```
 
-### Setup Instructions
-
-To use elicitation, configure your transport with a `ClientRequestAdapter` alongside your `SessionAdapter`:
+Elicitation requires both adapters:
 
 ```typescript
-import { 
-  StreamableHttpTransport, 
-  InMemorySessionAdapter, 
-  InMemoryClientRequestAdapter 
-} from "mcp-lite";
-
 const transport = new StreamableHttpTransport({
-  sessionAdapter: new InMemorySessionAdapter({
-    maxEventBufferSize: 1024
-  }),
-  clientRequestAdapter: new InMemoryClientRequestAdapter({
-    defaultTimeoutMs: 30000  // 30 second timeout for server-to-client requests
-  })
-});
-
-const httpHandler = transport.bind(mcp);
-```
-
-The `ClientRequestAdapter` manages pending server-to-client requests (such as elicitation), storing them temporarily while waiting for client responses. This enables the server to pause execution, send a request to the client, and resume once the client provides a response.
-
-For an example using Cloudflare KV as the `ClientRequestAdapter` see the [Elicitation README](./packages/core/README.elicitation.md).
-
-## Middleware
-
-Basic middleware pattern for logging, authentication, or request processing:
-
-```typescript
-// Logging middleware
-mcp.use(async (ctx, next) => {
-  console.log(`Request: ${ctx.request.method}`);
-  await next();
-});
-
-// Authentication middleware
-mcp.use(async (ctx, next) => {
-  // Access request context
-  ctx.state.user = "authenticated-user";
-  await next();
+  sessionAdapter: new InMemorySessionAdapter({ maxEventBufferSize: 1024 }),
+  clientRequestAdapter: new InMemoryClientRequestAdapter({ defaultTimeoutMs: 30000 })
 });
 ```
+
+See [packages/core/README.elicitation.md](./packages/core/README.elicitation.md) for distributed implementations.
 
 ## Error Handling
 
 ```typescript
 import { RpcError, JSON_RPC_ERROR_CODES } from "mcp-lite";
 
-mcp.tool("divide", {
-  description: "Divides two numbers",
-  inputSchema: {
-    type: "object",
-    properties: {
-      a: { type: "number" },
-      b: { type: "number" },
-    },
-    required: ["a", "b"],
-  },
-  handler: (args: { a: number; b: number }) => {
+server.tool("divide", {
+  inputSchema: z.object({ a: z.number(), b: z.number() }),
+  handler: (args) => {
     if (args.b === 0) {
       throw new RpcError(JSON_RPC_ERROR_CODES.INVALID_PARAMS, "Division by zero");
     }
     return {
-      content: [{ type: "text", text: String(args.a / args.b) }],
+      content: [{ type: "text", text: String(args.a / args.b) }]
     };
-  },
+  }
+});
+
+// Custom error handler
+server.onError((error, ctx) => {
+  if (error instanceof MyCustomError) {
+    return {
+      code: -32001,
+      message: "Custom error",
+      data: { requestId: ctx.requestId }
+    };
+  }
+  // Return undefined for default handling
 });
 ```
 
-## Protocol Information
+## Sessions
 
-This framework supports MCP protocol version `2025-06-18` with full JSON-RPC 2.0 compliance.
+### Stateless Mode
+
+Default mode with no session management:
+
+```typescript
+const transport = new StreamableHttpTransport();
+```
+
+### Stateful Mode
+
+Enable sessions for SSE streaming and event replay:
+
+```typescript
+import { StreamableHttpTransport, InMemorySessionAdapter } from "mcp-lite";
+
+const transport = new StreamableHttpTransport({
+  sessionAdapter: new InMemorySessionAdapter({
+    maxEventBufferSize: 1024
+  })
+});
+```
+
+This enables:
+- Session persistence across requests
+- SSE streaming via GET endpoint
+- Event replay for reconnections
+- Progress notifications
 
 ## Examples
 
-See the `playground/` directory for complete working examples demonstrating all features.
+- [playground/minimal-server.ts](./playground/minimal-server.ts) - Basic stateless server
+- [examples/validation-zod](./examples/validation-zod) - Zod validation
+- [examples/validation-valibot](./examples/validation-valibot) - Valibot validation
+- [examples/validation-effectschema](./examples/validation-effectschema) - Effect Schema
+- [examples/composing-servers](./examples/composing-servers) - Server composition
+- [examples/cloudflare-worker-kv-r2](./examples/cloudflare-worker-kv-r2) - Cloudflare Workers with KV
+- [examples/auth-clerk](./examples/auth-clerk) - Authentication with Clerk
+
+## Protocol
+
+Supports MCP protocol version `2025-06-18` with JSON-RPC 2.0 compliance.
