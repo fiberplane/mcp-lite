@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run src/index.ts",
+    "inspect": "bunx @modelcontextprotocol/inspector",
     "start": "bun run src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
@@ -23,8 +24,7 @@
     "mcp",
     "mcp-lite",
     "model-context-protocol",
-    "arktype",
-    "validation"
+    "sampling"
   ],
   "author": "Fiberplane <info@fiberplane.com>",
   "license": "MIT"

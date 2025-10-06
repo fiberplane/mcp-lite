@@ -49,6 +49,19 @@
         "typescript": "^5.9.2",
       },
     },
+    "examples/sampling": {
+      "name": "@mcp-lite-examples/sampling",
+      "version": "1.0.3",
+      "dependencies": {
+        "arktype": "^2.1.22",
+        "hono": "^4.9.5",
+        "mcp-lite": "workspace:*",
+      },
+      "devDependencies": {
+        "@internal/test-utils": "workspace:*",
+        "typescript": "^5.9.2",
+      },
+    },
     "examples/validation-arktype": {
       "name": "@mcp-lite-examples/validation-arktype",
       "version": "1.0.3",
@@ -104,7 +117,7 @@
     },
     "packages/core": {
       "name": "mcp-lite",
-      "version": "0.4.0",
+      "version": "0.6.0",
       "dependencies": {
         "@standard-schema/spec": "^1.0.0",
       },
@@ -368,6 +381,8 @@
     "@mcp-lite-examples/cloudflare-worker-kv-r2": ["@mcp-lite-examples/cloudflare-worker-kv-r2@workspace:examples/cloudflare-worker-kv-r2"],
 
     "@mcp-lite-examples/composing-servers": ["@mcp-lite-examples/composing-servers@workspace:examples/composing-servers"],
+
+    "@mcp-lite-examples/sampling": ["@mcp-lite-examples/sampling@workspace:examples/sampling"],
 
     "@mcp-lite-examples/validation-arktype": ["@mcp-lite-examples/validation-arktype@workspace:examples/validation-arktype"],
 
