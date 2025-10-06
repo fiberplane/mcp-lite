@@ -1,6 +1,13 @@
 # mcp-lite
 
-A lightweight, web-first framework for building MCP servers.
+A small, fetch-first implementation of the Model Context Protocol (MCP) server APIs.
+
+`mcp-lite` is a ground-up rewrite of the TypeScript MCP SDK. It keeps only the pieces you need to stand up a server: JSON-RPC handling, typed tool definitions, and an HTTP + SSE transport that works anywhere `Request` and `Response` are available (Node, Bun, Cloudflare Workers, Deno, browsers with Service Workers).
+
+You get:
+- A minimal core (`packages/core`) with zero runtime dependencies.
+- Opt-in adapters for sessions and client calls so you can start without state and add storage when you need it.
+- Plain TypeScript APIs that line up with the MCP spec and stay close to the wire format.
 
 ```typescript
 import { Hono } from "hono";
@@ -61,12 +68,12 @@ app.all("/mcp", async (c) => {
 
 ## Features
 
-- Zero dependencies
-- Type-safe tool definitions with Standard Schema (Zod, Valibot, Effect, ArkType)
-- HTTP/SSE transport (not stdio)
-- Adapter pattern for sessions and state management
-- Middleware support
-- Server composition via `.group()`
+- No runtime dependencies and a single TypeScript entrypoint.
+- Type-safe tool definitions with Standard Schema (Zod, Valibot, Effect, ArkType).
+- Structured outputs with runtime validation and schema exposure via `tools/list`.
+- HTTP + SSE transport built on the Fetch API (no stdio wrapper required).
+- Adapter interfaces for sessions, client requests, and persistence when you outgrow stateless mode.
+- Middleware hooks and server composition via `.group()` for modular setups.
 
 ## Installation
 
@@ -178,7 +185,13 @@ server
 
 ## Scaling with Adapters
 
-The framework uses adapters for sessions and state, allowing you to scale from development to production without changing your core logic.
+You can begin with a single file server and add state only when you need it. Adapters let you swap in storage or queueing code without touching tools or handlers.
+
+### Scaling playbook
+
+- **Local prototyping:** run the transport with no adapters. Every request is stateless and there is nothing to clean up.
+- **Single server:** add `InMemorySessionAdapter` (and optionally `InMemoryClientRequestAdapter`) to keep progress events and elicitations alive across multiple requests from the same client.
+- **Distributed or serverless:** implement the adapter interfaces against Redis, KV, Durable Objects, or queues. See the Cloudflare Workers example for a working KV-backed adapter.
 
 ### Deployment Patterns
 
@@ -211,6 +224,15 @@ const transport = new StreamableHttpTransport({
 - `InMemorySessionAdapter` - Session storage in memory
 - `InMemoryClientRequestAdapter` - Client request tracking in memory
 
+### Client Requests and Elicitation
+
+The server can send JSON-RPC requests back to the MCP client (for example when you call `ctx.elicit`). Those requests are routed through the `ClientRequestAdapter`. Provide one when you need:
+- Timeouts or retries for client prompts.
+- To make sure an elicitation response is delivered even when the original POST is finished.
+- To back the pending requests with shared storage in a multi-instance deployment.
+
+The in-memory adapter covers local runs. For production you can implement `ClientRequestAdapter` using Redis, D1, Durable Objects, or any queue that can look up pending requests by session and request id.
+
 ### Custom Adapters
 
 Implement these interfaces for custom storage:
@@ -235,9 +257,22 @@ interface ClientRequestAdapter {
 
 See [examples/cloudflare-worker-kv-r2](./examples/cloudflare-worker-kv-r2) for a production implementation using Cloudflare KV.
 
+## Runtime Environments
+
+`StreamableHttpTransport` runs anywhere the Fetch API is built in:
+- Node.js 18+, Bun, and Deno.
+- Cloudflare Workers and other service-worker runtimes.
+- Browser extensions or Service Workers that expose Fetch.
+
+For Node.js 16 or earlier, install a Fetch polyfill before creating the transport.
+
 ## Quick Start
 
+The snippets below show how to host the same server across different runtimes.
+
 ### Hono + Bun
+
+Run a stateless server on Bun using the Hono router.
 
 ```typescript
 import { Hono } from "hono"
@@ -268,6 +303,8 @@ export default app
 Run: `bun run index.ts`
 
 ### Cloudflare Workers
+
+Deploy the same server on Cloudflare Workers with in-memory sessions to keep progress events.
 
 ```typescript
 import { McpServer, StreamableHttpTransport, InMemorySessionAdapter } from "mcp-lite"
@@ -300,6 +337,8 @@ export default {
 Deploy: `wrangler deploy`
 
 ### Next.js App Router
+
+Expose MCP over the Next.js App Router without writing custom request plumbing.
 
 ```typescript
 // app/api/mcp/route.ts
@@ -336,6 +375,8 @@ export async function DELETE(request: Request) {
 
 ### Express
 
+Bridge the transport into an existing Express application.
+
 ```typescript
 import express from "express"
 import { McpServer, StreamableHttpTransport } from "mcp-lite"
@@ -367,9 +408,29 @@ app.all("/mcp", async (req, res) => {
 app.listen(3000)
 ```
 
-## Tools
+## Examples
+
+The repo includes runnable samples that show different adapters and runtimes:
+- `examples/cloudflare-worker-kv-r2` – Workers runtime with KV and R2-backed adapters.
+- `examples/composing-servers` – Multiple servers grouped behind one transport.
+- `examples/validation-arktype` – Standard Schema via ArkType.
+- `examples/validation-valibot` – Validation using Valibot.
+- `examples/validation-effectschema` – Validation with Effect Schema.
+- `examples/validation-zod` – Validation with Zod.
+- `playground/minimal-server.ts` – Small Bun server for local testing.
+- `examples/auth-clerk` – Adds Clerk auth middleware and guards.
+
+## MCP Concepts
+
+The sections below map directly to the MCP specification: tools, resources, prompts, and elicitations.
+
+### Tools
+
+Tools expose callable functionality to MCP clients. Each variant below shows a different way to define inputs and outputs.
 
 ### Basic Tool with JSON Schema
+
+Define a tool using plain JSON Schema input and output definitions.
 
 ```typescript
 server.tool("add", {
@@ -398,6 +459,8 @@ server.tool("add", {
 
 ### Tool with Standard Schema (Zod)
 
+Use a Standard Schema validator (Zod here) to infer handler types automatically.
+
 ```typescript
 import { z } from "zod";
 
@@ -423,6 +486,8 @@ server.tool("add", {
 
 ### Tool without Schema
 
+Skip validation entirely for endpoints that return static information.
+
 ```typescript
 server.tool("status", {
   description: "Returns server status",
@@ -432,11 +497,13 @@ server.tool("status", {
 });
 ```
 
-## Resources
+### Resources
 
 Resources are URI-identified content.
 
 ### Static Resource
+
+Serve fixed content for a specific URI.
 
 ```typescript
 server.resource(
@@ -459,6 +526,8 @@ server.resource(
 
 ### Templated Resource
 
+Bind template variables from the URI before returning content.
+
 ```typescript
 server.resource(
   "github://repos/{owner}/{repo}",
@@ -473,11 +542,13 @@ server.resource(
 );
 ```
 
-## Prompts
+### Prompts
 
 Prompts generate message sequences for LLM conversations.
 
 ### Basic Prompt
+
+Return a fixed message sequence.
 
 ```typescript
 server.prompt("greet", {
@@ -492,6 +563,8 @@ server.prompt("greet", {
 ```
 
 ### With Arguments
+
+Validate prompt arguments before building messages.
 
 ```typescript
 import { z } from "zod";
@@ -517,65 +590,9 @@ server.prompt("summarize", {
 });
 ```
 
-## Middleware
+### Elicitation
 
-Middleware functions run before request handlers:
-
-```typescript
-// Logging
-server.use(async (ctx, next) => {
-  const start = Date.now();
-  await next();
-  console.log(`${ctx.request.method} took ${Date.now() - start}ms`);
-});
-
-// Authentication
-server.use(async (ctx, next) => {
-  const token = ctx.request.headers?.get?.("Authorization");
-  if (!token) throw new Error("Unauthorized");
-  ctx.state.user = await validateToken(token);
-  await next();
-});
-
-// Rate limiting
-server.use(async (ctx, next) => {
-  const userId = ctx.state.user?.id;
-  if (await isRateLimited(userId)) {
-    throw new Error("Rate limit exceeded");
-  }
-  await next();
-});
-```
-
-## Server Composition
-
-Mount child servers to create modular architectures:
-
-```typescript
-const gitServer = new McpServer({ name: "git", version: "1.0.0" })
-  .tool("clone", { /* ... */ })
-  .tool("commit", { /* ... */ });
-
-const dbServer = new McpServer({ name: "database", version: "1.0.0" })
-  .tool("query", { /* ... */ })
-  .tool("migrate", { /* ... */ });
-
-// With namespacing
-const app = new McpServer({ name: "app", version: "1.0.0" })
-  .group("git", gitServer)      // Registers: git/clone, git/commit
-  .group("db", dbServer);        // Registers: db/query, db/migrate
-
-// Without namespacing
-const app2 = new McpServer({ name: "app", version: "1.0.0" })
-  .group(gitServer)              // Registers: clone, commit
-  .group(dbServer);              // Registers: query, migrate
-```
-
-See [examples/composing-servers](./examples/composing-servers) for details.
-
-## Elicitation
-
-Elicitation allows servers to request input from users during tool execution:
+Elicitation lets a tool request input from the client mid-execution. `mcp-lite` wires this through the same handler context:
 
 ```typescript
 import { z } from "zod";
@@ -616,7 +633,67 @@ const transport = new StreamableHttpTransport({
 
 See [packages/core/README.elicitation.md](./packages/core/README.elicitation.md) for distributed implementations.
 
-## Error Handling
+## `mcp-lite` Features
+
+### Middleware
+
+`mcp-lite` lets you apply Express-style middleware to every request before it reaches a tool or prompt handler:
+
+```typescript
+// Logging
+server.use(async (ctx, next) => {
+  const start = Date.now();
+  await next();
+  console.log(`${ctx.request.method} took ${Date.now() - start}ms`);
+});
+
+// Authentication
+server.use(async (ctx, next) => {
+  const token = ctx.request.headers?.get?.("Authorization");
+  if (!token) throw new Error("Unauthorized");
+  ctx.state.user = await validateToken(token);
+  await next();
+});
+
+// Rate limiting
+server.use(async (ctx, next) => {
+  const userId = ctx.state.user?.id;
+  if (await isRateLimited(userId)) {
+    throw new Error("Rate limit exceeded");
+  }
+  await next();
+});
+```
+
+### Server Composition
+
+Group smaller servers together while preserving their tooling and middleware:
+
+```typescript
+const gitServer = new McpServer({ name: "git", version: "1.0.0" })
+  .tool("clone", { /* ... */ })
+  .tool("commit", { /* ... */ });
+
+const dbServer = new McpServer({ name: "database", version: "1.0.0" })
+  .tool("query", { /* ... */ })
+  .tool("migrate", { /* ... */ });
+
+// With namespacing
+const app = new McpServer({ name: "app", version: "1.0.0" })
+  .group("git", gitServer)      // Registers: git/clone, git/commit
+  .group("db", dbServer);        // Registers: db/query, db/migrate
+
+// Without namespacing
+const app2 = new McpServer({ name: "app", version: "1.0.0" })
+  .group(gitServer)              // Registers: clone, commit
+  .group(dbServer);              // Registers: query, migrate
+```
+
+See [examples/composing-servers](./examples/composing-servers) for details.
+
+### Error Handling
+
+Throw `RpcError` to return structured JSON-RPC failures or customize `onError` for fallback logic.
 
 ```typescript
 import { RpcError, JSON_RPC_ERROR_CODES } from "mcp-lite";
@@ -646,9 +723,9 @@ server.onError((error, ctx) => {
 });
 ```
 
-## Sessions
+### Sessions
 
-### Stateless Mode
+#### Stateless Mode
 
 Default mode with no session management:
 
@@ -656,7 +733,7 @@ Default mode with no session management:
 const transport = new StreamableHttpTransport();
 ```
 
-### Stateful Mode
+#### Stateful Mode
 
 Enable sessions for SSE streaming and event replay:
 
@@ -675,16 +752,6 @@ This enables:
 - SSE streaming via GET endpoint
 - Event replay for reconnections
 - Progress notifications
-
-## Examples
-
-- [playground/minimal-server.ts](./playground/minimal-server.ts) - Basic stateless server
-- [examples/validation-zod](./examples/validation-zod) - Zod validation
-- [examples/validation-valibot](./examples/validation-valibot) - Valibot validation
-- [examples/validation-effectschema](./examples/validation-effectschema) - Effect Schema
-- [examples/composing-servers](./examples/composing-servers) - Server composition
-- [examples/cloudflare-worker-kv-r2](./examples/cloudflare-worker-kv-r2) - Cloudflare Workers with KV
-- [examples/auth-clerk](./examples/auth-clerk) - Authentication with Clerk
 
 ## Protocol
 
