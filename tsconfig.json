@@ -22,6 +22,9 @@
       "path": "./examples/cloudflare-worker-kv-r2"
     },
     {
+      "path": "./examples/sampling"
+    },
+    {
       "path": "./examples/validation-arktype"
     },
     {
