@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/complexity/useLiteralKeys: testing a private property */
 
 import { describe, expect, it } from "bun:test";
+import { type Type, type } from "arktype";
 import { METHODS } from "../../src/constants.js";
 import { McpServer } from "../../src/core.js";
 import type { MCPServerContext, ToolCallResult } from "../../src/types.js";
@@ -680,6 +681,77 @@ describe("McpServer.group()", () => {
       expect((dbResult as ToolCallResult).content[0]?.text).toBe(
         "query result",
       );
+    });
+  });
+
+  describe("Structured Output Validation", () => {
+    it("should preserve outputValidator when grouping servers", async () => {
+      const outputSchema = type({
+        result: "string",
+        count: "number",
+      });
+
+      const child = new McpServer({
+        name: "child",
+        version: "1.0.0",
+        schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
+      }).tool("validatedTool", {
+        description: "Tool with output validation",
+        outputSchema,
+        handler: () => ({
+          content: [{ type: "text", text: "success" }],
+          structuredContent: { result: "valid output", count: 42 },
+        }),
+      });
+
+      const parent = new McpServer({
+        name: "parent",
+        version: "1.0.0",
+      }).group("api", child);
+
+      // Call the tool - should succeed with valid output
+      const result = await parent["handleToolsCall"](
+        { name: "api/validatedTool", arguments: {} },
+        { validate: () => ({}) } as unknown as MCPServerContext,
+      );
+
+      // Verify the structured content was validated and returned
+      expect(result.structuredContent).toEqual({
+        result: "valid output",
+        count: 42,
+      });
+    });
+
+    it("should fail validation when grouped tool returns invalid structured output", async () => {
+      const outputSchema = type({
+        count: "number",
+        message: "string",
+      });
+
+      const child = new McpServer({
+        name: "child",
+        version: "1.0.0",
+        schemaAdapter: (schema) => (schema as Type).toJsonSchema(),
+      }).tool("invalidTool", {
+        description: "Tool that returns invalid output",
+        outputSchema,
+        handler: () => ({
+          content: [{ type: "text", text: "result" }],
+          structuredContent: { count: "not a number", message: "test" }, // Invalid!
+        }),
+      });
+
+      const parent = new McpServer({
+        name: "parent",
+        version: "1.0.0",
+      }).group("api", child);
+
+      // Should throw an error due to validation failure
+      await expect(
+        parent["handleToolsCall"]({ name: "api/invalidTool", arguments: {} }, {
+          validate: () => ({}),
+        } as unknown as MCPServerContext),
+      ).rejects.toThrow();
     });
   });
 });

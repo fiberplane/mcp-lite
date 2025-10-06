@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.6.0
+
+### Minor Changes
+
+- 320849b: Support structured outputs in tool calls.
+
 ## 0.5.1
 
 ### Patch Changes

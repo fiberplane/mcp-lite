@@ -47,7 +47,11 @@ import {
 } from "./types.js";
 import { compileUriTemplate } from "./uri-template.js";
 import { errorToResponse, isObject, isString } from "./utils.js";
-import { extractArgumentsFromSchema, resolveToolSchema } from "./validation.js";
+import {
+  createValidationFunction,
+  extractArgumentsFromSchema,
+  resolveSchema,
+} from "./validation.js";
 
 async function runMiddlewares(
   middlewares: Middleware[],
@@ -384,6 +388,7 @@ export class McpServer {
    * and must return content in the ToolCallResult format.
    *
    * @template TArgs - Type of the tool's input arguments
+   * @template TOutput - Type of the structured content output
    * @param name - Unique tool name
    * @param def - Tool definition with schema, description, and handler
    * @returns This server instance for chaining
@@ -406,23 +411,31 @@ export class McpServer {
    * });
    * ```
    *
-   * @example With Standard Schema (Zod)
+   * @example With Standard Schema (Zod) - Full type inference
    * ```typescript
    * import { z } from "zod";
    *
-   * const schema = z.object({
-   *   message: z.string(),
-   *   count: z.number().optional()
+   * const inputSchema = z.object({
+   *   location: z.string()
    * });
    *
-   * server.tool("repeat", {
-   *   description: "Repeats a message",
-   *   inputSchema: schema,
-   *   handler: (args: { message: string; count?: number }) => ({
-   *     content: [{
-   *       type: "text",
-   *       text: args.message.repeat(args.count || 1)
-   *     }]
+   * const outputSchema = z.object({
+   *   temperature: z.number(),
+   *   conditions: z.string()
+   * });
+   *
+   * server.tool("getWeather", {
+   *   description: "Get weather for a location",
+   *   inputSchema,
+   *   outputSchema,
+   *   handler: (args) => ({
+   *     // args.location is typed as string ✅
+   *     content: [{ type: "text", text: "Weather data" }],
+   *     structuredContent: {
+   *       temperature: 22,
+   *       conditions: "sunny"
+   *       // Typed and validated! ✅
+   *     }
    *   })
    * });
    * ```
@@ -437,12 +450,32 @@ export class McpServer {
    * });
    * ```
    */
-  // Overload for StandardSchemaV1 with automatic type inference
+  // Overload 1: Both input and output are Standard Schema (full type inference)
+  tool<
+    SInput extends StandardSchemaV1<unknown, unknown>,
+    SOutput extends StandardSchemaV1<unknown, unknown>,
+  >(
+    name: string,
+    def: {
+      description?: string;
+      inputSchema: SInput;
+      outputSchema: SOutput;
+      handler: (
+        args: InferOutput<SInput>,
+        ctx: MCPServerContext,
+      ) =>
+        | Promise<ToolCallResult<InferOutput<SOutput>>>
+        | ToolCallResult<InferOutput<SOutput>>;
+    },
+  ): this;
+
+  // Overload 2: Input is Standard Schema, output is JSON Schema or undefined
   tool<S extends StandardSchemaV1<unknown, unknown>>(
     name: string,
     def: {
       description?: string;
       inputSchema: S;
+      outputSchema?: unknown;
       handler: (
         args: InferOutput<S>,
         ctx: MCPServerContext,
@@ -450,16 +483,33 @@ export class McpServer {
     },
   ): this;
 
-  // Overload for JSON Schema or no schema (requires manual typing)
-  tool<TArgs = unknown>(
+  // Overload 3: Output is Standard Schema, input is JSON Schema or undefined
+  tool<S extends StandardSchemaV1<unknown, unknown>>(
     name: string,
     def: {
       description?: string;
       inputSchema?: unknown;
+      outputSchema: S;
+      handler: (
+        args: unknown,
+        ctx: MCPServerContext,
+      ) =>
+        | Promise<ToolCallResult<InferOutput<S>>>
+        | ToolCallResult<InferOutput<S>>;
+    },
+  ): this;
+
+  // Overload 4: JSON Schema or no schema (requires manual typing)
+  tool<TArgs = unknown, TOutput = unknown>(
+    name: string,
+    def: {
+      description?: string;
+      inputSchema?: unknown;
+      outputSchema?: unknown;
       handler: (
         args: TArgs,
         ctx: MCPServerContext,
-      ) => Promise<ToolCallResult> | ToolCallResult;
+      ) => Promise<ToolCallResult<TOutput>> | ToolCallResult<TOutput>;
     },
   ): this;
 
@@ -469,6 +519,7 @@ export class McpServer {
     def: {
       description?: string;
       inputSchema?: unknown | StandardSchemaV1<TArgs>;
+      outputSchema?: unknown | StandardSchemaV1<unknown>;
       handler: (
         args: TArgs,
         ctx: MCPServerContext,
@@ -479,17 +530,25 @@ export class McpServer {
       this.capabilities.tools = { listChanged: true };
     }
 
-    const { mcpInputSchema, validator } = resolveToolSchema(
+    const { resolvedSchema, validator } = resolveSchema(
       def.inputSchema,
+      this.schemaAdapter,
+    );
+
+    const outputSchemaResolved = resolveSchema(
+      def.outputSchema,
       this.schemaAdapter,
     );
 
     const metadata: Tool = {
       name,
-      inputSchema: mcpInputSchema,
+      inputSchema: resolvedSchema,
     };
     if (def.description) {
       metadata.description = def.description;
+    }
+    if (outputSchemaResolved.resolvedSchema && def.outputSchema) {
+      metadata.outputSchema = outputSchemaResolved.resolvedSchema;
     }
 
     const entry: ToolEntry = {
@@ -497,6 +556,7 @@ export class McpServer {
       // TODO - We could avoid this cast if MethodHandler had a generic type for `params` that defaulted to unknown, but here we could pass TArgs
       handler: def.handler as MethodHandler,
       validator,
+      outputValidator: outputSchemaResolved.validator,
     };
     this.tools.set(name, entry);
     if (this.initialized) {
@@ -687,18 +747,20 @@ export class McpServer {
       if (Array.isArray(def.arguments)) {
         argumentDefs = def.arguments as PromptArgumentDef[];
       } else {
-        const { mcpInputSchema, validator: schemaValidator } =
-          resolveToolSchema(def.arguments, this.schemaAdapter);
+        const { resolvedSchema, validator: schemaValidator } = resolveSchema(
+          def.arguments,
+          this.schemaAdapter,
+        );
         validator = schemaValidator;
-        argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
+        argumentDefs = extractArgumentsFromSchema(resolvedSchema);
       }
     } else if (def.inputSchema) {
-      const { mcpInputSchema, validator: schemaValidator } = resolveToolSchema(
+      const { resolvedSchema, validator: schemaValidator } = resolveSchema(
         def.inputSchema,
         this.schemaAdapter,
       );
       validator = schemaValidator;
-      argumentDefs = extractArgumentsFromSchema(mcpInputSchema);
+      argumentDefs = extractArgumentsFromSchema(resolvedSchema);
     }
 
     const metadata: PromptMetadata = {
@@ -981,6 +1043,7 @@ export class McpServer {
           metadata: { ...entry.metadata, name: qualifiedName },
           handler: wrappedHandler,
           validator: entry.validator,
+          outputValidator: entry.outputValidator,
         };
 
         this.tools.set(qualifiedName, wrappedEntry);
@@ -1242,8 +1305,33 @@ export class McpServer {
       validatedArgs = ctx.validate(entry.validator, callParams.arguments);
     }
 
-    const result = await entry.handler(validatedArgs, ctx);
-    return result as ToolCallResult;
+    const result = (await entry.handler(validatedArgs, ctx)) as ToolCallResult;
+
+    // Validate structured content if outputSchema provided
+    if (
+      entry.outputValidator &&
+      "structuredContent" in result &&
+      !result.isError
+    ) {
+      try {
+        const validated = createValidationFunction(
+          entry.outputValidator,
+          result.structuredContent,
+        );
+        result.structuredContent = validated;
+      } catch (validationError) {
+        throw new RpcError(
+          JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+          `Tool '${toolName}' returned invalid structured content: ${
+            validationError instanceof Error
+              ? validationError.message
+              : String(validationError)
+          }`,
+        );
+      }
+    }
+
+    return result;
   }
 
   private async handlePromptsList(

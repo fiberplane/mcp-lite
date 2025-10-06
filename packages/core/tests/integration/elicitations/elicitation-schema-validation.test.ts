@@ -21,17 +21,17 @@ describe("Elicitation schema validation tests", () => {
     });
 
     // Import the schema processing functions directly to test them
-    const { resolveToolSchema, toElicitationRequestedSchema } = await import(
+    const { resolveSchema, toElicitationRequestedSchema } = await import(
       "../../../src/validation.js"
     );
 
     // Test schema resolution
-    const { mcpInputSchema } = resolveToolSchema(testSchema, (s) =>
+    const { resolvedSchema } = resolveSchema(testSchema, (s) =>
       z.toJSONSchema(s as z.ZodType),
     );
 
     // Test elicitation schema projection
-    const requestedSchema = toElicitationRequestedSchema(mcpInputSchema);
+    const requestedSchema = toElicitationRequestedSchema(resolvedSchema);
 
     // Verify the schema projection is correct
     expect(requestedSchema.type).toBe("object");
@@ -68,7 +68,7 @@ describe("Elicitation schema validation tests", () => {
   });
 
   test("plain JSON Schema works correctly with elicitation schema", async () => {
-    const { resolveToolSchema, toElicitationRequestedSchema } = await import(
+    const { resolveSchema, toElicitationRequestedSchema } = await import(
       "../../../src/validation.js"
     );
 
@@ -90,10 +90,10 @@ describe("Elicitation schema validation tests", () => {
     };
 
     // Test schema resolution with plain JSON Schema
-    const { mcpInputSchema } = resolveToolSchema(jsonSchema, undefined);
+    const { resolvedSchema } = resolveSchema(jsonSchema, undefined);
 
     // Test elicitation schema projection
-    const requestedSchema = toElicitationRequestedSchema(mcpInputSchema);
+    const requestedSchema = toElicitationRequestedSchema(resolvedSchema);
 
     // Verify schema is projected correctly from JSON Schema input
     expect(requestedSchema).toMatchObject({
