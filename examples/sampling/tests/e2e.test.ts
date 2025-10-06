@@ -72,7 +72,7 @@ describe("Sampling Example", () => {
       });
     });
 
-    it("should reject calls without sampling capability", async () => {
+    it("should reject calls from clients without sampling capability", async () => {
       // Initialize WITHOUT sampling capability
       const initResponse = await fetch(server.url, {
         method: "POST",
@@ -153,7 +153,7 @@ describe("Sampling Example", () => {
       });
 
       // Missing required field
-      await expect(
+      expect(
         client.request("tools/call", {
           name: "craft_wonky_prompt",
           arguments: {},
@@ -161,7 +161,7 @@ describe("Sampling Example", () => {
       ).rejects.toThrow("JSON-RPC Error");
 
       // Wrong type
-      await expect(
+      expect(
         client.request("tools/call", {
           name: "craft_wonky_prompt",
           arguments: {
