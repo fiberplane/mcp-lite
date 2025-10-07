@@ -392,6 +392,32 @@ server.tool("status", {
 });
 ```
 
+### Tool with Metadata
+
+Add `title` and `_meta` fields to pass arbitrary metadata through `tools/list` and `tools/call` responses.
+
+```typescript
+server.tool("experimental-feature", {
+  description: "An experimental feature",
+  title: "Experimental Feature",
+  _meta: {
+    version: "0.1.0",
+    stability: "experimental",
+    tags: ["beta", "preview"],
+  },
+  inputSchema: z.object({ input: z.string() }),
+  handler: (args) => ({
+    content: [{ type: "text", text: `Processing: ${args.input}` }],
+    _meta: {
+      executionTime: 123,
+      cached: false,
+    },
+  }),
+});
+```
+
+The `_meta` and `title` from the definition appear in `tools/list` responses. Tool handlers can also return `_meta` in the result for per-call metadata like execution time or cache status.
+
 ### Resources
 
 Resources are URI-identified content.
@@ -436,6 +462,43 @@ server.resource(
   })
 );
 ```
+
+### Resource with Metadata
+
+Include `_meta` in the resource metadata to pass custom information through `resources/list`, `resources/templates/list`, and `resources/read` responses.
+
+```typescript
+server.resource(
+  "db://records/{id}",
+  {
+    name: "Database Record",
+    description: "Fetch a record from the database",
+    mimeType: "application/json",
+    _meta: {
+      cacheTtl: 300,
+      accessLevel: "read-only",
+      region: "us-west-2",
+    },
+  },
+  async (uri, { id }) => ({
+    contents: [{
+      uri: uri.href,
+      type: "text",
+      text: JSON.stringify({ id, data: "..." }),
+      _meta: {
+        contentVersion: "2.0",
+        lastModified: "2025-01-01",
+      },
+    }],
+    _meta: {
+      totalSize: 1024,
+      cached: true,
+    },
+  })
+);
+```
+
+The `_meta` from the resource definition appears in list responses. Handlers can also return `_meta` on the result and individual contents for per-read metadata.
 
 ### Prompts
 
@@ -484,6 +547,41 @@ server.prompt("summarize", {
   })
 });
 ```
+
+### Prompt with Metadata
+
+Add `title` and `_meta` to pass additional information through `prompts/list` and `prompts/get` responses.
+
+```typescript
+server.prompt("research-assistant", {
+  description: "Research assistant prompt with context",
+  title: "Research Assistant",
+  _meta: {
+    category: "research",
+    complexity: "advanced",
+    estimatedTokens: 500,
+  },
+  arguments: [
+    { name: "topic", description: "Research topic", required: true },
+    { name: "depth", description: "Research depth", required: false },
+  ],
+  handler: (args: { topic: string; depth?: string }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `Research ${args.topic} at ${args.depth || "medium"} depth`
+      }
+    }],
+    _meta: {
+      templateVersion: "2.0",
+      generated: true,
+    },
+  })
+});
+```
+
+The `_meta` and `title` from the definition appear in `prompts/list` responses. Handlers can also return `_meta` in the result for per-generation metadata.
 
 ### Elicitation
 

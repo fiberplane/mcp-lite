@@ -282,12 +282,16 @@ export interface Tool {
   description?: string;
   inputSchema: unknown;
   outputSchema?: unknown;
+  title?: string;
+  _meta?: { [key: string]: unknown };
 }
 
 export interface Prompt {
   name: string;
   description?: string;
   arguments?: unknown[];
+  title?: string;
+  _meta?: { [key: string]: unknown };
 }
 
 export interface PromptArgumentDef {
@@ -301,6 +305,7 @@ export interface PromptMetadata {
   title?: string;
   description?: string;
   arguments?: PromptArgumentDef[];
+  _meta?: { [key: string]: unknown };
 }
 
 export type PromptHandler<TArgs = unknown> = (
@@ -453,11 +458,13 @@ export interface ToolCallResult<TStructuredContent = unknown> {
   content: Content[];
   isError?: boolean;
   structuredContent?: TStructuredContent;
+  _meta?: { [key: string]: unknown };
 }
 
 export interface PromptGetResult {
   description?: string;
   messages: unknown[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ResourceReadResult {
@@ -467,10 +474,12 @@ export interface ResourceReadResult {
 
 export interface ListToolsResult {
   tools: Tool[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ListPromptsResult {
   prompts: Prompt[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ListResourcesResult {
