@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.7.0
+
+### Minor Changes
+
+- b236a4a: Add `_meta` and `title` field support for tools, prompts, and responses. These optional fields allow servers to attach arbitrary metadata for UI display, filtering, and custom client logic. Fully backwards compatible.
+
 ## 0.6.1
 
 ### Patch Changes
