@@ -581,6 +581,9 @@ type SamplingAudioContent = {
   mimeType?: string;
 };
 
+/**
+ * @see https://modelcontextprotocol.io/specification/2025-06-18/schema#createmessageresult
+ */
 export type SamplingResult = {
   role: "assistant";
   content: SamplingTextContent | SamplingImageContent | SamplingAudioContent;
@@ -593,7 +596,7 @@ export type SamplingResult = {
  * Type guard for a sampling result
  *
  * @note - This only verifies the content property.
- *         Since sampling is so loosely specified, and no clients implement it,
+ *         Since sampling is so loosely specified, and very few clients implement it,
  *        it seems best to only validate the bare minimum here
  */
 export function isSamplingResult(o: unknown): o is SamplingResult {
