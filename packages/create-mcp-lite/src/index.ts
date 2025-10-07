@@ -67,10 +67,6 @@ async function main() {
   }
 
   const devCommand = context.template === "bun" ? "bun run dev" : "npm run dev";
-  const deployInfo =
-    context.template === "cloudflare"
-      ? `\n# Deploy to Cloudflare:\n${context.packageManager} run deploy\n`
-      : "";
 
   outro(`🚀 MCP project created successfully in ${context.path}!
 
@@ -81,9 +77,9 @@ cd ${context.name}
 
 # Start the dev server:
 ${devCommand}
-${deployInfo}
+
 # Learn more about mcp-lite:
-open https://github.com/fiberplane/mcp
+open https://github.com/fiberplane/mcp-lite
 `);
   process.exit(0);
 }
