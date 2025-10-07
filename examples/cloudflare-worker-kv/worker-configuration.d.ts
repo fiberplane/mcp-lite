@@ -9,7 +9,6 @@ declare namespace Cloudflare {
 		KV: KVNamespace;
 		SESSIONS_KV: KVNamespace;
 		PENDING_REQUESTS_KV: KVNamespace;
-		R2: R2Bucket;
 	}
 }
 interface CloudflareBindings extends Cloudflare.Env {}

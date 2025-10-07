@@ -20,12 +20,6 @@
       "binding": "PENDING_REQUESTS_KV",
       "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "R2",
-      "bucket_name": "mcp-lite-example-bucket"
-    }
   ]
   // "d1_databases": [
   //   {

@@ -541,15 +541,11 @@ As with Elicitation, you need to configure both a SessionAdapter and ClientReque
 ### Example
 
 ```typescript
-import { z } from "zod";
-
-const WonkyPromptSchema = z.object({
-  theme: z.string().describe("A general theme, short but sweet"),
-});
+const FrenchSchema = z.object({});
 
 mcp.tool("frenchness_evaluation", {
   description: "Evaluates how French a host application is",
-  inputSchema: WonkyPromptSchema,
+  inputSchema: FrenchSchema,
   handler: async (args, ctx) => {
     // Check if client supports sampling
     if (!ctx.client.supports("sampling")) {
