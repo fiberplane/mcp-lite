@@ -1,0 +1,16 @@
+{
+  "name": "starter-mcp-cloudflare",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "hono": "^4.9.10",
+    "mcp-lite": "^0.7.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  }
+}

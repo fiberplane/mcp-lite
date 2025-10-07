@@ -9,4 +9,4 @@ export const FIBERPLANE_TITLE = `
 
 export const CANCEL_MESSAGE = "create-mcp-lite cancelled! 🙈";
 
-export const PROJECT_NAME = "echo-mcp";
+export const PROJECT_NAME = "my-mcp-server";
