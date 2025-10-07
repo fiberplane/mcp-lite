@@ -390,7 +390,13 @@ export class McpServer {
    * @template TArgs - Type of the tool's input arguments
    * @template TOutput - Type of the structured content output
    * @param name - Unique tool name
-   * @param def - Tool definition with schema, description, and handler
+   * @param def - Tool definition with schema, description, handler, and optional metadata
+   * @param def.description - Human-readable description of what the tool does
+   * @param def.title - Optional display title for the tool
+   * @param def._meta - Optional arbitrary metadata object passed through to clients via tools/list
+   * @param def.inputSchema - Schema for validating input arguments (JSON Schema or Standard Schema)
+   * @param def.outputSchema - Schema for validating structured output (JSON Schema or Standard Schema)
+   * @param def.handler - Function that executes the tool logic
    * @returns This server instance for chaining
    *
    * @example With JSON Schema
@@ -446,6 +452,23 @@ export class McpServer {
    *   description: "Simple ping tool",
    *   handler: () => ({
    *     content: [{ type: "text", text: "pong" }]
+   *   })
+   * });
+   * ```
+   *
+   * @example With metadata
+   * ```typescript
+   * server.tool("experimental-feature", {
+   *   description: "An experimental feature",
+   *   title: "Experimental Feature",
+   *   _meta: {
+   *     version: "0.1.0",
+   *     stability: "experimental",
+   *     tags: ["beta", "preview"]
+   *   },
+   *   inputSchema: z.object({ input: z.string() }),
+   *   handler: (args) => ({
+   *     content: [{ type: "text", text: `Processing: ${args.input}` }]
    *   })
    * });
    * ```
@@ -591,6 +614,11 @@ export class McpServer {
    *
    * @param template - URI template string (e.g. "file://config.json" or "github://repos/{owner}/{repo}")
    * @param meta - Resource metadata for listing
+   * @param meta.name - Human-readable name for the resource
+   * @param meta.description - Description of what the resource contains
+   * @param meta.mimeType - MIME type of the resource content
+   * @param meta._meta - Optional arbitrary metadata object passed through to clients via resources/list
+   * @param meta.annotations - Optional annotations for the resource
    * @param handler - Function that returns resource content
    * @returns This server instance for chaining
    *
@@ -612,6 +640,25 @@ export class McpServer {
    *   { description: "GitHub repository" },
    *   async (uri, { owner, repo }) => ({
    *     contents: [{ uri: uri.href, text: await fetchRepo(owner, repo) }]
+   *   })
+   * );
+   * ```
+   *
+   * @example Resource with metadata
+   * ```typescript
+   * server.resource(
+   *   "db://records/{id}",
+   *   {
+   *     name: "Database Record",
+   *     description: "Fetch a record from the database",
+   *     mimeType: "application/json",
+   *     _meta: {
+   *       cacheTtl: 300,
+   *       accessLevel: "read-only"
+   *     }
+   *   },
+   *   async (uri, { id }) => ({
+   *     contents: [{ uri: uri.href, text: JSON.stringify({ id, data: "..." }) }]
    *   })
    * );
    * ```
@@ -705,7 +752,13 @@ export class McpServer {
    *
    * @template TArgs - Type of the prompt's input arguments
    * @param name - Unique prompt name
-   * @param def - Prompt definition with schema, description, and handler
+   * @param def - Prompt definition with schema, description, handler, and optional metadata
+   * @param def.description - Human-readable description of what the prompt does
+   * @param def.title - Optional display title for the prompt
+   * @param def._meta - Optional arbitrary metadata object passed through to clients via prompts/list
+   * @param def.arguments - Array of argument definitions or a Standard Schema for validation
+   * @param def.inputSchema - Alternative to 'arguments' for specifying a validation schema
+   * @param def.handler - Function that generates the prompt messages
    * @returns This server instance for chaining
    *
    * @example Basic prompt
@@ -737,6 +790,28 @@ export class McpServer {
    *         type: "text",
    *         text: `Please summarize this text in ${args.length || "medium"} length:\n\n${args.text}`
    *       }
+   *     }]
+   *   })
+   * });
+   * ```
+   *
+   * @example Prompt with metadata
+   * ```typescript
+   * server.prompt("research-assistant", {
+   *   description: "Research assistant prompt with context",
+   *   title: "Research Assistant",
+   *   _meta: {
+   *     category: "research",
+   *     complexity: "advanced",
+   *     estimatedTokens: 500
+   *   },
+   *   arguments: [
+   *     { name: "topic", description: "Research topic", required: true }
+   *   ],
+   *   handler: (args: { topic: string }) => ({
+   *     messages: [{
+   *       role: "user",
+   *       content: { type: "text", text: `Research ${args.topic}` }
    *     }]
    *   })
    * });
