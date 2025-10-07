@@ -6,11 +6,8 @@ export async function promptTemplate(context: Context) {
   const template = await select({
     message: "Which runtime?",
     options: [
-      { value: "bun", label: "Bun (for local development)" },
-      {
-        value: "cloudflare",
-        label: "Cloudflare Workers (for edge deployment)",
-      },
+      { value: "bun", label: "Bun" },
+      { value: "cloudflare", label: "Cloudflare Workers" },
     ],
     initialValue: "bun",
   });

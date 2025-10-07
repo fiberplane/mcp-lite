@@ -25,8 +25,8 @@ async function main() {
   const context = initContext();
 
   const prompts = [
-    promptTemplate,
     promptPath,
+    promptTemplate,
     promptAIAssistant,
     promptDependencies,
     promptGit,

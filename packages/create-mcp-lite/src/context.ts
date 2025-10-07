@@ -1,4 +1,4 @@
-import { PROJECT_NAME } from "./const";
+import { DEFAULT_PROJECT_NAME } from "./const";
 import type { AIAssistant, Flags, Template } from "./types";
 import { getPackageManager } from "./utils";
 
@@ -23,7 +23,7 @@ export function initContext(): Context {
 
   return {
     cwd: process.cwd(),
-    name: projectName ?? PROJECT_NAME,
+    name: projectName ?? DEFAULT_PROJECT_NAME,
     packageManager: getPackageManager() ?? "npm",
     flags: [],
   };
