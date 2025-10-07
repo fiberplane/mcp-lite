@@ -2,33 +2,23 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests */
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { collectSseEventsCount } from "../../../test-utils/src/sse.js";
+import { collectSseEventsCount } from "../../../../test-utils/src/sse.js";
 import {
-  InMemoryClientRequestAdapter,
-  InMemorySessionAdapter,
-  McpServer,
-  StreamableHttpTransport,
-} from "../../src/index.js";
+  buildInitializeRequest,
+  createStatefulTestServer,
+} from "../../utils.js";
+
+const buildElicitatationInit = () =>
+  buildInitializeRequest({
+    capabilities: {
+      elicitation: {},
+    },
+  });
 
 describe("Elicitation E2E Tests", () => {
-  test("E2E: ctx.elicit() throws when client has elicitation capability", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+  // FIXME - this does not actually test ctx.elicit
+  test("E2E: ctx.elicit() does not throw when client has elicitation capability", async () => {
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("with-elicitation", {
       description: "Test elicitation support",
@@ -49,28 +39,8 @@ describe("Elicitation E2E Tests", () => {
     });
 
     // Initialize session WITH elicitation capability
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {
-          elicitation: {}, // Include elicitation capability
-        },
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
+    const initializeRequest = buildElicitatationInit();
+    const initResponse = await handler(initializeRequest);
 
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
@@ -102,23 +72,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: ctx.elicit() throws when client lacks elicitation capability", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("no-elicitation", {
       description: "Test no elicitation support",
@@ -144,26 +98,8 @@ describe("Elicitation E2E Tests", () => {
     });
 
     // Initialize session WITHOUT elicitation capability
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {}, // No elicitation capability
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
+    const initializeRequest = buildInitializeRequest();
+    const initResponse = await handler(initializeRequest);
 
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.headers.get("mcp-session-id")!;
@@ -197,136 +133,6 @@ describe("Elicitation E2E Tests", () => {
     );
   });
 
-  test("E2E: schema validation and projection works correctly", async () => {
-    // Test that Zod schemas are properly converted to JSON Schema for elicitation
-    const testSchema = z.object({
-      name: z.string().min(2).max(50).describe("Full name"),
-      age: z.number().int().min(18).max(120),
-      email: z.string().email().describe("Email address"),
-      role: z.enum(["admin", "user", "guest"]).describe("User role"),
-      settings: z
-        .object({
-          notifications: z.boolean().default(true),
-          theme: z.enum(["light", "dark"]).optional(),
-        })
-        .describe("User preferences"),
-      tags: z.array(z.string()).optional().describe("User tags"),
-    });
-
-    // Import the schema processing functions directly to test them
-    const { resolveSchema, toElicitationRequestedSchema } = await import(
-      "../../src/validation.js"
-    );
-
-    // Test schema resolution
-    const { resolvedSchema } = resolveSchema(testSchema, (s) =>
-      z.toJSONSchema(s as z.ZodType),
-    );
-
-    // Test elicitation schema projection
-    const requestedSchema = toElicitationRequestedSchema(resolvedSchema);
-
-    // Verify the schema projection is correct
-    expect(requestedSchema.type).toBe("object");
-
-    // Verify basic properties are projected correctly
-    expect(requestedSchema.properties.name).toMatchObject({
-      type: "string",
-      minLength: 2,
-      maxLength: 50,
-      description: "Full name",
-    });
-
-    expect(requestedSchema.properties.age).toMatchObject({
-      type: "integer",
-      minimum: 18,
-      maximum: 120,
-    });
-
-    expect(requestedSchema.properties.email).toMatchObject({
-      type: "string",
-      description: "Email address",
-    });
-
-    expect(requestedSchema.properties.role).toMatchObject({
-      type: "string",
-      enum: ["admin", "user", "guest"],
-      description: "User role",
-    });
-
-    // Note: Complex nested objects and arrays may be filtered out by schema projection
-    // to keep elicitation schemas simple and supported by all clients.
-    // This is expected behavior - only basic types (string, number, boolean, enum) are preserved.
-    expect(requestedSchema.required).toEqual(["name", "age", "email", "role"]);
-  });
-
-  test("E2E: plain JSON Schema works correctly with elicitation", async () => {
-    const { resolveSchema, toElicitationRequestedSchema } = await import(
-      "../../src/validation.js"
-    );
-
-    const jsonSchema = {
-      type: "object",
-      properties: {
-        username: {
-          type: "string",
-          minLength: 3,
-          description: "Username",
-        },
-        count: {
-          type: "integer",
-          minimum: 1,
-          maximum: 100,
-        },
-      },
-      required: ["username", "count"],
-    };
-
-    // Test schema resolution with plain JSON Schema
-    const { resolvedSchema } = resolveSchema(jsonSchema, undefined);
-
-    // Test elicitation schema projection
-    const requestedSchema = toElicitationRequestedSchema(resolvedSchema);
-
-    // Verify schema is projected correctly from JSON Schema input
-    expect(requestedSchema).toMatchObject({
-      type: "object",
-      properties: {
-        username: {
-          type: "string",
-          minLength: 3,
-          description: "Username",
-        },
-        count: {
-          type: "integer",
-          minimum: 1,
-          maximum: 100,
-        },
-      },
-      required: ["username", "count"],
-    });
-  });
-
-  test("E2E: client request adapter interface works correctly", async () => {
-    // Test the client request adapter interface that's used for elicitation
-    const adapter = new InMemoryClientRequestAdapter();
-
-    // Test creating a pending request
-    const { promise } = adapter.createPending("test-session", "req-123", {
-      timeout_ms: 5000,
-    });
-
-    // Test resolving the request
-    const result = { action: "accept", content: { response: "test" } };
-    const resolved = adapter.resolvePending("test-session", "req-123", result);
-
-    expect(resolved).toBe(true);
-
-    // Verify the promise resolves with the correct result
-    const promiseResult = await promise;
-    expect(promiseResult).toEqual(result);
-  });
-
   test("E2E: full elicitation flow with client accept response", async () => {
     // This test verifies the complete elicitation flow:
     // 1. Tool calls ctx.elicit() with proper schema
@@ -335,23 +141,7 @@ describe("Elicitation E2E Tests", () => {
     // 4. Server resolves the elicitation promise with the result
     // 5. Tool completes with the elicitation data
 
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("full-elicitation", {
       description: "Test complete elicitation flow",
@@ -492,121 +282,8 @@ describe("Elicitation E2E Tests", () => {
     expect(toolResult.result.content[0].text).toBe("Hello, Alice!");
   });
 
-  test("E2E: client capabilities are properly stored and retrieved", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
-
-    server.tool("test-capabilities", {
-      description: "Test capability detection",
-      inputSchema: z.object({}),
-      handler: async (_, ctx) => {
-        const hasElicitation = ctx.client.supports("elicitation");
-        const hasRoots = ctx.client.supports("roots");
-        const hasSampling = ctx.client.supports("sampling");
-        const hasUnknown = ctx.client.supports("unknown");
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `elicitation:${hasElicitation},roots:${hasRoots},sampling:${hasSampling},unknown:${hasUnknown}`,
-            },
-          ],
-        };
-      },
-    });
-
-    // Test 1: Initialize with multiple capabilities
-    const initializeRequest = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: { name: "test-client", version: "1.0.0" },
-        protocolVersion: "2025-06-18",
-        capabilities: {
-          elicitation: {},
-          roots: {},
-          // Note: no sampling capability
-        },
-      },
-    };
-
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(initializeRequest),
-      }),
-    );
-
-    expect(initResponse.status).toBe(200);
-    const sessionId = initResponse.headers.get("mcp-session-id")!;
-
-    // Test 2: Call tool to check capabilities
-    const toolResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "mcp-session-id": sessionId,
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "tool-call-1",
-          method: "tools/call",
-          params: {
-            name: "test-capabilities",
-            arguments: {},
-          },
-        }),
-      }),
-    );
-
-    expect(toolResponse.status).toBe(200);
-    const toolResult = await toolResponse.json();
-
-    // Verify that capabilities are correctly detected
-    expect(toolResult.result.content[0].text).toBe(
-      "elicitation:true,roots:true,sampling:false,unknown:false",
-    );
-  });
-
   test("E2E: full elicitation flow with client decline", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("decline-elicitation", {
       description: "Test elicitation decline flow",
@@ -741,23 +418,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: full elicitation flow with client cancel", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("cancel-elicitation", {
       description: "Test elicitation cancel flow",
@@ -889,23 +550,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: elicitation timeout when client doesn't respond", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("timeout-elicitation", {
       description: "Test elicitation timeout",
@@ -1009,23 +654,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: elicitation with invalid client response data", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("invalid-response-elicitation", {
       description: "Test elicitation with invalid response",
@@ -1164,23 +793,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: elicitation with client error response", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("error-response-elicitation", {
       description: "Test elicitation with client error",
@@ -1318,23 +931,7 @@ describe("Elicitation E2E Tests", () => {
     // The test expects both elicitation requests to be available simultaneously,
     // but sequential await calls mean the second elicitation doesn't start until
     // the first one completes. This requires more sophisticated event handling.
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("sequential-elicitations", {
       description: "Test multiple sequential elicitations",
@@ -1555,23 +1152,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: elicitation with empty schema", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("empty-schema-elicitation", {
       description: "Test elicitation with empty schema",
@@ -1704,23 +1285,7 @@ describe("Elicitation E2E Tests", () => {
   });
 
   test("E2E: elicitation with optional fields schema", async () => {
-    const server = new McpServer({
-      name: "elicitation-test-server",
-      version: "1.0.0",
-      schemaAdapter: (s) => z.toJSONSchema(s as z.ZodType),
-    });
-
-    const clientRequestAdapter = new InMemoryClientRequestAdapter();
-    const sessionAdapter = new InMemorySessionAdapter({
-      maxEventBufferSize: 1024,
-    });
-
-    const transport = new StreamableHttpTransport({
-      clientRequestAdapter,
-      sessionAdapter,
-    });
-
-    const handler = transport.bind(server);
+    const { server, handler } = createStatefulTestServer();
 
     server.tool("optional-fields-elicitation", {
       description: "Test elicitation with optional fields",

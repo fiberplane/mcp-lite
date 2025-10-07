@@ -528,6 +528,74 @@ const transport = new StreamableHttpTransport({
 
 See [packages/core/README.elicitation.md](./packages/core/README.elicitation.md) for an implementation that uses an external KV store.
 
+## Sampling
+
+Sampling refers to the ability of an MCP server to pause exeuction and ask the MCP client to provide LLM completions to inform its response.
+
+This is helpful, for example, in order to keep all inference on the client side.
+
+Sampling is unfortunately not well supported across MCP Clients. GitHub Copilot, however does support it.
+
+As with Elicitation, you need to configure both a SessionAdapter and ClientRequestAdapter to make Sampling work.
+
+### Example
+
+```typescript
+const FrenchSchema = z.object({});
+
+mcp.tool("frenchness_evaluation", {
+  description: "Evaluates how French a host application is",
+  inputSchema: FrenchSchema,
+  handler: async (args, ctx) => {
+    // Check if client supports sampling
+    if (!ctx.client.supports("sampling")) {
+      throw new Error("This tool requires a client that supports sampling");
+    }
+
+    // Request LLM completion through sampling
+    const response = await ctx.sample({
+      // ...
+      prompt: "What is the capital of France?",
+      modelPreferences: {
+        hints: [
+          {
+            "name": "claude-4.5-sonnet"
+          }
+        ],
+        intelligencePriority: 0.8,
+        speedPriority: 0.5
+      },
+      systemPrompt: "You are a wonky assistant.",
+      maxTokens: 100
+    });
+
+    if ("result" in response && response.result.type === "text") {
+      const { content } = response.result;
+      const isFrench = content?.toLowerCase().includes("paris");
+      return {
+        content: [{ 
+          type: "text", 
+          text: isFrench ? "Pas mal. You might be French enough" : "You are not very French my friend" 
+        }],
+      };
+
+    }
+
+    if ("error" in response) {
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Sampling completion failed: ${response.error.message}`,
+        }],
+      };
+    }
+
+    // Unknown case, should not hit this
+    throw new Error("Unexpected sampling response");
+  },
+});
+```
+
 ## `mcp-lite` Features
 
 ### Middleware
