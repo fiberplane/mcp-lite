@@ -392,6 +392,28 @@ server.tool("status", {
 });
 ```
 
+### Tool with Metadata
+
+Add `title` and `_meta` fields to pass arbitrary metadata through `tools/list` responses.
+
+```typescript
+server.tool("experimental-feature", {
+  description: "An experimental feature",
+  title: "Experimental Feature",
+  _meta: {
+    version: "0.1.0",
+    stability: "experimental",
+    tags: ["beta", "preview"],
+  },
+  inputSchema: z.object({ input: z.string() }),
+  handler: (args) => ({
+    content: [{ type: "text", text: `Processing: ${args.input}` }],
+  }),
+});
+```
+
+Clients can access these fields from the tool listing to display additional information or apply filtering logic.
+
 ### Resources
 
 Resources are URI-identified content.
@@ -432,6 +454,33 @@ server.resource(
       uri: uri.href,
       type: "text",
       text: `Repository: ${owner}/${repo}`,
+    }],
+  })
+);
+```
+
+### Resource with Metadata
+
+Include `_meta` in the resource metadata to pass custom information through `resources/list` or `resources/templates/list`.
+
+```typescript
+server.resource(
+  "db://records/{id}",
+  {
+    name: "Database Record",
+    description: "Fetch a record from the database",
+    mimeType: "application/json",
+    _meta: {
+      cacheTtl: 300,
+      accessLevel: "read-only",
+      region: "us-west-2",
+    },
+  },
+  async (uri, { id }) => ({
+    contents: [{
+      uri: uri.href,
+      type: "text",
+      text: JSON.stringify({ id, data: "..." }),
     }],
   })
 );
@@ -479,6 +528,35 @@ server.prompt("summarize", {
       content: {
         type: "text",
         text: `Please summarize this text in ${args.length || "medium"} length:\n\n${args.text}`
+      }
+    }]
+  })
+});
+```
+
+### Prompt with Metadata
+
+Add `title` and `_meta` to pass additional information through `prompts/list` responses.
+
+```typescript
+server.prompt("research-assistant", {
+  description: "Research assistant prompt with context",
+  title: "Research Assistant",
+  _meta: {
+    category: "research",
+    complexity: "advanced",
+    estimatedTokens: 500,
+  },
+  arguments: [
+    { name: "topic", description: "Research topic", required: true },
+    { name: "depth", description: "Research depth", required: false },
+  ],
+  handler: (args: { topic: string; depth?: string }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `Research ${args.topic} at ${args.depth || "medium"} depth`
       }
     }]
   })

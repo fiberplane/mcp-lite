@@ -458,6 +458,8 @@ export class McpServer {
     name: string,
     def: {
       description?: string;
+      title?: string;
+      _meta?: { [key: string]: unknown };
       inputSchema: SInput;
       outputSchema: SOutput;
       handler: (
@@ -474,6 +476,8 @@ export class McpServer {
     name: string,
     def: {
       description?: string;
+      title?: string;
+      _meta?: { [key: string]: unknown };
       inputSchema: S;
       outputSchema?: unknown;
       handler: (
@@ -488,6 +492,8 @@ export class McpServer {
     name: string,
     def: {
       description?: string;
+      title?: string;
+      _meta?: { [key: string]: unknown };
       inputSchema?: unknown;
       outputSchema: S;
       handler: (
@@ -504,6 +510,8 @@ export class McpServer {
     name: string,
     def: {
       description?: string;
+      title?: string;
+      _meta?: { [key: string]: unknown };
       inputSchema?: unknown;
       outputSchema?: unknown;
       handler: (
@@ -518,6 +526,8 @@ export class McpServer {
     name: string,
     def: {
       description?: string;
+      title?: string;
+      _meta?: { [key: string]: unknown };
       inputSchema?: unknown | StandardSchemaV1<TArgs>;
       outputSchema?: unknown | StandardSchemaV1<unknown>;
       handler: (
@@ -546,6 +556,12 @@ export class McpServer {
     };
     if (def.description) {
       metadata.description = def.description;
+    }
+    if (def.title) {
+      metadata.title = def.title;
+    }
+    if (def._meta) {
+      metadata._meta = def._meta;
     }
     if (outputSchemaResolved.resolvedSchema && def.outputSchema) {
       metadata.outputSchema = outputSchemaResolved.resolvedSchema;
@@ -731,6 +747,7 @@ export class McpServer {
     def: {
       title?: string;
       description?: string;
+      _meta?: { [key: string]: unknown };
       arguments?: unknown | StandardSchemaV1<TArgs>;
       inputSchema?: unknown | StandardSchemaV1<TArgs>;
       handler: PromptHandler<TArgs>;
@@ -771,6 +788,10 @@ export class McpServer {
 
     if (argumentDefs && argumentDefs.length > 0) {
       metadata.arguments = argumentDefs;
+    }
+
+    if (def._meta) {
+      metadata._meta = def._meta;
     }
 
     const entry: PromptEntry = {

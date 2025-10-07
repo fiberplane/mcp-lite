@@ -277,12 +277,16 @@ export interface Tool {
   description?: string;
   inputSchema: unknown;
   outputSchema?: unknown;
+  title?: string;
+  _meta?: { [key: string]: unknown };
 }
 
 export interface Prompt {
   name: string;
   description?: string;
   arguments?: unknown[];
+  title?: string;
+  _meta?: { [key: string]: unknown };
 }
 
 export interface PromptArgumentDef {
@@ -296,6 +300,7 @@ export interface PromptMetadata {
   title?: string;
   description?: string;
   arguments?: PromptArgumentDef[];
+  _meta?: { [key: string]: unknown };
 }
 
 export type PromptHandler<TArgs = unknown> = (
