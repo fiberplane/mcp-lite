@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { z } from "zod";
 import {
-  InMemoryClientRequestAdapter,
-  InMemorySessionAdapter,
   McpServer,
   StreamableHttpTransport,
 } from "../../src/index.js";
@@ -115,8 +113,16 @@ function createTestHandler() {
           uri: "test://static-resource",
           type: "text",
           text: "Static resource content",
+          _meta: {
+            contentVersion: "2.0",
+            lastModified: "2025-01-01",
+          },
         },
       ],
+      _meta: {
+        totalSize: 100,
+        cached: true,
+      },
     }),
   );
 
@@ -144,49 +150,16 @@ function createTestHandler() {
     }),
   );
 
-  const clientRequestAdapter = new InMemoryClientRequestAdapter();
-  const sessionAdapter = new InMemorySessionAdapter({
-    maxEventBufferSize: 1024,
-  });
-
-  const transport = new StreamableHttpTransport({
-    clientRequestAdapter,
-    sessionAdapter,
-  });
+  const transport = new StreamableHttpTransport();
 
   return transport.bind(mcp);
 }
 
 describe("Metadata Passthrough Tests", () => {
   let handler: (request: Request) => Promise<Response>;
-  let sessionId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     handler = createTestHandler();
-
-    // Initialize session
-    const initResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            clientInfo: { name: "test-client", version: "1.0.0" },
-            protocolVersion: "2025-06-18",
-            capabilities: {},
-          },
-        }),
-      }),
-    );
-
-    expect(initResponse.status).toBe(200);
-    sessionId = initResponse.headers.get("mcp-session-id") as string;
-    expect(sessionId).toBeTruthy();
   });
 
   describe("Tool metadata passthrough", () => {
@@ -196,7 +169,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -246,7 +219,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -298,7 +271,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -338,7 +311,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -371,6 +344,50 @@ describe("Metadata Passthrough Tests", () => {
         cacheable: false,
       });
     });
+
+    it("should include _meta in resources/read response", async () => {
+      const response = await handler(
+        new Request("http://localhost:3000/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": "2025-06-18",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "read-resource",
+            method: "resources/read",
+            params: {
+              uri: "test://static-resource",
+            },
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const result = (await response.json()) as JsonRpcResponse;
+      expect(result.error).toBeUndefined();
+
+      const readResult = result.result as {
+        contents: Array<{
+          uri: string;
+          _meta?: { [key: string]: unknown };
+        }>;
+        _meta?: { [key: string]: unknown };
+      };
+
+      // Check top-level _meta on ResourceReadResult
+      expect(readResult._meta).toEqual({
+        totalSize: 100,
+        cached: true,
+      });
+
+      // Check _meta on individual ResourceContents
+      expect(readResult.contents[0]._meta).toEqual({
+        contentVersion: "2.0",
+        lastModified: "2025-01-01",
+      });
+    });
   });
 
   describe("Response _meta fields", () => {
@@ -380,7 +397,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -414,7 +431,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -450,7 +467,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",
@@ -476,7 +493,7 @@ describe("Metadata Passthrough Tests", () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "mcp-session-id": sessionId,
+            "MCP-Protocol-Version": "2025-06-18",
           },
           body: JSON.stringify({
             jsonrpc: "2.0",

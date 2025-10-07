@@ -394,7 +394,7 @@ server.tool("status", {
 
 ### Tool with Metadata
 
-Add `title` and `_meta` fields to pass arbitrary metadata through `tools/list` responses.
+Add `title` and `_meta` fields to pass arbitrary metadata through `tools/list` and `tools/call` responses.
 
 ```typescript
 server.tool("experimental-feature", {
@@ -408,11 +408,15 @@ server.tool("experimental-feature", {
   inputSchema: z.object({ input: z.string() }),
   handler: (args) => ({
     content: [{ type: "text", text: `Processing: ${args.input}` }],
+    _meta: {
+      executionTime: 123,
+      cached: false,
+    },
   }),
 });
 ```
 
-Clients can access these fields from the tool listing to display additional information or apply filtering logic.
+The `_meta` and `title` from the definition appear in `tools/list` responses. Tool handlers can also return `_meta` in the result for per-call metadata like execution time or cache status.
 
 ### Resources
 
@@ -461,7 +465,7 @@ server.resource(
 
 ### Resource with Metadata
 
-Include `_meta` in the resource metadata to pass custom information through `resources/list` or `resources/templates/list`.
+Include `_meta` in the resource metadata to pass custom information through `resources/list`, `resources/templates/list`, and `resources/read` responses.
 
 ```typescript
 server.resource(
@@ -481,10 +485,20 @@ server.resource(
       uri: uri.href,
       type: "text",
       text: JSON.stringify({ id, data: "..." }),
+      _meta: {
+        contentVersion: "2.0",
+        lastModified: "2025-01-01",
+      },
     }],
+    _meta: {
+      totalSize: 1024,
+      cached: true,
+    },
   })
 );
 ```
+
+The `_meta` from the resource definition appears in list responses. Handlers can also return `_meta` on the result and individual contents for per-read metadata.
 
 ### Prompts
 
@@ -536,7 +550,7 @@ server.prompt("summarize", {
 
 ### Prompt with Metadata
 
-Add `title` and `_meta` to pass additional information through `prompts/list` responses.
+Add `title` and `_meta` to pass additional information through `prompts/list` and `prompts/get` responses.
 
 ```typescript
 server.prompt("research-assistant", {
@@ -558,10 +572,16 @@ server.prompt("research-assistant", {
         type: "text",
         text: `Research ${args.topic} at ${args.depth || "medium"} depth`
       }
-    }]
+    }],
+    _meta: {
+      templateVersion: "2.0",
+      generated: true,
+    },
   })
 });
 ```
+
+The `_meta` and `title` from the definition appear in `prompts/list` responses. Handlers can also return `_meta` in the result for per-generation metadata.
 
 ### Elicitation
 
