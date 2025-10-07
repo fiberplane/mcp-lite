@@ -1,5 +1,11 @@
 # create-mcp-lite
 
+## 0.1.0
+
+### Minor Changes
+
+- 58f079c: Add mcp-lite template selection and simplify the CLI flow.
+
 ## 0.0.4
 
 ### Patch Changes
