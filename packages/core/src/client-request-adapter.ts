@@ -45,6 +45,11 @@ function makeKey(
 
 export class InMemoryClientRequestAdapter implements ClientRequestAdapter {
   private pending = new Map<string, PendingEntry>();
+  private defaultTimeoutMs?: number;
+
+  constructor(options?: { defaultTimeoutMs?: number }) {
+    this.defaultTimeoutMs = options?.defaultTimeoutMs;
+  }
 
   createPending(
     sessionId: string | undefined,
@@ -74,11 +79,13 @@ export class InMemoryClientRequestAdapter implements ClientRequestAdapter {
 
     const entry: PendingEntry = { resolve, reject };
 
-    if (options?.timeout_ms && options.timeout_ms > 0) {
+    // Use provided timeout, or fall back to default timeout
+    const timeoutMs = options?.timeout_ms ?? this.defaultTimeoutMs;
+    if (timeoutMs && timeoutMs > 0) {
       entry.timer = setTimeout(() => {
         this.pending.delete(key);
         reject(new Error("Timeout"));
-      }, options.timeout_ms);
+      }, timeoutMs);
     }
 
     this.pending.set(key, entry);
