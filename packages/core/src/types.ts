@@ -453,11 +453,13 @@ export interface ToolCallResult<TStructuredContent = unknown> {
   content: Content[];
   isError?: boolean;
   structuredContent?: TStructuredContent;
+  _meta?: { [key: string]: unknown };
 }
 
 export interface PromptGetResult {
   description?: string;
   messages: unknown[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ResourceReadResult {
@@ -467,10 +469,12 @@ export interface ResourceReadResult {
 
 export interface ListToolsResult {
   tools: Tool[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ListPromptsResult {
   prompts: Prompt[];
+  _meta?: { [key: string]: unknown };
 }
 
 export interface ListResourcesResult {

@@ -37,6 +37,10 @@ function createTestHandler() {
     inputSchema: z.object({ input: z.string() }),
     handler: async (args) => ({
       content: [{ type: "text", text: `Received: ${args.input}` }],
+      _meta: {
+        executionTime: 123,
+        cached: false,
+      },
     }),
   });
 
@@ -72,6 +76,10 @@ function createTestHandler() {
           },
         },
       ],
+      _meta: {
+        templateVersion: "2.0",
+        generated: true,
+      },
     }),
   });
 
@@ -361,6 +369,76 @@ describe("Metadata Passthrough Tests", () => {
       expect(itemTemplate?._meta).toEqual({
         templateType: "item",
         cacheable: false,
+      });
+    });
+  });
+
+  describe("Response _meta fields", () => {
+    it("should include _meta in tool call results", async () => {
+      const response = await handler(
+        new Request("http://localhost:3000/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "mcp-session-id": sessionId,
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "call-tool",
+            method: "tools/call",
+            params: {
+              name: "tool-with-metadata",
+              arguments: { input: "test" },
+            },
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const result = (await response.json()) as JsonRpcResponse;
+      expect(result.error).toBeUndefined();
+
+      const toolResult = result.result as {
+        content: Array<unknown>;
+        _meta?: { [key: string]: unknown };
+      };
+      expect(toolResult._meta).toEqual({
+        executionTime: 123,
+        cached: false,
+      });
+    });
+
+    it("should include _meta in prompt get results", async () => {
+      const response = await handler(
+        new Request("http://localhost:3000/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "mcp-session-id": sessionId,
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "get-prompt",
+            method: "prompts/get",
+            params: {
+              name: "prompt-with-metadata",
+              arguments: { topic: "testing" },
+            },
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const result = (await response.json()) as JsonRpcResponse;
+      expect(result.error).toBeUndefined();
+
+      const promptResult = result.result as {
+        messages: Array<unknown>;
+        _meta?: { [key: string]: unknown };
+      };
+      expect(promptResult._meta).toEqual({
+        templateVersion: "2.0",
+        generated: true,
       });
     });
   });
