@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-lite-examples/cloudflare-worker-kv-r2",
+  "name": "@mcp-lite-examples/cloudflare-worker-kv",
   "type": "module",
   "private": true,
   "scripts": {

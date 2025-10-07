@@ -20,4 +20,4 @@ This distributed adapter works by:
 4. **Cross-instance coordination** - Any instance can resolve/reject requests by updating KV
 5. **Automatic cleanup** - Handles timeouts and cleans up both local state and KV entries
 
-The code for this is in [the examples folder](../../examples/cloudflare-worker-kv-r2/src/mcp/client-request-adapter.ts).
+The code for this is in [the examples folder](../../examples/cloudflare-worker-kv/src/mcp/client-request-adapter.ts).
