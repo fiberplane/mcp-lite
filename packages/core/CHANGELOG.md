@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.6.1
+
+### Patch Changes
+
+- 4d81815: Implements the `ctx.sample` method for requesting llm completions from the mcp client. Adds an example of this in `examples/sampling/`
+
 ## 0.6.0
 
 ### Minor Changes
