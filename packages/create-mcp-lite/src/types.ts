@@ -5,9 +5,9 @@ export type AIAssistant =
   | "windsurf"
   | "none";
 
-export type Flags = Array<
-  "install-dependencies" | "initialize-git" | "deploy-fiberplane"
->;
+export type Template = "bun" | "cloudflare";
+
+export type Flags = Array<"install-dependencies" | "initialize-git">;
 
 export const isError = (error: unknown): error is Error => {
   return error instanceof Error;

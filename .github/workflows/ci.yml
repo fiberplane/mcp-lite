@@ -48,7 +48,43 @@ jobs:
             - name: Test
               run: bun test
 
-            - name: Publish preview packages
-              if: github.event_name == 'pull_request'
+    publish-preview:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        needs: test
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: latest
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            - name: Build
+              run: bun run build
+
+            - name: Check changed files
+              id: changed-files
+              uses: tj-actions/changed-files@v47
+              with:
+                  files_yaml: |
+                      core:
+                        - 'packages/core/**'
+                      create:
+                        - 'packages/create-mcp-lite/**'
+                        - 'templates/**'
+
+            - name: Publish core preview package
+              if: steps.changed-files.outputs.core_any_changed == 'true'
               run: |
                   bunx pkg-pr-new publish "./packages/core"
+
+            - name: Publish create-mcp-lite preview package
+              if: steps.changed-files.outputs.create_any_changed == 'true'
+              run: |
+                  bunx pkg-pr-new publish --bin "./packages/create-mcp-lite"

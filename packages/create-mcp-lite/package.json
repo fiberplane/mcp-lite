@@ -2,17 +2,15 @@
   "name": "create-mcp-lite",
   "type": "module",
   "version": "0.0.4",
-  "description": "An interactive CLI to create MCP (Model Context Protocol) projects with Fiberplane",
+  "description": "An interactive CLI to create MCP (Model Context Protocol) projects with mcp-lite",
   "scripts": {
     "build": "bun run scripts/build.ts",
     "build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
     "dev": "bun run scripts/build.ts && node dist/index.js",
-    "dev:local": "bun run scripts/build.ts && FIBERPLANE_API_URL=http://localhost:7676 node dist/index.js",
-    "dev:target": "bun run scripts/build.ts && node dist/index.js test-name",
+    "dev:local": "bun run scripts/build.ts && TEMPLATE_ROOT_PATH=../../templates node dist/index.js",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome check --write .",
-    "clean:test-apps": "rm -rf test-apps/* && touch test-apps/.gitkeep",
     "prepublishOnly": "bun run build && bun run build:types"
   },
   "exports": {
@@ -27,16 +25,15 @@
   "bin": {
     "create-mcp-lite": "dist/index.js"
   },
-  "author": "Fiberplane<info@fiberplane.com>",
+  "author": "Fiberplane <info@fiberplane.com>",
   "license": "MIT",
   "repository": {
-    "url": "https://github.com/fiberplane/mcp/",
+    "url": "https://github.com/fiberplane/mcp-lite/",
     "type": "git"
   },
   "dependencies": {
     "@clack/core": "^0.3.4",
     "@clack/prompts": "^0.7.0",
-    "@oslojs/oauth2": "^0.5.0",
     "giget": "^1.2.3",
     "open": "^10.1.0",
     "picocolors": "^1.0.1",
