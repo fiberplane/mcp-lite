@@ -8,6 +8,7 @@ import {
   SSE_ACCEPT_HEADER,
   SSE_STREAM_ID,
   SUPPORTED_MCP_PROTOCOL_VERSION,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
 } from "../constants.js";
 import type { McpServer } from "../core.js";
 import { RpcError } from "../errors.js";
@@ -25,6 +26,7 @@ import {
 } from "../types.js";
 import {
   respondToInvalidJsonRpc,
+  respondToMissingProtocolHeader,
   respondToMissingSessionId,
   respondToProtocolMismatch,
 } from "./http-responses.js";
@@ -113,6 +115,21 @@ export class StreamableHttpTransport {
     try {
       const sessionData = await this.sessionAdapter.get(sessionId);
       return sessionData?.meta?.clientCapabilities;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async getSessionProtocolVersion(
+    sessionId: string | null,
+  ): Promise<string | undefined> {
+    if (!sessionId || !this.sessionAdapter) {
+      return undefined;
+    }
+
+    try {
+      const sessionData = await this.sessionAdapter.get(sessionId);
+      return sessionData?.meta?.protocolVersion;
     } catch {
       return undefined;
     }
@@ -330,6 +347,34 @@ export class StreamableHttpTransport {
       const body = await request.text();
       const jsonRpcMessage = parseJsonRpc(body);
 
+      // Check for batch requests (array of requests)
+      if (Array.isArray(jsonRpcMessage)) {
+        // Batching removed in 2025-06-18, only supported in 2025-03-26
+        let sessionVersion: string | undefined;
+        if (this.sessionAdapter && sessionId) {
+          const session = await this.sessionAdapter.get(sessionId);
+          sessionVersion = session?.meta?.protocolVersion;
+        }
+
+        if (sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26) {
+          // Process batch for 2025-03-26
+          return this.handleBatchRequest(jsonRpcMessage, sessionId, options);
+        }
+
+        // Reject batching for 2025-06-18 or unknown versions
+        const errorResponse = createJsonRpcError(
+          null,
+          new RpcError(
+            JSON_RPC_ERROR_CODES.INVALID_REQUEST,
+            "Batch requests are not supported in protocol version 2025-06-18",
+          ).toJson(),
+        );
+        return new Response(JSON.stringify(errorResponse), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
       // Check if it's a JSON-RPC response first
       if (isJsonRpcResponse(jsonRpcMessage)) {
         if (this.sessionAdapter && !sessionId) {
@@ -364,20 +409,66 @@ export class StreamableHttpTransport {
       const acceptHeader = request.headers.get("Accept");
       const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
 
-      // Return a protocol mismatch error if all the below are true:
-      // 1. it's not an initialize request
-      // 2. the protocol header is present
-      // 3. the protocol header is not the supported version
-      const shouldReturnProtocolMismatchError =
-        !isInitializeRequest &&
-        protocolHeader &&
-        protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION;
+      // Protocol header enforcement based on session version
+      if (!isInitializeRequest) {
+        if (this.sessionAdapter && sessionId) {
+          const session = await this.sessionAdapter.get(sessionId);
+          const sessionVersion = session?.meta?.protocolVersion;
 
-      if (shouldReturnProtocolMismatchError) {
-        const responseId = isNotification
-          ? null
-          : (jsonRpcMessage as JsonRpcReq).id;
-        return respondToProtocolMismatch(responseId, protocolHeader);
+          if (sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18) {
+            // Header REQUIRED for 06-18
+            if (!protocolHeader) {
+              const responseId = isNotification
+                ? null
+                : (jsonRpcMessage as JsonRpcReq).id;
+              return respondToMissingProtocolHeader(responseId);
+            }
+            if (protocolHeader !== sessionVersion) {
+              const responseId = isNotification
+                ? null
+                : (jsonRpcMessage as JsonRpcReq).id;
+              return respondToProtocolMismatch(
+                responseId,
+                protocolHeader,
+                sessionVersion,
+              );
+            }
+          } else if (
+            sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26
+          ) {
+            // Header optional for 03-26, but if present must match
+            if (protocolHeader && protocolHeader !== sessionVersion) {
+              const responseId = isNotification
+                ? null
+                : (jsonRpcMessage as JsonRpcReq).id;
+              return respondToProtocolMismatch(
+                responseId,
+                protocolHeader,
+                sessionVersion,
+              );
+            }
+          }
+        } else {
+          // No session: validate header if present
+          const supportedVersions = Object.values(
+            SUPPORTED_MCP_PROTOCOL_VERSIONS,
+          );
+          if (
+            protocolHeader &&
+            !supportedVersions.includes(
+              protocolHeader as (typeof supportedVersions)[number],
+            )
+          ) {
+            const responseId = isNotification
+              ? null
+              : (jsonRpcMessage as JsonRpcReq).id;
+            return respondToProtocolMismatch(
+              responseId,
+              protocolHeader,
+              supportedVersions,
+            );
+          }
+        }
       }
 
       // Check for missing session ID (except for initialize requests)
@@ -401,6 +492,7 @@ export class StreamableHttpTransport {
 
       const response = await this.server?._dispatch(jsonRpcMessage, {
         sessionId: sessionId || undefined,
+        sessionProtocolVersion: await this.getSessionProtocolVersion(sessionId),
         authInfo: options?.authInfo,
         clientCapabilities: await this.getClientCapabilities(sessionId),
       });
@@ -419,8 +511,14 @@ export class StreamableHttpTransport {
               [key: string]: unknown;
             };
           };
+
+          // Use the negotiated protocol version from the response (echoed by core)
+          const negotiatedVersion =
+            (response.result as { protocolVersion?: string })
+              ?.protocolVersion || SUPPORTED_MCP_PROTOCOL_VERSION;
+
           const sessionMeta: SessionMeta = {
-            protocolVersion: protocolHeader || SUPPORTED_MCP_PROTOCOL_VERSION,
+            protocolVersion: negotiatedVersion,
             clientInfo: initParams.clientInfo,
             clientCapabilities: initParams.capabilities, // Store capabilities
           };
@@ -479,6 +577,65 @@ export class StreamableHttpTransport {
     }
   }
 
+  private async handleBatchRequest(
+    batch: unknown[],
+    sessionId: string | null,
+    options?: { authInfo?: AuthInfo },
+  ): Promise<Response> {
+    const responses: JsonRpcRes[] = [];
+
+    for (const message of batch) {
+      if (!isJsonRpcRequest(message) && !isJsonRpcNotification(message)) {
+        // Invalid message in batch
+        responses.push(
+          createJsonRpcError(
+            null,
+            new RpcError(
+              JSON_RPC_ERROR_CODES.INVALID_REQUEST,
+              "Invalid JSON-RPC 2.0 message in batch",
+            ).toJson(),
+          ),
+        );
+        continue;
+      }
+
+      try {
+        const response = await this.server?._dispatch(message, {
+          sessionId: sessionId || undefined,
+          sessionProtocolVersion:
+            await this.getSessionProtocolVersion(sessionId),
+          authInfo: options?.authInfo,
+          clientCapabilities: await this.getClientCapabilities(sessionId),
+        });
+
+        if (response !== null && response !== undefined) {
+          responses.push(response);
+        }
+        // Notifications don't get responses
+      } catch (error) {
+        const errorResponse = createJsonRpcError(
+          (message as JsonRpcReq).id || null,
+          new RpcError(
+            JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
+            "Internal error processing batch item",
+            error instanceof Error ? error.message : "Unknown error",
+          ).toJson(),
+        );
+        responses.push(errorResponse);
+      }
+    }
+
+    return new Response(JSON.stringify(responses), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ...(this.sessionAdapter && sessionId
+          ? { [MCP_SESSION_ID_HEADER]: sessionId }
+          : {}),
+      },
+    });
+  }
+
   private async handlePostSse(args: {
     request: Request;
     jsonRpcRequest: unknown;
@@ -523,6 +680,8 @@ export class StreamableHttpTransport {
     Promise.resolve(
       this.server?._dispatch(jsonRpcRequest as JsonRpcReq, {
         sessionId: effectiveSessionId,
+        sessionProtocolVersion:
+          await this.getSessionProtocolVersion(effectiveSessionId),
         authInfo,
         clientCapabilities:
           await this.getClientCapabilities(effectiveSessionId),

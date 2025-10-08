@@ -32,6 +32,22 @@ export function buildInitializeRequest(options?: InitializeBuilderOptions) {
   });
 }
 
+export function buildRequest(
+  body: unknown,
+  sessionId: string,
+  protocolVersion = "2025-06-18",
+) {
+  return new Request("http://localhost:3000/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "mcp-session-id": sessionId,
+      "MCP-Protocol-Version": protocolVersion,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 export function createStatefulTestServer() {
   const server = new McpServer({
     name: "stateful-test-server",

@@ -8,6 +8,7 @@ import {
   McpServer,
   StreamableHttpTransport,
 } from "../../src/index.js";
+import { buildRequest } from "../utils.js";
 
 describe("Capabilities E2E Tests", () => {
   test("client capabilities are properly stored and retrieved", async () => {
@@ -80,13 +81,8 @@ describe("Capabilities E2E Tests", () => {
 
     // Test 2: Call tool to check capabilities
     const toolResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "mcp-session-id": sessionId,
-        },
-        body: JSON.stringify({
+      buildRequest(
+        {
           jsonrpc: "2.0",
           id: "tool-call-1",
           method: "tools/call",
@@ -94,8 +90,9 @@ describe("Capabilities E2E Tests", () => {
             name: "test-capabilities",
             arguments: {},
           },
-        }),
-      }),
+        },
+        sessionId,
+      ),
     );
 
     expect(toolResponse.status).toBe(200);

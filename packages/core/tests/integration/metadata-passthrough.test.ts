@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { z } from "zod";
-import {
-  McpServer,
-  StreamableHttpTransport,
-} from "../../src/index.js";
+import { McpServer, StreamableHttpTransport } from "../../src/index.js";
 
 interface JsonRpcResponse {
   jsonrpc: string;

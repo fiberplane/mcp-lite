@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
+import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSIONS } from "./constants.js";
 import {
   type CreateContextOptions,
   createContext,
@@ -1286,6 +1286,7 @@ export class McpServer {
 
     const ctx = createContext(message as JsonRpcMessage, requestId, {
       sessionId,
+      sessionProtocolVersion: contextOptions.sessionProtocolVersion,
       progressToken,
       progressSender,
       authInfo: contextOptions.authInfo,
@@ -1602,14 +1603,20 @@ export class McpServer {
     }
 
     const initParams = params;
+    const requested = initParams.protocolVersion;
+    const supportedVersions = Object.values(SUPPORTED_MCP_PROTOCOL_VERSIONS);
 
-    if (initParams.protocolVersion !== SUPPORTED_MCP_PROTOCOL_VERSION) {
+    if (
+      !supportedVersions.includes(
+        requested as (typeof supportedVersions)[number],
+      )
+    ) {
       throw new RpcError(
         -32000,
-        `Unsupported protocol version. Server supports: ${SUPPORTED_MCP_PROTOCOL_VERSION}, client requested: ${initParams.protocolVersion}`,
+        `Unsupported protocol version. Server supports: ${supportedVersions.join(", ")}, client requested: ${requested}`,
         {
-          supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
-          requestedVersion: initParams.protocolVersion,
+          supportedVersions,
+          requestedVersion: requested,
         },
       );
     }
@@ -1617,10 +1624,19 @@ export class McpServer {
     this.initialized = true;
 
     return {
-      protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+      protocolVersion: requested,
       serverInfo: this.serverInfo,
-      capabilities: this.capabilities,
+      capabilities: this.capabilitiesFor(requested),
     };
+  }
+
+  private capabilitiesFor(version: string): InitializeResult["capabilities"] {
+    const caps = { ...this.capabilities };
+    if (version === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26) {
+      // Remove elicitation (added in 06-18)
+      delete caps.elicitation;
+    }
+    return caps;
   }
 
   private async handlePing(): Promise<Record<string, never>> {
