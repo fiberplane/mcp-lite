@@ -840,7 +840,7 @@ During the `initialize` handshake, the server accepts the client's requested ver
 #### Client Capabilities
 
 - **`2025-06-18`**: Clients may declare `elicitation` and `sampling` capabilities
-- **`2025-03-26`**: Clients may declare `roots` and `sampling` capabilities (elicitation was added in 2025-06-18)
+- **`2025-03-26`**: Clients may declare `roots` and `sampling` capabilities 
 
 Note: Server capabilities (`tools`, `prompts`, `resources`) are version-independent.
 
