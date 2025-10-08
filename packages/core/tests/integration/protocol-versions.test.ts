@@ -40,7 +40,7 @@ describe("Protocol Version Negotiation", () => {
     expect(result.result.protocolVersion).toBe("2025-06-18");
   });
 
-  test("should reject unsupported protocol version", async () => {
+  test("should negotiate to 2025-03-26 when client requests unsupported version", async () => {
     const { handler } = createStatefulTestServer();
 
     const initRequest = new Request("http://localhost:3000/", {
@@ -52,22 +52,24 @@ describe("Protocol Version Negotiation", () => {
         method: "initialize",
         params: {
           clientInfo: { name: "test-client", version: "1.0.0" },
-          protocolVersion: "2024-01-01",
+          protocolVersion: "2024-01-01", // Unsupported version
           capabilities: {},
         },
       }),
     });
 
     const response = await handler(initRequest);
-    const result = await response.json();
+    expect(response.status).toBe(200); // Success, not error
 
-    // The error should be in the JSON-RPC response, not the HTTP status
-    expect(result.error).toBeDefined();
-    expect(result.error.code).toBe(-32000);
-    expect(result.error.message).toContain("Unsupported protocol version");
-    expect(result.error.data.supportedVersions).toContain("2025-03-26");
-    expect(result.error.data.supportedVersions).toContain("2025-06-18");
-    expect(result.error.data.requestedVersion).toBe("2024-01-01");
+    const result = await response.json();
+    expect(result.result).toBeDefined();
+    expect(result.error).toBeUndefined();
+
+    // Server responds with most compatible version (2025-03-26) per spec
+    expect(result.result.protocolVersion).toBe("2025-03-26");
+
+    // Should omit elicitation for 2025-03-26
+    expect(result.result.capabilities.elicitation).toBeUndefined();
   });
 
   test("should omit elicitation capability for 2025-03-26", async () => {
@@ -105,20 +107,31 @@ describe("Protocol Version Negotiation", () => {
   test("should include elicitation capability for 2025-06-18", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    // Register a tool
-    server.tool("test-tool", {
-      description: "Test tool",
-      inputSchema: z.object({}),
-      handler: async () => ({ content: [{ type: "text", text: "ok" }] }),
+    // Ensure server has elicitation capability enabled
+    server.capabilities.elicitation = {};
+
+    const initRequest = new Request("http://localhost:3000/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          clientInfo: { name: "test-client", version: "1.0.0" },
+          protocolVersion: "2025-06-18",
+          capabilities: { elicitation: {} },
+        },
+      }),
     });
 
-    const initRequest = buildInitializeRequest();
     const response = await handler(initRequest);
     expect(response.status).toBe(200);
 
-    const _result = await response.json();
-    // Elicitation is available but not required to be present
-    // The server can choose to advertise it or not
+    const result = await response.json();
+    expect(result.result.protocolVersion).toBe("2025-06-18");
+    // Elicitation should be present for 2025-06-18
+    expect(result.result.capabilities.elicitation).toBeDefined();
   });
 });
 

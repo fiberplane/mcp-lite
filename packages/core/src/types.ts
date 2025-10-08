@@ -79,7 +79,7 @@ export interface InitializeResult {
     tools?: { listChanged?: boolean };
     prompts?: { listChanged?: boolean };
     resources?: { listChanged?: boolean; subscribe?: boolean };
-    elicitation?: Record<string, never>;
+    elicitation?: {};
   };
 }
 

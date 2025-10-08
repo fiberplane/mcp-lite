@@ -1618,23 +1618,26 @@ export class McpServer {
     const initParams = params;
     const requested = initParams.protocolVersion;
 
-    if (!isSupportedVersion(requested)) {
-      throw new RpcError(
-        -32000,
-        `Unsupported protocol version. Server supports: ${SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST.join(", ")}, client requested: ${requested}`,
-        {
-          supportedVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST,
-          requestedVersion: requested,
-        },
+    // Determine which version to use
+    let negotiatedVersion: string;
+    if (isSupportedVersion(requested)) {
+      // Client requested a version we support - use it
+      negotiatedVersion = requested;
+    } else {
+      // Client requested unsupported version - use our most compatible version (2025-03-26)
+      // Per MCP spec: server responds with version it wants to use, client disconnects if incompatible
+      negotiatedVersion = SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26;
+      this.logger?.warn?.(
+        `Client requested unsupported protocol version ${requested}, negotiating to ${negotiatedVersion}`,
       );
     }
 
     this.initialized = true;
 
     return {
-      protocolVersion: requested,
+      protocolVersion: negotiatedVersion,
       serverInfo: this.serverInfo,
-      capabilities: this.capabilitiesFor(requested),
+      capabilities: this.capabilitiesFor(negotiatedVersion),
     };
   }
 

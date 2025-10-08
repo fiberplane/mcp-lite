@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   InMemoryClientRequestAdapter,
   InMemorySessionAdapter,
+  MCP_SESSION_ID_HEADER,
   McpServer,
   StreamableHttpTransport,
 } from "../src/index.js";
@@ -9,6 +10,7 @@ import type { ClientCapabilities } from "../src/types.js";
 
 type InitializeBuilderOptions = {
   capabilities: Partial<Record<ClientCapabilities, string | object>>;
+  protocolVersion?: string;
 };
 
 export function buildInitializeRequest(options?: InitializeBuilderOptions) {
@@ -18,7 +20,7 @@ export function buildInitializeRequest(options?: InitializeBuilderOptions) {
     method: "initialize",
     params: {
       clientInfo: { name: "test-client", version: "1.0.0" },
-      protocolVersion: "2025-06-18",
+      protocolVersion: options?.protocolVersion ?? "2025-06-18",
       capabilities: options?.capabilities,
     },
   };
@@ -41,7 +43,7 @@ export function buildRequest(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "mcp-session-id": sessionId,
+      [MCP_SESSION_ID_HEADER]: sessionId,
       "MCP-Protocol-Version": protocolVersion,
     },
     body: JSON.stringify(body),
