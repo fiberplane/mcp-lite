@@ -1641,13 +1641,10 @@ export class McpServer {
     };
   }
 
-  private capabilitiesFor(version: string): InitializeResult["capabilities"] {
-    const caps = { ...this.capabilities };
-    if (version === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26) {
-      // Remove elicitation (added in 06-18)
-      delete caps.elicitation;
-    }
-    return caps;
+  private capabilitiesFor(_version: string): InitializeResult["capabilities"] {
+    // Server capabilities are the same across all supported protocol versions
+    // (Client capabilities like elicitation/sampling are negotiated separately)
+    return { ...this.capabilities };
   }
 
   private async handlePing(): Promise<Record<string, never>> {

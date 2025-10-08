@@ -233,9 +233,13 @@ describe("E2E MCP Integration", () => {
       expect(result.error).toBeDefined();
       expect(result.error?.code).toBe(-32602); // INVALID_PARAMS
       expect(result.error?.message).toBe("Protocol version mismatch");
-      expect(result.error?.data.expectedVersion).toContain("2025-03-26");
-      expect(result.error?.data.expectedVersion).toContain("2025-06-18");
-      expect(result.error?.data.receivedVersion).toBe("1.0.0");
+      const errorData = result.error?.data as {
+        expectedVersion?: string[];
+        receivedVersion?: string;
+      };
+      expect(errorData.expectedVersion).toContain("2025-03-26");
+      expect(errorData.expectedVersion).toContain("2025-06-18");
+      expect(errorData.receivedVersion).toBe("1.0.0");
     });
 
     it("should handle unknown methods", async () => {

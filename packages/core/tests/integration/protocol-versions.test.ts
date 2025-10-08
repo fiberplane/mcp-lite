@@ -72,10 +72,10 @@ describe("Protocol Version Negotiation", () => {
     expect(result.result.capabilities.elicitation).toBeUndefined();
   });
 
-  test("should omit elicitation capability for 2025-03-26", async () => {
+  test("should return same server capabilities for 2025-03-26", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    // Register a tool that uses elicitation
+    // Register a tool to enable tools capability
     server.tool("test-tool", {
       description: "Test tool",
       inputSchema: z.object({}),
@@ -101,14 +101,21 @@ describe("Protocol Version Negotiation", () => {
     expect(response.status).toBe(200);
 
     const result = await response.json();
+    // Server capabilities (tools, prompts, resources) are version-independent
+    expect(result.result.capabilities.tools).toBeDefined();
+    // Elicitation is a CLIENT capability, not server capability
     expect(result.result.capabilities.elicitation).toBeUndefined();
   });
 
-  test("should include elicitation capability for 2025-06-18", async () => {
+  test("should return same server capabilities for 2025-06-18", async () => {
     const { server, handler } = createStatefulTestServer();
 
-    // Ensure server has elicitation capability enabled
-    server.capabilities.elicitation = {};
+    // Register a tool to enable tools capability
+    server.tool("test-tool", {
+      description: "Test tool",
+      inputSchema: z.object({}),
+      handler: async () => ({ content: [{ type: "text", text: "ok" }] }),
+    });
 
     const initRequest = new Request("http://localhost:3000/", {
       method: "POST",
@@ -120,7 +127,7 @@ describe("Protocol Version Negotiation", () => {
         params: {
           clientInfo: { name: "test-client", version: "1.0.0" },
           protocolVersion: "2025-06-18",
-          capabilities: { elicitation: {} },
+          capabilities: { elicitation: {} }, // This is CLIENT capability
         },
       }),
     });
@@ -130,8 +137,10 @@ describe("Protocol Version Negotiation", () => {
 
     const result = await response.json();
     expect(result.result.protocolVersion).toBe("2025-06-18");
-    // Elicitation should be present for 2025-06-18
-    expect(result.result.capabilities.elicitation).toBeDefined();
+    // Server capabilities (tools, prompts, resources) are version-independent
+    expect(result.result.capabilities.tools).toBeDefined();
+    // Elicitation is a CLIENT capability, not server capability
+    expect(result.result.capabilities.elicitation).toBeUndefined();
   });
 });
 
