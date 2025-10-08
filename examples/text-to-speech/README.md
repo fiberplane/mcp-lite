@@ -5,7 +5,7 @@ A simple MCP server that converts text to speech using ElevenLabs AI voices.
 ## Features
 
 - Converts text to natural-sounding speech using ElevenLabs' multilingual AI voices
-- Supports runtime voice selection via MCP elicitation (with a default Rachel voice)
+- Interactive voice selection via MCP elicitation with easy numbered choices (default: Rachel voice)
 - Returns audio as proper MCP `audio` content type with MIME type `audio/mpeg`
 - Saves audio to a local file for easy access
 - Supports custom filenames for output audio files
@@ -64,9 +64,20 @@ The server provides a `text_to_speech` tool that accepts:
    > The default voice is Rachel. Would you like to pick a different ElevenLabs voice?
 
    - Reply `false` (or cancel the dialog) to stick with the default Rachel voice.
-   - Reply `true` to see the available voices. The tool will fetch the voice list from ElevenLabs and prompt you to provide a specific `voiceId`.
+   - Reply `true` to see the available voices. The tool will fetch the voice list and display it with numbered options.
 
-4. Once a voice is confirmed, the tool will:
+4. If you chose to select a different voice, you'll see a numbered list like:
+
+   ```
+   1. Rachel (ID: 21m00Tcm4TlvDq8ikWAM) - Preview: https://...
+   2. Drew (ID: 29vD33N1CtxCmqQRPOHJ) - Preview: https://...
+   3. Clyde (ID: 2EiwWnXFnvU5JabPnv8n) - Preview: https://...
+   ...
+   ```
+
+   Simply reply with the **number** (e.g., `1`, `2`, `3`) or the full **voice ID** if you prefer.
+
+5. Once a voice is confirmed, the tool will:
    - Generate speech from your text using the selected voice and the multilingual v2 model
    - Save the audio to `./output/welcome-message.mp3` (or a timestamped filename if none was provided)
    - Return MCP content containing both a confirmation message and the `audio/mpeg` payload

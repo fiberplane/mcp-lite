@@ -1,7 +1,7 @@
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
-import { McpServer } from "mcp-lite";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { type ElevenLabs, ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import { McpServer } from "mcp-lite";
 import { z } from "zod";
 
 const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
@@ -9,6 +9,13 @@ const DEFAULT_VOICE_NAME = "Rachel";
 
 let elevenLabsClient: ElevenLabsClient | null = null;
 
+/**
+ * Gets or creates the ElevenLabs client instance.
+ *
+ * Uses a singleton pattern to cache the client across requests, avoiding
+ * repeated initialization. This is safe in Node.js's single-threaded event
+ * loop and improves performance by reusing the same client instance.
+ */
 function getElevenLabsClient() {
   if (elevenLabsClient) {
     return elevenLabsClient;
@@ -45,10 +52,12 @@ const VoicePreferenceSchema = z.object({
 });
 
 const VoiceSelectionSchema = z.object({
-  voiceId: z
+  selection: z
     .string()
     .min(1)
-    .describe("Provide the ElevenLabs voice ID you want to use from the list."),
+    .describe(
+      "Enter the number (e.g., 1, 2, 3) or voice ID from the list above.",
+    ),
 });
 
 export const mcp = new McpServer({
@@ -133,12 +142,12 @@ mcp.tool("text_to_speech", {
               const preview = voice.previewUrl
                 ? ` - Preview: ${voice.previewUrl}`
                 : "";
-              return `${index + 1}. ${displayName} (ID: ${voice.voiceId})${preview}`;
+              return `${index + 1}. ${displayName} (ID: ${voice.voiceId})${preview}\n`;
             })
             .join("\n");
 
           const selectionResponse = await ctx.elicit({
-            message: `Here are the available ElevenLabs voices:\n${voiceOptions}\n\nPlease reply with the voice ID you'd like to use.`,
+            message: `Here are the available ElevenLabs voices:\n${voiceOptions}\n\nEnter a number (1-${availableVoices.length}) or voice ID to select:`,
             schema: VoiceSelectionSchema,
           });
 
@@ -155,18 +164,32 @@ mcp.tool("text_to_speech", {
 
           if (
             selectionResponse.action === "accept" &&
-            selectionResponse.content?.voiceId
+            selectionResponse.content?.selection
           ) {
-            const chosenVoice = availableVoices.find(
-              (voice) => voice.voiceId === selectionResponse.content?.voiceId,
-            );
+            const selection = selectionResponse.content.selection;
+            let chosenVoice: ElevenLabs.Voice | undefined;
+
+            // Try to parse as a number first (1-indexed)
+            const numSelection = Number.parseInt(selection, 10);
+            if (
+              !Number.isNaN(numSelection) &&
+              numSelection >= 1 &&
+              numSelection <= availableVoices.length
+            ) {
+              chosenVoice = availableVoices[numSelection - 1];
+            } else {
+              // Otherwise, treat as voice ID
+              chosenVoice = availableVoices.find(
+                (voice) => voice.voiceId === selection,
+              );
+            }
 
             if (!chosenVoice) {
               return {
                 content: [
                   {
                     type: "text",
-                    text: "The specified voice ID was not found in the available options.",
+                    text: `Invalid selection. Please enter a number between 1-${availableVoices.length} or a valid voice ID.`,
                   },
                 ],
                 isError: true,

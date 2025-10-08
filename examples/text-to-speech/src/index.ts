@@ -13,18 +13,13 @@ const transport = new StreamableHttpTransport({
   sessionAdapter: new InMemorySessionAdapter({
     maxEventBufferSize: 1024,
   }),
-  clientRequestAdapter: new InMemoryClientRequestAdapter({
-    defaultTimeoutMs: 30000,
-  }),
+  clientRequestAdapter: new InMemoryClientRequestAdapter(),
 });
 const httpHandler = transport.bind(mcp);
 
 const app = new Hono();
 
-app.all("/mcp", async (c) => {
-  const response = await httpHandler(c.req.raw);
-  return response;
-});
+app.all("/mcp", async (c) => httpHandler(c.req.raw));
 
 app.get("/", (c) => {
   return c.text("Text-to-speech MCP Server - MCP endpoint available at /mcp");
