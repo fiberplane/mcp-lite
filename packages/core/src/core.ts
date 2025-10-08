@@ -1,5 +1,9 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSIONS } from "./constants.js";
+import {
+  METHODS,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST,
+} from "./constants.js";
 import {
   type CreateContextOptions,
   createContext,
@@ -52,6 +56,15 @@ import {
   extractArgumentsFromSchema,
   resolveSchema,
 } from "./validation.js";
+
+type SupportedVersion =
+  (typeof SUPPORTED_MCP_PROTOCOL_VERSIONS)[keyof typeof SUPPORTED_MCP_PROTOCOL_VERSIONS];
+
+function isSupportedVersion(version: string): version is SupportedVersion {
+  return SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST.includes(
+    version as SupportedVersion,
+  );
+}
 
 async function runMiddlewares(
   middlewares: Middleware[],
@@ -1604,18 +1617,13 @@ export class McpServer {
 
     const initParams = params;
     const requested = initParams.protocolVersion;
-    const supportedVersions = Object.values(SUPPORTED_MCP_PROTOCOL_VERSIONS);
 
-    if (
-      !supportedVersions.includes(
-        requested as (typeof supportedVersions)[number],
-      )
-    ) {
+    if (!isSupportedVersion(requested)) {
       throw new RpcError(
         -32000,
-        `Unsupported protocol version. Server supports: ${supportedVersions.join(", ")}, client requested: ${requested}`,
+        `Unsupported protocol version. Server supports: ${SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST.join(", ")}, client requested: ${requested}`,
         {
-          supportedVersions,
+          supportedVersions: SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST,
           requestedVersion: requested,
         },
       );

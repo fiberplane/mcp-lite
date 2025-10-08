@@ -820,7 +820,7 @@ This enables:
 
 `mcp-lite` supports multiple MCP protocol versions with automatic negotiation:
 
-- **`2025-06-18`** (current) - Full feature set including elicitation, sampling, and structured tool outputs
+- **`2025-06-18`** (current) - Full feature set including elicitation and structured tool outputs
 - **`2025-03-26`** (backward compatible) - Includes batch request support, optional protocol headers
 
 During the `initialize` handshake, the server accepts the client's requested version if supported and echoes it back. The negotiated version is persisted per session and enforces version-specific behavior throughout the connection.
@@ -839,7 +839,7 @@ During the `initialize` handshake, the server accepts the client's requested ver
 
 #### Capabilities
 
-- **`2025-06-18`**: Full capabilities including `elicitation`, `sampling`, structured outputs
+- **`2025-06-18`**: Full capabilities including `elicitation` and structured outputs
 - **`2025-03-26`**: Excludes `elicitation` capability; structured outputs may not be recognized by older clients
 
 ### Example: Version Negotiation

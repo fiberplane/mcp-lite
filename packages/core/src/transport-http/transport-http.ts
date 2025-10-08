@@ -7,8 +7,8 @@ import {
   MCP_SESSION_ID_HEADER,
   SSE_ACCEPT_HEADER,
   SSE_STREAM_ID,
-  SUPPORTED_MCP_PROTOCOL_VERSION,
   SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST,
 } from "../constants.js";
 import type { McpServer } from "../core.js";
 import { RpcError } from "../errors.js";
@@ -21,6 +21,7 @@ import {
   isJsonRpcRequest,
   isJsonRpcResponse,
   JSON_RPC_ERROR_CODES,
+  type JsonRpcNotification,
   type JsonRpcReq,
   type JsonRpcRes,
 } from "../types.js";
@@ -338,6 +339,64 @@ export class StreamableHttpTransport {
     }
   }
 
+  /**
+   * Validates the MCP-Protocol-Version header based on session version
+   * Returns null if valid, or an error Response if invalid
+   */
+  private validateProtocolHeader(
+    sessionVersion: string | undefined,
+    protocolHeader: string | null,
+    jsonRpcMessage: JsonRpcReq | JsonRpcNotification,
+    isNotification: boolean,
+  ): Response | null {
+    const responseId = isNotification
+      ? null
+      : (jsonRpcMessage as JsonRpcReq).id;
+
+    // For 2025-06-18: header is REQUIRED
+    if (sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18) {
+      if (!protocolHeader) {
+        return respondToMissingProtocolHeader(responseId);
+      }
+      if (protocolHeader !== sessionVersion) {
+        return respondToProtocolMismatch(
+          responseId,
+          protocolHeader,
+          sessionVersion,
+        );
+      }
+      return null;
+    }
+
+    // For 2025-03-26: header is optional, but if present must match
+    if (sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26) {
+      if (protocolHeader && protocolHeader !== sessionVersion) {
+        return respondToProtocolMismatch(
+          responseId,
+          protocolHeader,
+          sessionVersion,
+        );
+      }
+      return null;
+    }
+
+    // No session: validate header if present
+    if (
+      protocolHeader &&
+      !SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST.includes(
+        protocolHeader as (typeof SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST)[number],
+      )
+    ) {
+      return respondToProtocolMismatch(
+        responseId,
+        protocolHeader,
+        SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST,
+      );
+    }
+
+    return null;
+  }
+
   private async handlePost(
     request: Request,
     options?: { authInfo?: AuthInfo },
@@ -411,63 +470,20 @@ export class StreamableHttpTransport {
 
       // Protocol header enforcement based on session version
       if (!isInitializeRequest) {
+        let sessionVersion: string | undefined;
         if (this.sessionAdapter && sessionId) {
           const session = await this.sessionAdapter.get(sessionId);
-          const sessionVersion = session?.meta?.protocolVersion;
+          sessionVersion = session?.meta?.protocolVersion;
+        }
 
-          if (sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18) {
-            // Header REQUIRED for 06-18
-            if (!protocolHeader) {
-              const responseId = isNotification
-                ? null
-                : (jsonRpcMessage as JsonRpcReq).id;
-              return respondToMissingProtocolHeader(responseId);
-            }
-            if (protocolHeader !== sessionVersion) {
-              const responseId = isNotification
-                ? null
-                : (jsonRpcMessage as JsonRpcReq).id;
-              return respondToProtocolMismatch(
-                responseId,
-                protocolHeader,
-                sessionVersion,
-              );
-            }
-          } else if (
-            sessionVersion === SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26
-          ) {
-            // Header optional for 03-26, but if present must match
-            if (protocolHeader && protocolHeader !== sessionVersion) {
-              const responseId = isNotification
-                ? null
-                : (jsonRpcMessage as JsonRpcReq).id;
-              return respondToProtocolMismatch(
-                responseId,
-                protocolHeader,
-                sessionVersion,
-              );
-            }
-          }
-        } else {
-          // No session: validate header if present
-          const supportedVersions = Object.values(
-            SUPPORTED_MCP_PROTOCOL_VERSIONS,
-          );
-          if (
-            protocolHeader &&
-            !supportedVersions.includes(
-              protocolHeader as (typeof supportedVersions)[number],
-            )
-          ) {
-            const responseId = isNotification
-              ? null
-              : (jsonRpcMessage as JsonRpcReq).id;
-            return respondToProtocolMismatch(
-              responseId,
-              protocolHeader,
-              supportedVersions,
-            );
-          }
+        const validationError = this.validateProtocolHeader(
+          sessionVersion,
+          protocolHeader,
+          jsonRpcMessage,
+          isNotification,
+        );
+        if (validationError) {
+          return validationError;
         }
       }
 
@@ -515,7 +531,7 @@ export class StreamableHttpTransport {
           // Use the negotiated protocol version from the response (echoed by core)
           const negotiatedVersion =
             (response.result as { protocolVersion?: string })
-              ?.protocolVersion || SUPPORTED_MCP_PROTOCOL_VERSION;
+              ?.protocolVersion || SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18;
 
           const sessionMeta: SessionMeta = {
             protocolVersion: negotiatedVersion,
@@ -742,7 +758,10 @@ export class StreamableHttpTransport {
     }
 
     const protocolHeader = request.headers.get(MCP_PROTOCOL_HEADER);
-    if (protocolHeader && protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSION) {
+    if (
+      protocolHeader &&
+      protocolHeader !== SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18
+    ) {
       return new Response("Bad Request: Protocol version mismatch", {
         status: 400,
       });

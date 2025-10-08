@@ -1,7 +1,4 @@
-import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from "../constants.js";
-
-const supportedVersionsList = Object.values(SUPPORTED_MCP_PROTOCOL_VERSIONS);
-
+import { SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST } from "../constants.js";
 import { RpcError } from "../errors.js";
 import {
   createJsonRpcError,
@@ -31,7 +28,7 @@ export function respondToProtocolMismatch(
   protocolHeader: string,
   expected?: string | readonly string[],
 ) {
-  const expectedVersion = expected || supportedVersionsList;
+  const expectedVersion = expected || SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST;
   const errorResponse = createJsonRpcError(
     responseId,
     new RpcError(
