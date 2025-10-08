@@ -1,5 +1,5 @@
-import { PROJECT_NAME } from "./const";
-import type { AIAssistant, Flags } from "./types";
+import { DEFAULT_PROJECT_NAME } from "./const";
+import type { AIAssistant, Flags, Template } from "./types";
 import { getPackageManager } from "./utils";
 
 export interface Context {
@@ -8,10 +8,9 @@ export interface Context {
   name: string;
   path?: string;
   description?: string;
+  template?: Template;
   aiAssistant?: AIAssistant;
   flags: Flags;
-  fpMcpServerEnabled: boolean;
-  deploymentUrl?: string;
 }
 
 /**
@@ -24,10 +23,9 @@ export function initContext(): Context {
 
   return {
     cwd: process.cwd(),
-    name: projectName ?? PROJECT_NAME,
+    name: projectName ?? DEFAULT_PROJECT_NAME,
     packageManager: getPackageManager() ?? "npm",
     flags: [],
-    fpMcpServerEnabled: false, // Temporarily disabled - Fiberplane MCP server is not yet ready
   };
 }
 

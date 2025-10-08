@@ -6,10 +6,10 @@ import {
   promptAIAssistant,
 } from "./actions/ai-assistant/ai-assistant";
 import { actionDependencies, promptDependencies } from "./actions/dependencies";
-import { actionDeploy, promptDeploy } from "./actions/deploy";
 import { actionGit, promptGit } from "./actions/git";
 import { promptPath } from "./actions/path";
 import { actionTemplate } from "./actions/template";
+import { promptTemplate } from "./actions/template-selection";
 import { FIBERPLANE_TITLE } from "./const";
 import { initContext } from "./context";
 import { isError } from "./types";
@@ -26,10 +26,10 @@ async function main() {
 
   const prompts = [
     promptPath,
+    promptTemplate,
     promptAIAssistant,
     promptDependencies,
     promptGit,
-    promptDeploy,
   ];
 
   for (const prompt of prompts) {
@@ -52,7 +52,6 @@ async function main() {
     actionAIAssistant,
     actionDependencies,
     actionGit,
-    actionDeploy,
   ];
 
   for (const action of actions) {
@@ -67,6 +66,8 @@ async function main() {
     }
   }
 
+  const devCommand = context.template === "bun" ? "bun run dev" : "npm run dev";
+
   outro(`🚀 MCP project created successfully in ${context.path}!
 
 ${pico.cyan("Next steps:")}
@@ -74,21 +75,11 @@ ${pico.cyan("Next steps:")}
 # Navigate to your project:
 cd ${context.name}
 
-# As you develop, deploy:
-${context.packageManager} fp deploy
+# Start the dev server:
+${devCommand}
 
-# Learn more about Fiberplane:
-open https://docs.fiberplane.com
-
-${
-  context.flags.includes("deploy-fiberplane")
-    ? `\n${pico.green("✓")} Fiberplane deployment is configured and ready!${
-        context.deploymentUrl
-          ? `\n${pico.cyan("🔗")} Your deployment: ${pico.bold(pico.cyan(context.deploymentUrl))}`
-          : ""
-      }`
-    : ""
-}
+# Learn more about mcp-lite:
+open https://github.com/fiberplane/mcp-lite
 `);
   process.exit(0);
 }

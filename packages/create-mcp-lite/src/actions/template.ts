@@ -1,15 +1,47 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, join, resolve } from "node:path";
 import { spinner } from "@clack/prompts";
 import { downloadTemplate } from "giget";
 import pico from "picocolors";
 import type { Context } from "../context";
 
-const MCP_TEMPLATE_URL = "github:brettimus/moncy-bars/apps/echo"; // This would be the actual template URL
+const TEMPLATE_URLS = {
+  bun: "github:fiberplane/mcp-lite/templates/starter-mcp-bun",
+  cloudflare: "github:fiberplane/mcp-lite/templates/starter-mcp-cloudflare",
+};
+
+// TEMPLATE_ROOT_PATH: Override for local development to avoid GitHub downloads.
+// When set, templates are copied from the local filesystem instead of being fetched from GitHub.
+// Example: TEMPLATE_ROOT_PATH=../../templates (relative to create-mcp-lite package)
+function getLocalTemplatePath(template: "bun" | "cloudflare"): string | null {
+  const templateRoot = process.env.TEMPLATE_ROOT_PATH;
+  if (!templateRoot) {
+    return null;
+  }
+
+  const resolvedRoot = resolve(templateRoot);
+  const templatePath = join(resolvedRoot, `starter-mcp-${template}`);
+
+  if (existsSync(templatePath)) {
+    return templatePath;
+  }
+
+  return null;
+}
 
 export async function actionTemplate(context: Context) {
   if (!context.path) {
     throw new Error("Path not set");
+  }
+
+  if (!context.template) {
+    throw new Error("Template not selected");
   }
 
   const s = spinner();
@@ -21,11 +53,20 @@ export async function actionTemplate(context: Context) {
       mkdirSync(context.path, { recursive: true });
     }
 
-    // Download the MCP template
-    await downloadTemplate(MCP_TEMPLATE_URL, {
-      dir: context.path,
-      force: true,
-    });
+    // Check if using local templates (for development)
+    const localTemplatePath = getLocalTemplatePath(context.template);
+
+    if (localTemplatePath) {
+      // Copy from local filesystem
+      cpSync(localTemplatePath, context.path, { recursive: true });
+    } else {
+      // Download from GitHub
+      const templateUrl = TEMPLATE_URLS[context.template];
+      await downloadTemplate(templateUrl, {
+        dir: context.path,
+        force: true,
+      });
+    }
 
     // Update package.json name field with the project directory name
     const packageJsonPath = join(context.path, "package.json");

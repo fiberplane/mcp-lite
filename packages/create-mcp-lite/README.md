@@ -2,8 +2,6 @@
 
 An interactive CLI to create MCP (Model Context Protocol) projects with mcp-lite.
 
-Optionally deploys straight to Fiberplane.
-
 ## Usage
 
 ```bash
@@ -16,16 +14,30 @@ npm create mcp-lite@latest [project-name]
 - 📦 Automatic dependency installation
 - 🤖 AI assistant integration (Cursor, Claude Code, VSCode, Windsurf)
 - 🔧 Git initialization
-- ☁️ Fiberplane deployment configuration
-- 📋 MCP template scaffolding
+- 🎯 Template selection (Bun or Cloudflare Workers)
+
+## Templates
+
+### Bun Template
+- Local development with Bun runtime
+- Hono for HTTP routing
+- Zod for schema validation
+- Simple `sum` tool example
+
+### Cloudflare Workers Template
+- Edge deployment with Cloudflare Workers
+- Hono for HTTP routing
+- Zod for schema validation
+- Same `sum` tool example
+- Ready for `wrangler deploy`
 
 ## Flow
 
-1. **Target directory?** - Project directory name (default: "echo-mcp")
-2. **Install AI assistance?** - Choose your preferred AI coding assistant
-3. **Install dependencies?** - Automatically install project dependencies
-4. **Initialize git?** - Set up git repository (skipped if already in a git repo)
-5. **"Make it live" (Deploy with Fiberplane?)** - Configure Fiberplane deployment
+1. **Which runtime?** - Choose between Bun or Cloudflare Workers
+2. **Target directory?** - Project directory name (default: "my-mcp-server")
+3. **Who is your copilot?** - Choose your preferred AI coding assistant
+4. **Install dependencies?** - Automatically install project dependencies (always yes)
+5. **Initialize git?** - Set up git repository (skipped if already in a git repo)
 
 ## Debugging
 
@@ -57,20 +69,27 @@ ls -t ~/Library/Logs/create-mcp-lite/ | head -1 | xargs -I {} cat ~/Library/Logs
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Build the CLI
-pnpm build
+bun run build
 
-# Test locally
-pnpm dev
+# Test locally (downloads templates from GitHub)
+bun run dev
 
-# Test locally (check log files for debug output)
-pnpm dev
+# Test locally with local templates (no GitHub download)
+bun run dev:local
 
-# Format code
-pnpm format
+# Type check
+bun run typecheck
+
+# Lint and format
+bun run lint
 ```
+
+### Environment Variables
+
+- `TEMPLATE_ROOT_PATH` - Path to local templates directory for development (e.g., `../../templates`). When set, templates are copied from the local filesystem instead of being downloaded from GitHub. Used by `dev:local` script.
 
 ## License
 
