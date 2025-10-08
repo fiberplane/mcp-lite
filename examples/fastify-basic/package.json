@@ -1,5 +1,5 @@
 {
-  "name": "fastify-basic-example",
+  "name": "@mcp-lite-examples/fastify-basic-example",
   "version": "1.0.1",
   "description": "Basic example of using mcp-lite with Fastify",
   "type": "module",
