@@ -1,10 +1,11 @@
-# Text-to-Podcast MCP Server
+# Text-to-Speech MCP Server
 
 A simple MCP server that converts text to speech using ElevenLabs AI voices.
 
 ## Features
 
 - Converts text to natural-sounding speech using ElevenLabs' multilingual AI voices
+- Supports runtime voice selection via MCP elicitation (with a default Rachel voice)
 - Returns audio as proper MCP `audio` content type with MIME type `audio/mpeg`
 - Saves audio to a local file for easy access
 - Supports custom filenames for output audio files
@@ -20,8 +21,9 @@ You need an ElevenLabs API key. Get one at [https://elevenlabs.io](https://eleve
 # Install dependencies
 bun install
 
-# Set your ElevenLabs API key
-export ELEVENLABS_API_KEY="your_api_key_here"
+# Configure environment
+cp .env.example .env
+# then edit .env and set ELEVENLABS_API_KEY
 
 # Start the server
 bun start
@@ -40,19 +42,34 @@ The server provides a `text_to_speech` tool that accepts:
 - `text` (required): The text to convert to speech
 - `outputFilename` (optional): Custom filename for the output audio file (without extension)
 
-### Example with MCP Inspector
+### Flow with MCP Inspector
 
-```json
-{
-  "text": "Hello! Welcome to this AI-powered podcast.",
-  "outputFilename": "welcome-message"
-}
-```
+1. Start the inspector and connect to the server:
 
-The tool will:
-1. Generate speech from your text using ElevenLabs
-2. Save the audio to `./output/welcome-message.mp3`
-3. Return the audio as MCP `audio` content with MIME type `audio/mpeg`
+   ```bash
+   bunx @modelcontextprotocol/inspector
+   ```
+
+2. Invoke the `text_to_speech` tool with your desired text (and optional output filename). For example:
+
+   ```json
+   {
+     "text": "Hello! Welcome to this AI-powered narration demo.",
+     "outputFilename": "welcome-message"
+   }
+   ```
+
+3. If elicitation is supported, the inspector will first ask:
+
+   > The default voice is Rachel. Would you like to pick a different ElevenLabs voice?
+
+   - Reply `false` (or cancel the dialog) to stick with the default Rachel voice.
+   - Reply `true` to see the available voices. The tool will fetch the voice list from ElevenLabs and prompt you to provide a specific `voiceId`.
+
+4. Once a voice is confirmed, the tool will:
+   - Generate speech from your text using the selected voice and the multilingual v2 model
+   - Save the audio to `./output/welcome-message.mp3` (or a timestamped filename if none was provided)
+   - Return MCP content containing both a confirmation message and the `audio/mpeg` payload
 
 ## Output
 

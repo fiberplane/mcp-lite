@@ -28,8 +28,7 @@
     "mcp-lite",
     "model-context-protocol",
     "elevenlabs",
-    "text-to-speech",
-    "podcast"
+    "text-to-speech"
   ],
   "author": "Fiberplane <info@fiberplane.com>",
   "license": "MIT"
