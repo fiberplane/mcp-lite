@@ -12,4 +12,3 @@ Implement protocol version negotiation during the initialize handshake. When a c
 Server capabilities (`tools`, `prompts`, `resources`) are version-independent. Client capabilities (`elicitation`, `sampling`, `roots`) are negotiated per client.
 
 This enables compatibility with ChatGPT Apps SDK and other clients using protocol version 2025-03-26.
-

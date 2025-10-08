@@ -132,6 +132,7 @@ export class StreamableHttpTransport {
       const sessionData = await this.sessionAdapter.get(sessionId);
       return sessionData?.meta?.protocolVersion;
     } catch {
+      // TODO: Invoke a logger here to warn that the session protocol version could not be fetched
       return undefined;
     }
   }
@@ -600,6 +601,10 @@ export class StreamableHttpTransport {
   ): Promise<Response> {
     const responses: JsonRpcRes[] = [];
 
+    const sessionProtocolVersion =
+      await this.getSessionProtocolVersion(sessionId);
+    const clientCapabilities = await this.getClientCapabilities(sessionId);
+
     for (const message of batch) {
       if (!isJsonRpcRequest(message) && !isJsonRpcNotification(message)) {
         // Invalid message in batch
@@ -618,10 +623,9 @@ export class StreamableHttpTransport {
       try {
         const response = await this.server?._dispatch(message, {
           sessionId: sessionId || undefined,
-          sessionProtocolVersion:
-            await this.getSessionProtocolVersion(sessionId),
+          sessionProtocolVersion,
           authInfo: options?.authInfo,
-          clientCapabilities: await this.getClientCapabilities(sessionId),
+          clientCapabilities,
         });
 
         if (response !== null && response !== undefined) {

@@ -242,7 +242,7 @@ export function createContext(
       id: options.sessionId,
       protocolVersion:
         options.sessionProtocolVersion ||
-        SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
+        SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26,
     };
   }
 
