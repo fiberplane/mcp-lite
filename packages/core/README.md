@@ -837,10 +837,12 @@ During the `initialize` handshake, the server accepts the client's requested ver
 - **`2025-06-18`**: Batch requests (JSON array of requests) are **not supported** and will return an error
 - **`2025-03-26`**: Batch requests are **supported** - send an array of JSON-RPC requests and receive an array of responses
 
-#### Capabilities
+#### Client Capabilities
 
-- **`2025-06-18`**: Full capabilities including `elicitation` and structured outputs
-- **`2025-03-26`**: Excludes `elicitation` capability; structured outputs may not be recognized by older clients
+- **`2025-06-18`**: Clients may declare `elicitation` and `sampling` capabilities
+- **`2025-03-26`**: Clients may declare `roots` and `sampling` capabilities (elicitation was added in 2025-06-18)
+
+Note: Server capabilities (`tools`, `prompts`, `resources`) are version-independent.
 
 ### Example: Version Negotiation
 
@@ -865,8 +867,8 @@ const initResponse = {
     protocolVersion: "2025-03-26",  // Echoed back
     serverInfo: { name: "my-server", version: "1.0.0" },
     capabilities: {
-      tools: { listChanged: true },
-      // Note: elicitation is omitted for 2025-03-26
+      tools: { listChanged: true }
+      // Server capabilities are version-independent
     }
   }
 };

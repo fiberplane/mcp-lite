@@ -1637,14 +1637,8 @@ export class McpServer {
     return {
       protocolVersion: negotiatedVersion,
       serverInfo: this.serverInfo,
-      capabilities: this.capabilitiesFor(negotiatedVersion),
+      capabilities: this.capabilities,
     };
-  }
-
-  private capabilitiesFor(_version: string): InitializeResult["capabilities"] {
-    // Server capabilities are the same across all supported protocol versions
-    // (Client capabilities like elicitation/sampling are negotiated separately)
-    return { ...this.capabilities };
   }
 
   private async handlePing(): Promise<Record<string, never>> {
