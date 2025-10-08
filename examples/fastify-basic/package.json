@@ -1,0 +1,29 @@
+{
+  "name": "fastify-basic-example",
+  "version": "1.0.0",
+  "description": "Basic example of using mcp-lite with Fastify",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "fastify",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "mcp-lite": "workspace:*",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
