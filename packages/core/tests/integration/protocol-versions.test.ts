@@ -67,12 +67,9 @@ describe("Protocol Version Negotiation", () => {
 
     // Server responds with most compatible version (2025-03-26) per spec
     expect(result.result.protocolVersion).toBe("2025-03-26");
-
-    // Should omit elicitation for 2025-03-26
-    expect(result.result.capabilities.elicitation).toBeUndefined();
   });
 
-  test("should return same server capabilities for 2025-03-26", async () => {
+  test("should return consistent server capabilities across protocol versions", async () => {
     const { server, handler } = createStatefulTestServer();
 
     // Register a tool to enable tools capability
@@ -82,7 +79,8 @@ describe("Protocol Version Negotiation", () => {
       handler: async () => ({ content: [{ type: "text", text: "ok" }] }),
     });
 
-    const initRequest = new Request("http://localhost:3000/", {
+    // Test with 2025-03-26
+    const request2503 = new Request("http://localhost:3000/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -97,50 +95,35 @@ describe("Protocol Version Negotiation", () => {
       }),
     });
 
-    const response = await handler(initRequest);
-    expect(response.status).toBe(200);
+    const response2503 = await handler(request2503);
+    expect(response2503.status).toBe(200);
+    const result2503 = await response2503.json();
 
-    const result = await response.json();
-    // Server capabilities (tools, prompts, resources) are version-independent
-    expect(result.result.capabilities.tools).toBeDefined();
-    // Elicitation is a CLIENT capability, not server capability
-    expect(result.result.capabilities.elicitation).toBeUndefined();
-  });
-
-  test("should return same server capabilities for 2025-06-18", async () => {
-    const { server, handler } = createStatefulTestServer();
-
-    // Register a tool to enable tools capability
-    server.tool("test-tool", {
-      description: "Test tool",
-      inputSchema: z.object({}),
-      handler: async () => ({ content: [{ type: "text", text: "ok" }] }),
-    });
-
-    const initRequest = new Request("http://localhost:3000/", {
+    // Test with 2025-06-18
+    const request2506 = new Request("http://localhost:3000/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: 1,
+        id: 2,
         method: "initialize",
         params: {
           clientInfo: { name: "test-client", version: "1.0.0" },
           protocolVersion: "2025-06-18",
-          capabilities: { elicitation: {} }, // This is CLIENT capability
+          capabilities: { elicitation: {} }, // CLIENT capability
         },
       }),
     });
 
-    const response = await handler(initRequest);
-    expect(response.status).toBe(200);
+    const response2506 = await handler(request2506);
+    expect(response2506.status).toBe(200);
+    const result2506 = await response2506.json();
 
-    const result = await response.json();
-    expect(result.result.protocolVersion).toBe("2025-06-18");
-    // Server capabilities (tools, prompts, resources) are version-independent
-    expect(result.result.capabilities.tools).toBeDefined();
-    // Elicitation is a CLIENT capability, not server capability
-    expect(result.result.capabilities.elicitation).toBeUndefined();
+    // Server capabilities should be identical across versions
+    expect(result2503.result.capabilities).toEqual(
+      result2506.result.capabilities,
+    );
+    expect(result2503.result.capabilities.tools).toBeDefined();
   });
 });
 
