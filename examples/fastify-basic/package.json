@@ -1,8 +1,9 @@
 {
-  "name": "fastify-basic-example",
+  "name": "@mcp-lite-examples/fastify-basic",
   "version": "1.0.0",
   "description": "Basic example of using mcp-lite with Fastify",
   "type": "module",
+  "private": true,
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/index.ts",

@@ -140,6 +140,11 @@ fastify.all("/mcp", async (request, reply) => {
       reply.raw.writeHead(response.status, headers);
       const decoder = new TextDecoder();
 
+      // Cancel the stream when the connection closes to prevent memory leaks
+      reply.raw.once("close", () => {
+        reader.cancel();
+      });
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
