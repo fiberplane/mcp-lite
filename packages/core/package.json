@@ -1,7 +1,7 @@
 {
   "name": "mcp-lite",
   "type": "module",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "homepage": "https://github.com/fiberplane/mcp-lite",
   "repository": {
     "type": "git",
