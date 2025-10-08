@@ -84,7 +84,11 @@ export class InMemoryClientRequestAdapter implements ClientRequestAdapter {
     if (timeoutMs && timeoutMs > 0) {
       entry.timer = setTimeout(() => {
         this.pending.delete(key);
-        reject(new Error("Timeout"));
+        reject(
+          new Error(
+            `Client request ${requestId} timed out after ${timeoutMs}ms`,
+          ),
+        );
       }, timeoutMs);
     }
 
