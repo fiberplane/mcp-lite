@@ -1,5 +1,5 @@
 import type { AuthInfo } from "./auth.js";
-import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
+import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSIONS } from "./constants.js";
 import { RpcError } from "./errors.js";
 import type {
   ElicitationResult,
@@ -24,6 +24,7 @@ import {
 
 export interface CreateContextOptions {
   sessionId?: string;
+  sessionProtocolVersion?: string;
   progressToken?: ProgressToken;
   progressSender?: (update: ProgressUpdate) => Promise<void> | void;
   authInfo?: AuthInfo;
@@ -239,7 +240,9 @@ export function createContext(
   if (options.sessionId) {
     context.session = {
       id: options.sessionId,
-      protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+      protocolVersion:
+        options.sessionProtocolVersion ||
+        SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26,
     };
   }
 

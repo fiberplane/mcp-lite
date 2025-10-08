@@ -1,4 +1,4 @@
-import { SUPPORTED_MCP_PROTOCOL_VERSION } from "../constants.js";
+import { SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST } from "../constants.js";
 import { RpcError } from "../errors.js";
 import {
   createJsonRpcError,
@@ -26,15 +26,37 @@ export function respondToInvalidJsonRpc() {
 export function respondToProtocolMismatch(
   responseId: JsonRpcId,
   protocolHeader: string,
+  expected?: string | readonly string[],
 ) {
+  const expectedVersion = expected || SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST;
   const errorResponse = createJsonRpcError(
     responseId,
     new RpcError(
       JSON_RPC_ERROR_CODES.INVALID_PARAMS,
       "Protocol version mismatch",
       {
-        expectedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+        expectedVersion,
         receivedVersion: protocolHeader,
+      },
+    ).toJson(),
+  );
+
+  return new Response(JSON.stringify(errorResponse), {
+    status: 400,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+export function respondToMissingProtocolHeader(responseId: JsonRpcId) {
+  const errorResponse = createJsonRpcError(
+    responseId,
+    new RpcError(
+      JSON_RPC_ERROR_CODES.INVALID_PARAMS,
+      "Missing required MCP-Protocol-Version header",
+      {
+        requiredHeader: "MCP-Protocol-Version",
       },
     ).toJson(),
   );

@@ -1,6 +1,13 @@
 export const JSON_RPC_VERSION = "2.0";
 
-export const SUPPORTED_MCP_PROTOCOL_VERSION = "2025-06-18";
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS = {
+  V2025_03_26: "2025-03-26",
+  V2025_06_18: "2025-06-18",
+} as const;
+
+export const SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST = Object.values(
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
+);
 
 export const MCP_PROTOCOL_HEADER = "MCP-Protocol-Version";
 

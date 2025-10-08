@@ -153,19 +153,20 @@ describe("E2E MCP Integration", () => {
       });
     });
 
-    it("should reject unsupported protocol version", async () => {
+    it("should negotiate to compatible version when client requests unsupported version", async () => {
       const request = new Request("http://localhost/mcp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "MCP-Protocol-Version": "2025-06-18", // Correct header
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: "1",
           method: "initialize",
           params: {
-            protocolVersion: "1.0.0", // Wrong params version - this should be caught
+            protocolVersion: "1.0.0", // Unsupported version
+            capabilities: {},
+            clientInfo: { name: "test-client", version: "1.0.0" },
           },
         }),
       });
@@ -174,8 +175,12 @@ describe("E2E MCP Integration", () => {
       expect(response.ok).toBe(true);
 
       const result = (await response.json()) as JsonRpcResponse;
-      expect(result.error).toBeDefined();
-      expect(result.error?.code).toBe(-32000);
+      expect(result.error).toBeUndefined();
+      expect(result.result).toBeDefined();
+      // Server should negotiate to 2025-03-26 (most compatible)
+      expect(
+        (result.result as { protocolVersion?: string })?.protocolVersion,
+      ).toBe("2025-03-26");
     });
 
     it("should reject protocol version mismatch in header for non-initialize requests", async () => {
@@ -228,10 +233,13 @@ describe("E2E MCP Integration", () => {
       expect(result.error).toBeDefined();
       expect(result.error?.code).toBe(-32602); // INVALID_PARAMS
       expect(result.error?.message).toBe("Protocol version mismatch");
-      expect(result.error?.data).toEqual({
-        expectedVersion: "2025-06-18",
-        receivedVersion: "1.0.0",
-      });
+      const errorData = result.error?.data as {
+        expectedVersion?: string[];
+        receivedVersion?: string;
+      };
+      expect(errorData.expectedVersion).toContain("2025-03-26");
+      expect(errorData.expectedVersion).toContain("2025-06-18");
+      expect(errorData.receivedVersion).toBe("1.0.0");
     });
 
     it("should handle unknown methods", async () => {

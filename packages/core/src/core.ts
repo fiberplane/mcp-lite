@@ -1,5 +1,9 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSION } from "./constants.js";
+import {
+  METHODS,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST,
+} from "./constants.js";
 import {
   type CreateContextOptions,
   createContext,
@@ -52,6 +56,15 @@ import {
   extractArgumentsFromSchema,
   resolveSchema,
 } from "./validation.js";
+
+type SupportedVersion =
+  (typeof SUPPORTED_MCP_PROTOCOL_VERSIONS)[keyof typeof SUPPORTED_MCP_PROTOCOL_VERSIONS];
+
+function isSupportedVersion(version: string): version is SupportedVersion {
+  return SUPPORTED_MCP_PROTOCOL_VERSIONS_LIST.includes(
+    version as SupportedVersion,
+  );
+}
 
 async function runMiddlewares(
   middlewares: Middleware[],
@@ -1286,6 +1299,7 @@ export class McpServer {
 
     const ctx = createContext(message as JsonRpcMessage, requestId, {
       sessionId,
+      sessionProtocolVersion: contextOptions.sessionProtocolVersion,
       progressToken,
       progressSender,
       authInfo: contextOptions.authInfo,
@@ -1602,22 +1616,26 @@ export class McpServer {
     }
 
     const initParams = params;
+    const requested = initParams.protocolVersion;
 
-    if (initParams.protocolVersion !== SUPPORTED_MCP_PROTOCOL_VERSION) {
-      throw new RpcError(
-        -32000,
-        `Unsupported protocol version. Server supports: ${SUPPORTED_MCP_PROTOCOL_VERSION}, client requested: ${initParams.protocolVersion}`,
-        {
-          supportedVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
-          requestedVersion: initParams.protocolVersion,
-        },
+    // Determine which version to use
+    let negotiatedVersion: string;
+    if (isSupportedVersion(requested)) {
+      // Client requested a version we support - use it
+      negotiatedVersion = requested;
+    } else {
+      // Client requested unsupported version - use our most compatible version (2025-03-26)
+      // Per MCP spec: server responds with version it wants to use, client disconnects if incompatible
+      negotiatedVersion = SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_03_26;
+      this.logger?.warn?.(
+        `Client requested unsupported protocol version ${requested}, negotiating to ${negotiatedVersion}`,
       );
     }
 
     this.initialized = true;
 
     return {
-      protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+      protocolVersion: negotiatedVersion,
       serverInfo: this.serverInfo,
       capabilities: this.capabilities,
     };

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { collectSseEventsCount } from "../../../../test-utils/src/sse.js";
 import {
   buildInitializeRequest,
+  buildRequest,
   createStatefulTestServer,
 } from "../../utils.js";
 
@@ -46,13 +47,8 @@ describe("Elicitation E2E Tests", () => {
     const sessionId = initResponse.headers.get("mcp-session-id")!;
 
     const toolResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "mcp-session-id": sessionId,
-        },
-        body: JSON.stringify({
+      buildRequest(
+        {
           jsonrpc: "2.0",
           id: "tool-call-1",
           method: "tools/call",
@@ -60,8 +56,9 @@ describe("Elicitation E2E Tests", () => {
             name: "with-elicitation",
             arguments: {},
           },
-        }),
-      }),
+        },
+        sessionId,
+      ),
     );
 
     expect(toolResponse.status).toBe(200);
@@ -105,13 +102,8 @@ describe("Elicitation E2E Tests", () => {
     const sessionId = initResponse.headers.get("mcp-session-id")!;
 
     const toolResponse = await handler(
-      new Request("http://localhost:3000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "mcp-session-id": sessionId,
-        },
-        body: JSON.stringify({
+      buildRequest(
+        {
           jsonrpc: "2.0",
           id: "tool-call-1",
           method: "tools/call",
@@ -119,8 +111,9 @@ describe("Elicitation E2E Tests", () => {
             name: "no-elicitation",
             arguments: {},
           },
-        }),
-      }),
+        },
+        sessionId,
+      ),
     );
 
     expect(toolResponse.status).toBe(200);
