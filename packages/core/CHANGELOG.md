@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.7.1
+
+### Patch Changes
+
+- a64849f: Adds optional timeout argument paramater to `InMemoryClientRequestAdapter`
+
 ## 0.7.0
 
 ### Minor Changes
