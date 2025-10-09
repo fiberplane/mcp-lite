@@ -10,23 +10,31 @@ import { spinner } from "@clack/prompts";
 import { downloadTemplate } from "giget";
 import pico from "picocolors";
 import type { Context } from "../context";
+import type { Template } from "../types";
 
-const TEMPLATE_URLS = {
+const TEMPLATE_URLS: Record<Template, string> = {
   bun: "github:fiberplane/mcp-lite/templates/starter-mcp-bun",
   cloudflare: "github:fiberplane/mcp-lite/templates/starter-mcp-cloudflare",
+  "chatgpt-app-sdk": "github:fiberplane/mcp-lite/templates/starter-chatgpt-app-sdk",
 };
 
 // TEMPLATE_ROOT_PATH: Override for local development to avoid GitHub downloads.
 // When set, templates are copied from the local filesystem instead of being fetched from GitHub.
 // Example: TEMPLATE_ROOT_PATH=../../templates (relative to create-mcp-lite package)
-function getLocalTemplatePath(template: "bun" | "cloudflare"): string | null {
+function getLocalTemplatePath(template: Template): string | null {
   const templateRoot = process.env.TEMPLATE_ROOT_PATH;
   if (!templateRoot) {
     return null;
   }
 
   const resolvedRoot = resolve(templateRoot);
-  const templatePath = join(resolvedRoot, `starter-mcp-${template}`);
+
+  // Map template names to their directory names
+  const templateDir = template === "bun" || template === "cloudflare"
+    ? `starter-mcp-${template}`
+    : `starter-${template}`;
+
+  const templatePath = join(resolvedRoot, templateDir);
 
   if (existsSync(templatePath)) {
     return templatePath;
