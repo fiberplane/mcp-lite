@@ -5,7 +5,7 @@ export type AIAssistant =
   | "windsurf"
   | "none";
 
-export type Template = "bun" | "cloudflare";
+export type Template = "bun" | "cloudflare" | "chatgpt-app-sdk";
 
 export type Flags = Array<"install-dependencies" | "initialize-git">;
 
