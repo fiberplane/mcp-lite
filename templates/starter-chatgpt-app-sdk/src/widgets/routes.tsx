@@ -4,8 +4,8 @@ import {
   createRouter,
   Outlet,
 } from "@tanstack/react-router";
-import { ItemListWidget } from "./components/ItemListWidget";
 import { ItemDetailWidget } from "./components/ItemDetailWidget";
+import { ItemListWidget } from "./components/ItemListWidget";
 import { LoadingWidget } from "./components/LoadingWidget";
 import { NavigationSync } from "./NavigationSync";
 
@@ -40,11 +40,7 @@ const detailRoute = createRoute({
   component: ItemDetailWidget,
 });
 
-const routeTree = rootRoute.addChildren([
-  loadingRoute,
-  listRoute,
-  detailRoute,
-]);
+const routeTree = rootRoute.addChildren([loadingRoute, listRoute, detailRoute]);
 
 export const router = createRouter({ routeTree });
 

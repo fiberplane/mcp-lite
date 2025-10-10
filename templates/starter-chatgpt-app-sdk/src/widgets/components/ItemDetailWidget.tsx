@@ -1,10 +1,8 @@
-import { useParams } from "@tanstack/react-router";
 import type { Item } from "../../types";
+import { useTheme, useToolOutput } from "../hooks";
 import { getOpenAI } from "../openai-types";
-import { useToolOutput, useTheme } from "../hooks";
 
 export function ItemDetailWidget() {
-  const { itemId } = useParams({ strict: false });
   const item = useToolOutput<Item>();
   const theme = useTheme();
   const isDark = theme === "dark";
@@ -72,6 +70,7 @@ export function ItemDetailWidget() {
       </div>
 
       <button
+        type="button"
         onClick={handleBackToList}
         className={`px-5 py-2.5 text-sm rounded transition-colors ${
           isDark

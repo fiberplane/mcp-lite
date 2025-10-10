@@ -1,22 +1,26 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { serveStatic } from "@hono/node-server/serve-static";
 import {
-  ItemListOutputSchema,
-  ItemDetailOutputSchema,
   type Item,
-  type ItemListOutput,
   type ItemDetailOutput,
+  ItemDetailOutputSchema,
+  type ItemListOutput,
+  ItemListOutputSchema,
 } from "../types";
 
 // IMPORTANT: ChatGPT widgets require a publicly accessible HTTPS URL (localhost is NOT supported)
-const HOST_URL = process.env.HOST_URL || (() => {
-  throw new Error("HOST_URL environment variable is required. ChatGPT widgets do not support localhost.");
-})();
+const HOST_URL =
+  process.env.HOST_URL ||
+  (() => {
+    throw new Error(
+      "HOST_URL environment variable is required. ChatGPT widgets do not support localhost.",
+    );
+  })();
 
 // Single widget URI for all tools
 const WIDGET_URI = "ui://widget/index.html";

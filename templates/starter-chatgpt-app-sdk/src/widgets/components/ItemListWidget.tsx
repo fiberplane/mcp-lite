@@ -1,6 +1,6 @@
 import type { Item } from "../../types";
+import { useTheme, useToolOutput } from "../hooks";
 import { getOpenAI } from "../openai-types";
-import { useToolOutput, useTheme } from "../hooks";
 
 export function ItemListWidget() {
   const data = useToolOutput<{ items?: Item[] }>();
@@ -52,10 +52,11 @@ export function ItemListWidget() {
       ) : (
         <div className="flex flex-col gap-3">
           {items.map((item) => (
-            <div
+            <button
               key={item.id}
+              type="button"
               onClick={() => handleViewDetails(item)}
-              className={`p-4 rounded cursor-pointer transition-all ${
+              className={`p-4 rounded cursor-pointer transition-all text-left ${
                 isDark
                   ? "bg-gray-800 hover:bg-gray-750 hover:shadow-lg"
                   : "bg-gray-50 hover:bg-gray-100 hover:shadow-lg"
@@ -72,7 +73,7 @@ export function ItemListWidget() {
               >
                 {new Date(item.createdAt).toLocaleString()}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

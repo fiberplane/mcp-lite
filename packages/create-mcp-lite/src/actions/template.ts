@@ -15,7 +15,8 @@ import type { Template } from "../types";
 const TEMPLATE_URLS: Record<Template, string> = {
   bun: "github:fiberplane/mcp-lite/templates/starter-mcp-bun",
   cloudflare: "github:fiberplane/mcp-lite/templates/starter-mcp-cloudflare",
-  "chatgpt-app-sdk": "github:fiberplane/mcp-lite/templates/starter-chatgpt-app-sdk",
+  "chatgpt-app-sdk":
+    "github:fiberplane/mcp-lite/templates/starter-chatgpt-app-sdk",
 };
 
 // TEMPLATE_ROOT_PATH: Override for local development to avoid GitHub downloads.
@@ -30,9 +31,10 @@ function getLocalTemplatePath(template: Template): string | null {
   const resolvedRoot = resolve(templateRoot);
 
   // Map template names to their directory names
-  const templateDir = template === "bun" || template === "cloudflare"
-    ? `starter-mcp-${template}`
-    : `starter-${template}`;
+  const templateDir =
+    template === "bun" || template === "cloudflare"
+      ? `starter-mcp-${template}`
+      : `starter-${template}`;
 
   const templatePath = join(resolvedRoot, templateDir);
 

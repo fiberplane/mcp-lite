@@ -36,7 +36,12 @@ export interface OpenAIWidgetAPI<
   ToolOutput extends UnknownObject = UnknownObject,
   ToolResponseMetadata extends UnknownObject = UnknownObject,
   WidgetState extends UnknownObject = UnknownObject,
-> extends OpenAiGlobals<ToolInput, ToolOutput, ToolResponseMetadata, WidgetState> {
+> extends OpenAiGlobals<
+    ToolInput,
+    ToolOutput,
+    ToolResponseMetadata,
+    WidgetState
+  > {
   setWidgetState: (state: WidgetState) => Promise<void>;
   callTool: (name: string, args: unknown) => Promise<unknown>;
   sendFollowUpMessage: (params: { prompt: string }) => Promise<void>;
@@ -44,7 +49,8 @@ export interface OpenAIWidgetAPI<
 
 export const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
 
-export interface SetGlobalsEvent extends CustomEvent<{ globals: Partial<OpenAiGlobals> }> {
+export interface SetGlobalsEvent
+  extends CustomEvent<{ globals: Partial<OpenAiGlobals> }> {
   type: typeof SET_GLOBALS_EVENT_TYPE;
 }
 

@@ -1,6 +1,6 @@
-import { useSyncExternalStore, useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { OpenAiGlobals, SetGlobalsEvent } from "./openai-types";
-import { SET_GLOBALS_EVENT_TYPE, getOpenAI } from "./openai-types";
+import { getOpenAI, SET_GLOBALS_EVENT_TYPE } from "./openai-types";
 
 type UnknownObject = Record<string, unknown>;
 
