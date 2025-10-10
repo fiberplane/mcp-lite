@@ -10,7 +10,7 @@ export async function promptTemplate(context: Context) {
       { value: "cloudflare", label: "Cloudflare Workers (MCP server)" },
       {
         value: "chatgpt-app-sdk",
-        label: "ChatGPT App SDK (Hono + Vite + Interactive Widgets)",
+        label: "ChatGPT App SDK Starter",
       },
     ],
     initialValue: "bun",
