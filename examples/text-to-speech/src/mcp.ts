@@ -170,13 +170,15 @@ mcp.tool("text_to_speech", {
             let chosenVoice: ElevenLabs.Voice | undefined;
 
             // Try to parse as a number first (1-indexed)
-            const numSelection = Number.parseInt(selection, 10);
-            if (
-              !Number.isNaN(numSelection) &&
-              numSelection >= 1 &&
-              numSelection <= availableVoices.length
-            ) {
-              chosenVoice = availableVoices[numSelection - 1];
+            const numberSchema = z.coerce
+              .number()
+              .int()
+              .min(1)
+              .max(availableVoices.length);
+            const parseResult = numberSchema.safeParse(selection);
+
+            if (parseResult.success) {
+              chosenVoice = availableVoices[parseResult.data - 1];
             } else {
               // Otherwise, treat as voice ID
               chosenVoice = availableVoices.find(
