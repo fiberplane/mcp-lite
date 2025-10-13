@@ -48,9 +48,10 @@ export async function createTestHarness(
   const handler = transport.bind(server);
 
   // Create Bun server
+  // Wrap handler to match Bun.serve signature (ignores server parameter)
   const bunServer = Bun.serve({
     port,
-    fetch: handler,
+    fetch: (req) => handler(req),
   });
 
   const url = `http://localhost:${bunServer.port}`;

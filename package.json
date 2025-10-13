@@ -23,6 +23,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
     "@changesets/cli": "^2.29.7",
+    "@types/bun": "^1.3.0",
     "arktype": "^2.1.22",
     "pkg-pr-new": "^0.0.59",
     "typescript": "^5.9.2"
