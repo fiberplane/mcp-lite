@@ -7,10 +7,10 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
-    "hono": "^4.9.10",
-    "mcp-lite": "^0.7.0"
+    "hono": "^4.9.12",
+    "mcp-lite": "^0.8.1"
   },
   "devDependencies": {
-    "wrangler": "^4.4.0"
+    "wrangler": "^4.42.2"
   }
 }
