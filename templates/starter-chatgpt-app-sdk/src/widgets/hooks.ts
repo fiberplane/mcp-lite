@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import type { OpenAiGlobals, SetGlobalsEvent } from "./openai-types";
 import { getOpenAI, SET_GLOBALS_EVENT_TYPE } from "./openai-types";
+import type { WidgetState } from "../types";
 
 type UnknownObject = Record<string, unknown>;
 
@@ -118,4 +120,33 @@ export function useWidgetState<T extends UnknownObject>(
   );
 
   return [widgetState, setWidgetState] as const;
+}
+
+/**
+ * Hook to synchronize navigation based on tool output
+ * Automatically navigates to the appropriate route when tool output changes
+ */
+export function useNavigationSync() {
+  const data = useToolOutput<WidgetState>();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!data) {
+      navigate({ to: "/" });
+      return;
+    }
+
+    switch (data.kind) {
+      case "item_list":
+        navigate({ to: "/list" });
+        break;
+
+      case "item_detail":
+        navigate({
+          to: "/detail/$itemId",
+          params: { itemId: data.id },
+        });
+        break;
+    }
+  }, [data, navigate]);
 }
