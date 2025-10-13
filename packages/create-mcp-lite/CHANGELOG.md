@@ -1,5 +1,15 @@
 # create-mcp-lite
 
+## 0.2.0
+
+### Minor Changes
+
+- 7d09273: Add ChatGPT App SDK starter template with TanStack Router and OpenAI hooks
+
+### Patch Changes
+
+- 9ed10ee: Fix CI failures, due to Bun version bump.
+
 ## 0.1.0
 
 ### Minor Changes
