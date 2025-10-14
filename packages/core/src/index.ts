@@ -1,3 +1,20 @@
+export type { ToolAdapter } from "./client/adapters/index.js";
+// Client exports
+export {
+  type ClientCapabilities,
+  type ClientMiddleware,
+  type ClientSessionAdapter,
+  type ClientSessionData,
+  Connection,
+  type ConnectionOptions,
+  createClientContext,
+  InMemoryClientSessionAdapter,
+  type MCPClientContext,
+  McpClient,
+  type McpClientOptions,
+  StreamableHttpClientTransport,
+  type StreamableHttpClientTransportOptions,
+} from "./client/index.js";
 export type { ClientRequestAdapter } from "./client-request-adapter.js";
 export { InMemoryClientRequestAdapter } from "./client-request-adapter.js";
 export {
