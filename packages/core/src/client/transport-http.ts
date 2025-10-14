@@ -2,7 +2,7 @@ import {
   JSON_RPC_VERSION,
   MCP_PROTOCOL_HEADER,
   MCP_SESSION_ID_HEADER,
-  SUPPORTED_MCP_PROTOCOL_VERSION,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
 } from "../constants.js";
 import { RpcError } from "../errors.js";
 import type { InitializeResult, JsonRpcRes } from "../types.js";
@@ -63,7 +63,7 @@ export class StreamableHttpClientTransport {
         id: "init",
         method: "initialize",
         params: {
-          protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+          protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
           clientInfo: this.client.clientInfo,
           capabilities: this.client.capabilities || {},
         },
@@ -73,7 +73,7 @@ export class StreamableHttpClientTransport {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSION,
+          [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
         },
         body: JSON.stringify(initRequest),
       });
@@ -105,7 +105,7 @@ export class StreamableHttpClientTransport {
       if (sessionId && this.sessionAdapter) {
         await this.sessionAdapter.create(sessionId, {
           sessionId,
-          protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSION,
+          protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
           serverInfo: initResult.serverInfo,
           serverCapabilities: initResult.capabilities,
           createdAt: Date.now(),
@@ -143,7 +143,7 @@ export class StreamableHttpClientTransport {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSION,
+          [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
           [MCP_SESSION_ID_HEADER]: sessionId,
         },
         body: JSON.stringify(response),
