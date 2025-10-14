@@ -1,0 +1,34 @@
+{
+  "name": "@mcp-lite-examples/text-to-speech",
+  "version": "1.0.0",
+  "description": "MCP server example using mcp-lite with ElevenLabs for text-to-speech conversion",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "inspect": "bunx @modelcontextprotocol/inspector",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.17.0",
+    "hono": "^4.9.5",
+    "mcp-lite": "workspace:*",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@internal/test-utils": "workspace:*",
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-lite",
+    "model-context-protocol",
+    "elevenlabs",
+    "text-to-speech"
+  ],
+  "author": "Fiberplane <info@fiberplane.com>",
+  "license": "MIT"
+}

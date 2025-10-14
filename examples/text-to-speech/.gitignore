@@ -1,0 +1,6 @@
+# Output directory for generated audio files
+output/
+
+# Node modules
+node_modules/
+
