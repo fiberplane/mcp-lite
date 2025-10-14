@@ -4,7 +4,7 @@ import {
   MCP_SESSION_ID_HEADER,
   METHODS,
   SSE_ACCEPT_HEADER,
-  SUPPORTED_MCP_PROTOCOL_VERSION,
+  SUPPORTED_MCP_PROTOCOL_VERSIONS,
 } from "../constants.js";
 import type { Logger } from "../core.js";
 import { RpcError } from "../errors.js";
@@ -171,7 +171,7 @@ export class Connection {
   private async _request(method: string, params?: unknown): Promise<unknown> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "MCP-Protocol-Version": SUPPORTED_MCP_PROTOCOL_VERSION,
+      "MCP-Protocol-Version": SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
     };
 
     if (this.sessionId) {
@@ -232,7 +232,7 @@ export class Connection {
 
     const headers: Record<string, string> = {
       Accept: SSE_ACCEPT_HEADER,
-      [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSION,
+      [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
       [MCP_SESSION_ID_HEADER]: this.sessionId,
     };
 
