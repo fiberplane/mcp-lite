@@ -7,15 +7,12 @@ import {
 import { ItemDetailWidget } from "./components/ItemDetailWidget";
 import { ItemListWidget } from "./components/ItemListWidget";
 import { LoadingWidget } from "./components/LoadingWidget";
-import { NavigationSync } from "./NavigationSync";
+import { useNavigationSync } from "./hooks";
 
 function RootComponent() {
-  return (
-    <>
-      <NavigationSync />
-      <Outlet />
-    </>
-  );
+  useNavigationSync();
+
+  return <Outlet />;
 }
 
 const rootRoute = createRootRoute({
