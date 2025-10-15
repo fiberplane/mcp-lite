@@ -1,4 +1,3 @@
-import type { Serve } from "bun";
 import { Hono } from "hono";
 import {
   InMemoryClientRequestAdapter,
@@ -28,4 +27,4 @@ app.get("/", (c) => {
 export default {
   fetch: app.fetch,
   idleTimeout: 30,
-} satisfies Serve.Options;
+};

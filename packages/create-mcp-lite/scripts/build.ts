@@ -26,10 +26,21 @@ await Bun.build({
 });
 
 // Sync exports from publishConfig into dist/package.json and root package.json
-const { publishConfig, ...packageJsonForDist } = packageJson as Record<string, unknown>;
-const publishExports = (publishConfig as any)?.exports ?? (packageJson as any).exports;
+interface PackageJsonShape {
+  exports?: unknown;
+  publishConfig?: { exports?: unknown } & Record<string, unknown>;
+  [key: string]: unknown;
+}
 
-const rewriteExports = (value: unknown, transform: (path: string) => string): unknown => {
+const { publishConfig, ...packageJsonForDist } =
+  packageJson as PackageJsonShape;
+const publishExports =
+  publishConfig?.exports ?? (packageJson as PackageJsonShape).exports;
+
+const rewriteExports = (
+  value: unknown,
+  transform: (path: string) => string,
+): unknown => {
   if (typeof value === "string") {
     return transform(value);
   }
@@ -64,16 +75,21 @@ if (publishExports) {
     )}\n`,
   );
 
-  const { exports: _ignoredExports, ...publishConfigWithoutExports } = (publishConfig ?? {}) as Record<string, unknown>;
+  const { exports: _ignoredExports, ...publishConfigWithoutExports } =
+    (publishConfig ?? {}) as Record<string, unknown>;
   const packageJsonForPublish = {
     ...(packageJson as Record<string, unknown>),
     exports: publishExports,
-    ...(publishConfigWithoutExports && Object.keys(publishConfigWithoutExports).length
+    ...(publishConfigWithoutExports &&
+    Object.keys(publishConfigWithoutExports).length
       ? { publishConfig: publishConfigWithoutExports }
       : {}),
   };
 
-  await Bun.write(packageJsonUrl, `${JSON.stringify(packageJsonForPublish, null, 2)}\n`);
+  await Bun.write(
+    packageJsonUrl,
+    `${JSON.stringify(packageJsonForPublish, null, 2)}\n`,
+  );
 }
 
 // Make the built CLI file executable

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import type { WidgetState } from "../types";
 import type { OpenAiGlobals, SetGlobalsEvent } from "./openai-types";
 import { getOpenAI, SET_GLOBALS_EVENT_TYPE } from "./openai-types";
-import type { WidgetState } from "../types";
 
 type UnknownObject = Record<string, unknown>;
 

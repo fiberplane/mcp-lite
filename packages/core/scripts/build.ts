@@ -16,7 +16,10 @@ await Bun.build({
 const { publishConfig, ...packageJsonForDist } = packageJson;
 const publishExports = publishConfig?.exports ?? packageJson.exports;
 
-const rewriteExports = (value: unknown, transform: (path: string) => string): unknown => {
+const rewriteExports = (
+  value: unknown,
+  transform: (path: string) => string,
+): unknown => {
   if (typeof value === "string") {
     return transform(value);
   }
@@ -25,7 +28,10 @@ const rewriteExports = (value: unknown, transform: (path: string) => string): un
   }
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, rewriteExports(entry, transform)]),
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        rewriteExports(entry, transform),
+      ]),
     );
   }
   return value;
@@ -48,11 +54,13 @@ if (publishExports) {
     )}\n`,
   );
 
-  const { exports: _ignoredExports, ...publishConfigWithoutExports } = publishConfig ?? {};
+  const { exports: _ignoredExports, ...publishConfigWithoutExports } =
+    publishConfig ?? {};
   const packageJsonForPublish = {
     ...packageJson,
     exports: publishExports,
-    ...(publishConfigWithoutExports && Object.keys(publishConfigWithoutExports).length
+    ...(publishConfigWithoutExports &&
+    Object.keys(publishConfigWithoutExports).length
       ? { publishConfig: publishConfigWithoutExports }
       : {}),
   };
