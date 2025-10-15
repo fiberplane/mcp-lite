@@ -15,9 +15,13 @@ await Bun.build({
 const { publishConfig, ...packageJsonForDist } = packageJson;
 const publishExports = publishConfig?.exports ?? packageJson.exports;
 
+// publishConfig exports resolve from the repository root (e.g. "./dist/index.js"),
+// but the package.json we write here lives inside the built dist/ directory. We
+// rewrite any "./dist/" prefixes so that installed consumers resolve files from
+// the dist package root ("./index.js", "./types/index.d.ts", etc.).
 const stripDistPrefix = (value: unknown): unknown => {
-  if (typeof value === "string") {
-    return value.replace(/^\.\/dist\//, "./");
+  if (typeof value === "string" && value.startsWith("./dist/")) {
+    return `./${value.slice("./dist/".length)}`;
   }
   if (Array.isArray(value)) {
     return value.map((entry) => stripDistPrefix(entry));
