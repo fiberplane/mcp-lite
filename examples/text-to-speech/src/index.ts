@@ -28,4 +28,4 @@ app.get("/", (c) => {
 export default {
   fetch: app.fetch,
   idleTimeout: 30,
-} satisfies Serve;
+} satisfies Serve.Options;
