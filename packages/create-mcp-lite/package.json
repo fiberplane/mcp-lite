@@ -14,7 +14,10 @@
     "prepublishOnly": "bun run build && bun run build:types"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "files": [
     "dist",
@@ -48,12 +51,6 @@
     "node": ">=18.17.0"
   },
   "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": {
-        "types": "./dist/types/index.d.ts",
-        "import": "./dist/index.js"
-      }
-    }
+    "access": "public"
   }
 }
