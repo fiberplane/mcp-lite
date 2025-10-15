@@ -2,4 +2,4 @@
 "mcp-lite": patch
 ---
 
-Ensure the build output package.json mirrors the publish exports without the extra dist/ prefix.
+Ensure the core package.json exports match the built dist/ files so Bun resolves the published bundle correctly and mirror those exports when generating the dist metadata.
