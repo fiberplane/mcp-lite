@@ -1,5 +1,11 @@
 # mcp-lite
 
+## 0.8.2
+
+### Patch Changes
+
+- db5e3ca: Ensure the core package.json exports match the built dist/ files so Bun resolves the published bundle correctly and mirror those exports when generating the dist metadata.
+
 ## 0.8.1
 
 ### Patch Changes
