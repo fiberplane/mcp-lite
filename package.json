@@ -18,7 +18,8 @@
     "lint": "biome check --write .",
     "test": "bun run --filter=* test",
     "test:watch": "bun run --filter=* test:watch",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "prepublishOnly": "bun run --filter=* prepublishOnly"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
