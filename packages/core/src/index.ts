@@ -2,16 +2,20 @@ export type { ToolAdapter } from "./client/adapters/index.js";
 // Client exports
 export {
   type ClientCapabilities,
-  type ClientMiddleware,
+  type ClientConnectionInfo,
   type ClientSessionAdapter,
   type ClientSessionData,
   Connection,
   type ConnectionOptions,
-  createClientContext,
+  type ElicitHandler,
+  type ElicitationParams,
+  type ElicitationResult,
   InMemoryClientSessionAdapter,
-  type MCPClientContext,
   McpClient,
   type McpClientOptions,
+  type SampleHandler,
+  type SamplingParams,
+  type SamplingResult,
   StreamableHttpClientTransport,
   type StreamableHttpClientTransportOptions,
 } from "./client/index.js";

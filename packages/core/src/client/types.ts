@@ -1,38 +1,11 @@
 import type { JsonRpcReq, JsonRpcRes } from "../types.js";
 
 /**
- * Client context passed through middleware chain for server-initiated requests.
- * This mirrors MCPServerContext but for client-side handling.
+ * Connection information provided to handlers for context about the connected server
  */
-export interface MCPClientContext {
-  request: JsonRpcReq;
-  requestId: string | number;
-  response: JsonRpcRes | null;
-  env: Record<string, unknown>;
-  state: Record<string, unknown>;
-  connection?: {
-    serverInfo: { name: string; version: string };
-    protocolVersion: string;
-  };
-}
-
-/**
- * Client middleware function signature.
- * Middleware runs when the server sends requests to the client (e.g., sampling, elicitation).
- */
-export type ClientMiddleware = (
-  ctx: MCPClientContext,
-  next: () => Promise<void>,
-) => Promise<void> | void;
-
-/**
- * Options for creating a client context
- */
-export interface CreateClientContextOptions {
-  connection?: {
-    serverInfo: { name: string; version: string };
-    protocolVersion: string;
-  };
+export interface ClientConnectionInfo {
+  serverInfo: { name: string; version: string };
+  protocolVersion: string;
 }
 
 /**
@@ -72,7 +45,7 @@ export interface SamplingResult {
  */
 export type SampleHandler = (
   params: SamplingParams,
-  ctx: MCPClientContext,
+  connection?: ClientConnectionInfo,
 ) => Promise<SamplingResult> | SamplingResult;
 
 /**
@@ -96,5 +69,5 @@ export interface ElicitationResult {
  */
 export type ElicitHandler = (
   params: ElicitationParams,
-  ctx: MCPClientContext,
+  connection?: ClientConnectionInfo,
 ) => Promise<ElicitationResult> | ElicitationResult;

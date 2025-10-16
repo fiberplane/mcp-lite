@@ -112,6 +112,12 @@ export class StreamableHttpClientTransport {
         });
       }
 
+      // Set connection info on client after successful initialization
+      this.client._setConnectionInfo({
+        serverInfo: initResult.serverInfo,
+        protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
+      });
+
       // Create connection with server info and capabilities
       const connection = new Connection({
         baseUrl,
