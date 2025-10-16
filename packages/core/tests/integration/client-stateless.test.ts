@@ -181,23 +181,4 @@ describe("MCP Client - Stateless Operations", () => {
     expect(results[1].content[0].text).toBe("Second");
     expect(results[2].content[0].text).toBe("3");
   });
-
-  it("should support client middleware", async () => {
-    const log: string[] = [];
-
-    const client = new McpClient({
-      name: "test-client",
-      version: "1.0.0",
-    });
-
-    client.use(async (_ctx, next) => {
-      log.push("before");
-      await next();
-      log.push("after");
-    });
-
-    // Note: Middleware runs on server-initiated requests only
-    // For Phase 1, this is a placeholder test
-    expect(log).toHaveLength(0); // No server requests yet
-  });
 });

@@ -5,7 +5,6 @@ export {
   type McpClientOptions,
 } from "./client.js";
 export { Connection, type ConnectionOptions } from "./connection.js";
-export { createClientContext } from "./context.js";
 export {
   type ClientSessionAdapter,
   type ClientSessionData,
@@ -16,7 +15,11 @@ export {
   type StreamableHttpClientTransportOptions,
 } from "./transport-http.js";
 export type {
-  ClientMiddleware,
-  CreateClientContextOptions,
-  MCPClientContext,
+  ClientConnectionInfo,
+  ElicitHandler,
+  ElicitationParams,
+  ElicitationResult,
+  SampleHandler,
+  SamplingParams,
+  SamplingResult,
 } from "./types.js";

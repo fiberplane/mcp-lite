@@ -7,11 +7,9 @@ import {
   createJsonRpcResponse,
   type JsonRpcReq,
   type JsonRpcRes,
-  type OnError,
 } from "../types.js";
-import { createClientContext } from "./context.js";
 import type {
-  ClientMiddleware,
+  ClientConnectionInfo,
   ElicitHandler,
   ElicitationParams,
   SampleHandler,
@@ -70,13 +68,14 @@ export interface McpClientOptions {
 export class McpClient {
   public readonly clientInfo: { name: string; version: string };
   public readonly capabilities?: ClientCapabilities;
-  private middlewares: ClientMiddleware[] = [];
-  private onErrorHandler?: OnError;
   private logger: Logger;
 
   // Handlers for server-initiated requests
   private sampleHandler?: SampleHandler;
   private elicitHandler?: ElicitHandler;
+
+  // Connection info set by transport after initialize
+  private connectionInfo?: ClientConnectionInfo;
 
   /**
    * Create a new MCP client instance.
@@ -93,31 +92,6 @@ export class McpClient {
   }
 
   /**
-   * Add middleware to the client pipeline.
-   *
-   * Middleware functions execute when the server sends requests to the client
-   * (e.g., for sampling or elicitation in future phases).
-   *
-   * @param middleware - Middleware function to add
-   * @returns This client instance for chaining
-   */
-  use(middleware: ClientMiddleware): this {
-    this.middlewares.push(middleware);
-    return this;
-  }
-
-  /**
-   * Set a custom error handler for the client.
-   *
-   * @param handler - Error handler function
-   * @returns This client instance for chaining
-   */
-  onError(handler: OnError): this {
-    this.onErrorHandler = handler;
-    return this;
-  }
-
-  /**
    * Register handler for server sampling requests.
    *
    * When the server needs the client to call an LLM, it will send a sampling
@@ -128,7 +102,7 @@ export class McpClient {
    *
    * @example
    * ```typescript
-   * client.onSample(async (params, ctx) => {
+   * client.onSample(async (params, connection) => {
    *   const response = await callLLM(params.messages, params.modelPreferences);
    *   return {
    *     role: "assistant",
@@ -155,7 +129,7 @@ export class McpClient {
    *
    * @example
    * ```typescript
-   * client.onElicit(async (params, ctx) => {
+   * client.onElicit(async (params, connection) => {
    *   const userInput = await promptUser(params.message, params.requestedSchema);
    *   return {
    *     action: "accept",
@@ -170,6 +144,14 @@ export class McpClient {
   }
 
   /**
+   * Set connection info after successful initialization.
+   * @internal
+   */
+  _setConnectionInfo(info: ClientConnectionInfo): void {
+    this.connectionInfo = info;
+  }
+
+  /**
    * Internal dispatcher for server-initiated requests.
    * Called by transport when SSE stream receives a request.
    *
@@ -177,10 +159,8 @@ export class McpClient {
    */
   async _dispatch(message: JsonRpcReq): Promise<JsonRpcRes> {
     const requestId = message.id;
-    const ctx = createClientContext(message, requestId as string | number);
 
-    // Run middleware chain
-    const tail = async (): Promise<void> => {
+    try {
       let result: unknown;
 
       switch (message.method) {
@@ -193,18 +173,21 @@ export class McpClient {
           }
           result = await this.elicitHandler(
             message.params as ElicitationParams,
-            ctx,
+            this.connectionInfo,
           );
           break;
 
-        case "sampling/createMessage":
+        case METHODS.SAMPLING.CREATE:
           if (!this.sampleHandler) {
             throw new RpcError(
               JSON_RPC_ERROR_CODES.METHOD_NOT_FOUND,
               "No sampling handler registered",
             );
           }
-          result = await this.sampleHandler(message.params as SamplingParams, ctx);
+          result = await this.sampleHandler(
+            message.params as SamplingParams,
+            this.connectionInfo,
+          );
           break;
 
         default:
@@ -214,36 +197,8 @@ export class McpClient {
           );
       }
 
-      ctx.response = createJsonRpcResponse(requestId, result);
-    };
-
-    try {
-      await this.runMiddlewares(ctx, tail);
-
-      if (!ctx.response) {
-        return createJsonRpcError(
-          requestId,
-          new RpcError(
-            JSON_RPC_ERROR_CODES.INTERNAL_ERROR,
-            "No response generated",
-          ).toJson(),
-        );
-      }
-
-      return ctx.response;
+      return createJsonRpcResponse(requestId, result);
     } catch (error) {
-      // Handle errors with custom error handler if provided
-      if (this.onErrorHandler) {
-        try {
-          const customError = await this.onErrorHandler(error, ctx as never);
-          if (customError) {
-            return createJsonRpcError(requestId, customError);
-          }
-        } catch (_handlerError) {
-          // Fall through to default error handling
-        }
-      }
-
       // Default error handling
       if (error instanceof RpcError) {
         return createJsonRpcError(requestId, error.toJson());
@@ -257,28 +212,5 @@ export class McpClient {
         ).toJson(),
       );
     }
-  }
-
-  /**
-   * Run the middleware chain
-   * @private
-   */
-  private async runMiddlewares(
-    ctx: Parameters<ClientMiddleware>[0],
-    tail: () => Promise<void>,
-  ): Promise<void> {
-    const dispatch = async (i: number): Promise<void> => {
-      if (i < this.middlewares.length) {
-        const middleware = this.middlewares[i];
-        if (middleware) {
-          await middleware(ctx, () => dispatch(i + 1));
-        } else {
-          await dispatch(i + 1);
-        }
-      } else {
-        await tail();
-      }
-    };
-    await dispatch(0);
   }
 }

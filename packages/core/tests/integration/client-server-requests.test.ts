@@ -214,13 +214,6 @@ describe("MCP Client - Server-Initiated Requests", () => {
       capabilities: { elicitation: {} },
     });
 
-    // Add middleware
-    client.use(async (_ctx, next) => {
-      log.push("before");
-      await next();
-      log.push("after");
-    });
-
     client.onElicit(async () => {
       log.push("handler");
       return { action: "accept", content: {} };
@@ -238,7 +231,7 @@ describe("MCP Client - Server-Initiated Requests", () => {
     // Wait a bit for async processing
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    expect(log).toEqual(["before", "handler", "after"]);
+    expect(log).toEqual(["handler"]);
 
     await connection.close(true);
   });
