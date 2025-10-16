@@ -21,7 +21,7 @@ await Bun.build({
 });
 
 // After build: copy publishConfig.exports → package.json.exports (only during prepublish)
-const isPrepublish = process.env.npm_lifecycle_event === "prepublishOnly";
+const isPrepublish = process.argv.includes("--prepublish");
 if (isPrepublish) {
   const publishExports = packageJson.publishConfig?.exports;
   if (publishExports) {

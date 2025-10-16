@@ -28,7 +28,7 @@
     "build:types": "tsc --project tsconfig.build.json --outDir dist/types --rootDir src",
     "typecheck": "tsc --noEmit",
     "lint": "biome check --write .",
-    "prepublishOnly": "bun run build && bun run build:types"
+    "prepublishOnly": "bun run scripts/build.ts --prepublish"
   },
   "exports": {
     ".": "./src/index.ts"
