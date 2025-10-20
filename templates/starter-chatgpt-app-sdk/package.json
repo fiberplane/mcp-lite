@@ -12,7 +12,7 @@
     "@hono/node-server": "^1.19.5",
     "@tanstack/react-router": "^1.132.47",
     "hono": "^4.9.12",
-    "mcp-lite": "^0.8.1",
+    "mcp-lite": "^0.8.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.14",
