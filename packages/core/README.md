@@ -195,29 +195,11 @@ const transport = new StreamableHttpTransport({
 
 ### Logging
 
-By default, `mcp-lite` is **quiet** to avoid polluting your application's output:
-- `error` and `warn` messages log to `console.error`
-- `info` and `debug` messages are silent (no-op)
+By default, `mcp-lite` is **completely silent** (all log levels are no-ops). This follows the adapter pattern used throughout mcp-lite - you opt-in when you need it.
 
-This is a sensible default for a library. You can customize logging by providing a `logger` option:
+Enable logging by providing a `logger` option:
 
 ```typescript
-const mcp = new McpServer({
-  name: "my-server",
-  version: "1.0.0",
-  logger: {
-    error: (msg, ...args) => myLogger.error(msg, ...args),
-    warn: (msg, ...args) => myLogger.warn(msg, ...args),
-    info: (msg, ...args) => myLogger.info(msg, ...args),  // Enable info logs
-    debug: (msg, ...args) => myLogger.debug(msg, ...args), // Enable debug logs
-  }
-});
-```
-
-**Common patterns:**
-
-```typescript
-// Enable verbose logging (show everything)
 const mcp = new McpServer({
   name: "my-server",
   version: "1.0.0",
@@ -228,16 +210,32 @@ const mcp = new McpServer({
     debug: console.debug,
   }
 });
+```
 
-// Completely silent (disable all logs)
+**Common patterns:**
+
+```typescript
+// Errors and warnings only
 const mcp = new McpServer({
   name: "my-server",
   version: "1.0.0",
   logger: {
-    error: () => {},
-    warn: () => {},
-    info: () => {},
-    debug: () => {},
+    error: console.error,
+    warn: console.warn,
+    info: () => {},   // Silent
+    debug: () => {},  // Silent
+  }
+});
+
+// Custom logger (e.g., pino, winston)
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: (msg, ...args) => myLogger.error(msg, ...args),
+    warn: (msg, ...args) => myLogger.warn(msg, ...args),
+    info: (msg, ...args) => myLogger.info(msg, ...args),
+    debug: (msg, ...args) => myLogger.debug(msg, ...args),
   }
 });
 ```

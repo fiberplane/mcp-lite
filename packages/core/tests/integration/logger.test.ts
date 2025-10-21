@@ -4,14 +4,16 @@ import { McpServer } from "../../src/core.js";
 import type { MCPServerContext } from "../../src/types.js";
 
 describe("Logger", () => {
-  it("should use quiet defaults - error/warn to console.error, info/debug silent", () => {
+  it("should be completely silent by default (all levels are no-ops)", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
     const logger = server["logger"];
-    expect(logger.error).toBe(console.error);
-    expect(logger.warn).toBe(console.error);
-    // info and debug should be no-ops (functions, not console methods)
+    // All levels should be no-ops (functions, not console methods)
+    expect(typeof logger.error).toBe("function");
+    expect(typeof logger.warn).toBe("function");
     expect(typeof logger.info).toBe("function");
     expect(typeof logger.debug).toBe("function");
+    expect(logger.error).not.toBe(console.error);
+    expect(logger.warn).not.toBe(console.warn);
     expect(logger.info).not.toBe(console.info);
     expect(logger.debug).not.toBe(console.debug);
   });

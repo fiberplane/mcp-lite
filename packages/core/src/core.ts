@@ -89,9 +89,8 @@ async function runMiddlewares(
 /**
  * Logger interface for MCP server internal logging.
  *
- * By default, the server is quiet:
- * - `error` and `warn` log to console.error
- * - `info` and `debug` are no-ops (silent)
+ * By default, the server is completely silent (all log levels are no-ops).
+ * Opt-in to logging by providing your own logger implementation.
  *
  * @example Custom logger
  * ```typescript
@@ -133,9 +132,22 @@ export interface McpServerOptions {
   /**
    * Logger for internal server messages.
    *
-   * By default, the server is quiet to avoid polluting output:
-   * - `error` and `warn` log to console.error
-   * - `info` and `debug` are silent (no-op)
+   * By default, the server is completely silent (all log levels are no-ops).
+   * Opt-in to logging by providing your own logger implementation.
+   *
+   * @example Using console for all logs
+   * ```typescript
+   * const server = new McpServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   logger: {
+   *     error: console.error,
+   *     warn: console.warn,
+   *     info: console.info,
+   *     debug: console.debug,
+   *   }
+   * });
+   * ```
    *
    * @example Using a custom logger
    * ```typescript
@@ -151,7 +163,7 @@ export interface McpServerOptions {
    * });
    * ```
    *
-   * @example Enabling verbose logging
+   * @example Partial logging (errors and warnings only)
    * ```typescript
    * const server = new McpServer({
    *   name: "my-server",
@@ -159,22 +171,8 @@ export interface McpServerOptions {
    *   logger: {
    *     error: console.error,
    *     warn: console.warn,
-   *     info: console.info,  // Enable info logs
-   *     debug: console.debug, // Enable debug logs
-   *   }
-   * });
-   * ```
-   *
-   * @example Disabling all logs
-   * ```typescript
-   * const server = new McpServer({
-   *   name: "my-server",
-   *   version: "1.0.0",
-   *   logger: {
-   *     error: () => {},
-   *     warn: () => {},
-   *     info: () => {},
-   *     debug: () => {},
+   *     info: () => {},   // Silent
+   *     debug: () => {},  // Silent
    *   }
    * });
    * ```
@@ -340,11 +338,11 @@ export class McpServer {
       version: options.version,
     };
     this.schemaAdapter = options.schemaAdapter;
-    // Default logger is quiet by default - only errors and warnings are logged
-    // This is a sensible default for a library to avoid polluting output
+    // Default logger is completely silent - libraries should be quiet by default
+    // Users can opt-in to logging by providing their own logger
     this.logger = options.logger || {
-      error: console.error,
-      warn: console.error,
+      error: () => {}, // no-op
+      warn: () => {}, // no-op
       info: () => {}, // no-op
       debug: () => {}, // no-op
     };
