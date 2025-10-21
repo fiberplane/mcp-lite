@@ -1,0 +1,13 @@
+{
+  "name": "starter-mcp-supabase",
+  "type": "module",
+  "scripts": {
+    "dev": "supabase functions serve mcp-server",
+    "deploy": "supabase functions deploy mcp-server",
+    "typecheck": "deno check supabase/functions/mcp-server/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.9.12",
+    "mcp-lite": "^0.8.1"
+  }
+}
