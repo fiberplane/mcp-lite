@@ -2,6 +2,7 @@ import type { EventId } from "./session-store.js";
 
 export interface StreamWriter {
   write(message: unknown, eventId?: EventId): void;
+  writeComment(comment: string): void;
   end(): void;
 }
 
@@ -41,6 +42,14 @@ export function createSSEStream(options?: { onClose?: () => void }): {
         if (eventId) sse += `id: ${eventId}\n`;
         sse += `data: ${JSON.stringify(message)}\n\n`;
         controller.enqueue(encoder.encode(sse));
+      } catch (_error) {
+        end();
+      }
+    },
+    writeComment(comment: string): void {
+      if (closed) return;
+      try {
+        controller.enqueue(encoder.encode(`: ${comment}\n\n`));
       } catch (_error) {
         end();
       }

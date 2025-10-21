@@ -103,9 +103,14 @@ interface ElicitationJsonSchema {
   additionalProperties?: boolean;
 }
 
+interface Logger {
+  warn(message: string, ...args: unknown[]): void;
+}
+
 export function toElicitationRequestedSchema(
   schema: unknown,
   strict = false,
+  logger?: Logger,
 ): ElicitationJsonSchema {
   // Handle Standard Schema inputs by converting to JSON Schema first
   if (isStandardSchema(schema)) {
@@ -147,12 +152,23 @@ export function toElicitationRequestedSchema(
   const validRequired: string[] = [];
 
   for (const [propName, propSchema] of Object.entries(properties)) {
-    const projectedProp = projectPropertyToElicitation(propSchema, strict);
+    const projectedProp = projectPropertyToElicitation(
+      propSchema,
+      strict,
+      logger,
+      propName,
+    );
     if (projectedProp !== null) {
       elicitationProperties[propName] = projectedProp;
       if (requiredArray.includes(propName)) {
         validRequired.push(propName);
       }
+    } else if (logger) {
+      // Property was dropped - log a warning
+      const propType = (propSchema as Record<string, unknown>)?.type;
+      logger.warn(
+        `[mcp-lite] Elicitation schema projection: Dropped property "${propName}" with unsupported type "${propType}"`,
+      );
     }
   }
 
@@ -171,6 +187,8 @@ export function toElicitationRequestedSchema(
 function projectPropertyToElicitation(
   propSchema: unknown,
   strict: boolean,
+  logger?: Logger,
+  propName?: string,
 ): unknown | null {
   if (!propSchema || typeof propSchema !== "object") {
     if (strict) {
@@ -218,6 +236,10 @@ function projectPropertyToElicitation(
           result.format = prop.format;
         } else if (strict) {
           throw new Error(`Unsupported string format: ${prop.format}`);
+        } else if (logger && propName) {
+          logger.warn(
+            `[mcp-lite] Elicitation schema projection: Ignoring unsupported string format "${prop.format}" for property "${propName}"`,
+          );
         }
       }
 
@@ -236,6 +258,10 @@ function projectPropertyToElicitation(
           }
         } else if (strict) {
           throw new Error("Enum values must be strings for elicitation");
+        } else if (logger && propName) {
+          logger.warn(
+            `[mcp-lite] Elicitation schema projection: Dropping non-string enum values for property "${propName}"`,
+          );
         }
       }
     }

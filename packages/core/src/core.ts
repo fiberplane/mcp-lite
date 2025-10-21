@@ -1306,6 +1306,7 @@ export class McpServer {
       clientCapabilities: contextOptions.clientCapabilities,
       schemaAdapter: this.schemaAdapter,
       clientRequestSender: this.clientRequestSender,
+      logger: this.logger,
     });
 
     const method = (message as JsonRpcMessage).method;

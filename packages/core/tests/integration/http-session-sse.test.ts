@@ -61,8 +61,8 @@ describe("Session SSE Happy Path", () => {
     // Open session SSE stream
     const sseStream = await openSessionStream(testServer.url, sessionId);
 
-    // Start collecting SSE events (expect 3 progress events + 1 connection event = 4 total)
-    const ssePromise = collectSseEventsCount(sseStream, 4);
+    // Start collecting SSE events (expect 3 progress events)
+    const ssePromise = collectSseEventsCount(sseStream, 3);
 
     // Trigger tool call with progress token
     const toolResponse = await fetch(testServer.url, {
@@ -95,29 +95,21 @@ describe("Session SSE Happy Path", () => {
     // Close the session after we've collected events
     await closeSession(testServer.url, sessionId);
 
-    // Verify we received 4 events total (1 ping + 3 progress notifications)
-    expect(events).toHaveLength(4);
+    // Verify we received 3 events total (3 progress notifications)
+    expect(events).toHaveLength(3);
 
-    // First event should be ping to establish connection (no ID)
-    expect(events[0].id).toBeUndefined();
-    expect(events[0].data).toEqual({
-      jsonrpc: "2.0",
-      method: "ping",
-      params: {},
-    });
-
-    // Next 3 events should be progress notifications with IDs (1, 2, 3) suffixed by _GET_stream
-    for (let i = 1; i <= 3; i++) {
+    // All 3 events should be progress notifications with IDs (1, 2, 3) suffixed by _GET_stream
+    for (let i = 0; i < 3; i++) {
       const event = events[i];
-      expect(event.id).toBe(`${String(i)}#_GET_stream`);
+      expect(event.id).toBe(`${String(i + 1)}#_GET_stream`);
       expect(event.data).toEqual({
         jsonrpc: "2.0",
         method: "notifications/progress",
         params: {
           progressToken: "abc123",
-          progress: i,
+          progress: i + 1,
           total: 3,
-          message: `step ${i}`,
+          message: `step ${i + 1}`,
         },
       });
     }
@@ -247,24 +239,16 @@ describe("Session SSE Happy Path", () => {
 
     const events = await ssePromise;
 
-    // Should receive 5 events total (1 ping + 4 progress)
-    expect(events).toHaveLength(5);
-
-    // First event should be ping to establish connection (no ID)
-    expect(events[0].id).toBeUndefined();
-    expect(events[0].data).toEqual({
-      jsonrpc: "2.0",
-      method: "ping",
-      params: {},
-    });
+    // Should receive 4 events total (4 progress)
+    expect(events).toHaveLength(4);
 
     // Verify monotonic event IDs for progress events (1, 2, 3, 4) with _GET_stream suffix
-    for (let i = 1; i <= 4; i++) {
-      expect(events[i].id).toBe(`${i}#_GET_stream`);
+    for (let i = 0; i < 4; i++) {
+      expect(events[i].id).toBe(`${i + 1}#_GET_stream`);
     }
 
     // Verify first two progress events are from token1
-    expect(events[1].data).toEqual({
+    expect(events[0].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/progress",
       params: {
@@ -275,7 +259,7 @@ describe("Session SSE Happy Path", () => {
       },
     });
 
-    expect(events[2].data).toEqual({
+    expect(events[1].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/progress",
       params: {
@@ -287,7 +271,7 @@ describe("Session SSE Happy Path", () => {
     });
 
     // Verify next two progress events are from token2
-    expect(events[3].data).toEqual({
+    expect(events[2].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/progress",
       params: {
@@ -298,7 +282,7 @@ describe("Session SSE Happy Path", () => {
       },
     });
 
-    expect(events[4].data).toEqual({
+    expect(events[3].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/progress",
       params: {
@@ -407,7 +391,7 @@ describe("Session SSE Happy Path", () => {
 
     // Open session SSE stream
     const sseStream = await openSessionStream(testServer.url, sessionId);
-    const ssePromise = collectSseEvents(sseStream);
+    const ssePromise = collectSseEvents(sseStream, 1000); // Short timeout since we expect no events
 
     // Tool call without progress token
     await fetch(testServer.url, {
@@ -433,16 +417,8 @@ describe("Session SSE Happy Path", () => {
 
     const events = await ssePromise;
 
-    // Should receive only the ping event (no progress notifications without progressToken)
-    expect(events).toHaveLength(1);
-
-    // First event should be ping to establish connection (no ID)
-    expect(events[0].id).toBeUndefined();
-    expect(events[0].data).toEqual({
-      jsonrpc: "2.0",
-      method: "ping",
-      params: {},
-    });
+    // Should receive no events (no progress notifications without progressToken, and no ping)
+    expect(events).toHaveLength(0);
   });
 });
 

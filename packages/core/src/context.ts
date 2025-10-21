@@ -22,6 +22,10 @@ import {
   toElicitationRequestedSchema,
 } from "./validation.js";
 
+interface Logger {
+  warn(message: string, ...args: unknown[]): void;
+}
+
 export interface CreateContextOptions {
   sessionId?: string;
   sessionProtocolVersion?: string;
@@ -42,6 +46,7 @@ export interface CreateContextOptions {
     request: JsonRpcReq,
     options?: { relatedRequestId?: string | number; timeout_ms?: number },
   ) => Promise<JsonRpcRes>;
+  logger?: Logger;
 }
 
 /**
@@ -114,6 +119,7 @@ export function createContext(
       const requestedSchema = toElicitationRequestedSchema(
         resolvedSchema,
         elicitOptions?.strict,
+        options.logger,
       );
 
       // 4. Build JSON-RPC request

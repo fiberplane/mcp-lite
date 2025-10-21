@@ -215,7 +215,7 @@ describe("Elicitation E2E Tests", () => {
     expect(sseResponse.status).toBe(200);
 
     // Set up event collection from the SSE stream
-    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call (without SSE - regular POST)
     const toolPromise = handler(
@@ -240,10 +240,10 @@ describe("Elicitation E2E Tests", () => {
 
     // Wait for events from SSE stream
     const events = await sseEventPromise;
-    expect(events).toHaveLength(2); // ping + elicitation
+    expect(events).toHaveLength(1); // elicitation
 
     // First event is ping, second is elicitation
-    const elicitationData = events[1].data as any;
+    const elicitationData = events[0].data as any;
     expect(elicitationData.method).toBe("elicitation/create");
     expect(elicitationData.params.message).toBe("Please provide your name");
 
@@ -353,7 +353,7 @@ describe("Elicitation E2E Tests", () => {
     expect(sseResponse.status).toBe(200);
 
     // Start collecting SSE events (ping + elicitation = 2 events)
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -378,10 +378,10 @@ describe("Elicitation E2E Tests", () => {
 
     // Wait for elicitation request via SSE
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
     // First event is ping, second is elicitation
-    const elicitationData = events[1].data as any;
+    const elicitationData = events[0].data as any;
     expect(elicitationData.method).toBe("elicitation/create");
     expect(elicitationData.params.message).toBe("Please provide your age");
 
@@ -487,7 +487,7 @@ describe("Elicitation E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -512,9 +512,9 @@ describe("Elicitation E2E Tests", () => {
 
     // Get elicitation request from SSE
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
-    const elicitationData = events[1].data as any;
+    const elicitationData = events[0].data as any;
     expect(elicitationData.method).toBe("elicitation/create");
 
     // Respond with cancel
@@ -723,7 +723,7 @@ describe("Elicitation E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -748,9 +748,9 @@ describe("Elicitation E2E Tests", () => {
 
     // Get elicitation request
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
-    const elicitationData = events[1].data as any;
+    const elicitationData = events[0].data as any;
     expect(elicitationData.method).toBe("elicitation/create");
 
     // Respond with invalid data (string instead of number for age)
@@ -857,7 +857,7 @@ describe("Elicitation E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -882,9 +882,9 @@ describe("Elicitation E2E Tests", () => {
 
     // Get elicitation request
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
-    const elicitationData = events[1].data as any;
+    const elicitationData = events[0].data as any;
     expect(elicitationData.method).toBe("elicitation/create");
 
     // Respond with JSON-RPC error instead of result
@@ -1221,7 +1221,7 @@ describe("Elicitation E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -1245,9 +1245,9 @@ describe("Elicitation E2E Tests", () => {
     );
 
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
-    const elicitationData = events[1].data as any;
+    const elicitationData = events[0].data as any;
     expect(elicitationData.params.requestedSchema.type).toBe("object");
     expect(elicitationData.params.requestedSchema.properties).toEqual({});
 
