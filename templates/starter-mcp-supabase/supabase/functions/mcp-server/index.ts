@@ -5,9 +5,15 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
+
 import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
+
+// We create two Hono instances:
+// 1. `app` is the root handler for the Supabase Edge Function (must match the function name, e.g. /mcp-server)
+// 2. `mcpApp` handles the MCP protocol and health endpoints, mounted under the function route
+// This pattern is required because Supabase Edge Functions route all requests to /<function-name>/*
 
 const mcp = new McpServer({
   name: "starter-mcp-supabase-server",
