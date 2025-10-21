@@ -1,5 +1,6 @@
 import type { AuthInfo } from "./auth.js";
 import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSIONS } from "./constants.js";
+import type { Logger } from "./core.js";
 import { RpcError } from "./errors.js";
 import type {
   ElicitationResult,
@@ -21,10 +22,6 @@ import {
   resolveSchema,
   toElicitationRequestedSchema,
 } from "./validation.js";
-
-interface Logger {
-  warn(message: string, ...args: unknown[]): void;
-}
 
 export interface CreateContextOptions {
   sessionId?: string;

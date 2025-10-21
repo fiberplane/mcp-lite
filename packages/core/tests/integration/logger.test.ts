@@ -4,13 +4,16 @@ import { McpServer } from "../../src/core.js";
 import type { MCPServerContext } from "../../src/types.js";
 
 describe("Logger", () => {
-  it("should use console.error as default logger for all levels", () => {
+  it("should use quiet defaults - error/warn to console.error, info/debug silent", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
     const logger = server["logger"];
     expect(logger.error).toBe(console.error);
     expect(logger.warn).toBe(console.error);
-    expect(logger.info).toBe(console.error);
-    expect(logger.debug).toBe(console.error);
+    // info and debug should be no-ops (functions, not console methods)
+    expect(typeof logger.info).toBe("function");
+    expect(typeof logger.debug).toBe("function");
+    expect(logger.info).not.toBe(console.info);
+    expect(logger.debug).not.toBe(console.debug);
   });
 
   it("should use custom logger when provided", () => {

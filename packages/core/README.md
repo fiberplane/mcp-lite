@@ -193,6 +193,60 @@ const transport = new StreamableHttpTransport({
 })
 ```
 
+### Logging
+
+By default, `mcp-lite` is **quiet** to avoid polluting your application's output:
+- `error` and `warn` messages log to `console.error`
+- `info` and `debug` messages are silent (no-op)
+
+This is a sensible default for a library. You can customize logging by providing a `logger` option:
+
+```typescript
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: (msg, ...args) => myLogger.error(msg, ...args),
+    warn: (msg, ...args) => myLogger.warn(msg, ...args),
+    info: (msg, ...args) => myLogger.info(msg, ...args),  // Enable info logs
+    debug: (msg, ...args) => myLogger.debug(msg, ...args), // Enable debug logs
+  }
+});
+```
+
+**Common patterns:**
+
+```typescript
+// Enable verbose logging (show everything)
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: console.error,
+    warn: console.warn,
+    info: console.info,
+    debug: console.debug,
+  }
+});
+
+// Completely silent (disable all logs)
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: () => {},
+    warn: () => {},
+    info: () => {},
+    debug: () => {},
+  }
+});
+```
+
+The logger is used for internal server messages, including:
+- Schema validation warnings (when elicitation schemas are projected and properties are dropped)
+- Protocol version negotiation messages
+- Server composition warnings (when mounting child servers with duplicate tools/resources)
+
 ### DNS Rebinding Protection
 
 When running MCP servers locally, you should protect against [DNS rebinding attacks](https://en.wikipedia.org/wiki/DNS_rebinding). An attacker can use DNS rebinding to make your browser send requests to your local MCP server from a malicious website.

@@ -209,6 +209,8 @@ export class StreamableHttpTransport {
   ) => Promise<Response> {
     // Check if this server has already been bound to a transport
     if (this.boundServers.has(server)) {
+      // Note: Using console.warn here (not server logger) because this is a transport-level
+      // warning that occurs during binding setup, before normal server operation
       console.warn(
         "[mcp-lite] WARNING: Binding an HTTP transport multiple times to the same server can break stateful servers. " +
           "The transport overrides methods in the server for sending notifications and requests. " +

@@ -1,3 +1,4 @@
+import type { Logger } from "./core.js";
 import { RpcError } from "./errors.js";
 import type { PromptArgumentDef, SchemaAdapter } from "./types.js";
 import { isStandardSchema, JSON_RPC_ERROR_CODES } from "./types.js";
@@ -101,10 +102,6 @@ interface ElicitationJsonSchema {
   properties: Record<string, unknown>;
   required?: string[];
   additionalProperties?: boolean;
-}
-
-interface Logger {
-  warn(message: string, ...args: unknown[]): void;
 }
 
 export function toElicitationRequestedSchema(
