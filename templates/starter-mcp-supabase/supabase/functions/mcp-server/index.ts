@@ -8,12 +8,11 @@
 import { Hono } from "hono";
 import { McpServer, StreamableHttpTransport } from "mcp-lite";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const mcp = new McpServer({
   name: "starter-mcp-supabase-server",
   version: "1.0.0",
-  schemaAdapter: (schema: unknown) => zodToJsonSchema(schema as z.ZodType),
+  schemaAdapter: (schema: unknown) => z.toJSONSchema(schema as z.ZodType),
 });
 
 mcp.tool("sum", {
@@ -32,24 +31,23 @@ const httpHandler = transport.bind(mcp);
 
 const app = new Hono();
 
-// Create a sub-app for the MCP server (following your pattern)
 const mcpApp = new Hono();
 
 mcpApp.get("/", (c) => {
-  return c.json({ 
-    message: "MCP Server on Supabase Edge Functions", 
+  return c.json({
+    message: "MCP Server on Supabase Edge Functions",
     endpoints: {
       mcp: "/mcp",
-      health: "/health"
-    }
+      health: "/health",
+    },
   });
 });
 
 mcpApp.get("/health", (c) => {
   return c.json({
-    message: "Service is up and running"
-  })
-})
+    message: "Service is up and running",
+  });
+});
 
 mcpApp.all("/mcp", async (c) => {
   const response = await httpHandler(c.req.raw);

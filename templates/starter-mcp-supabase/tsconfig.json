@@ -13,11 +13,6 @@
     "rootDir": "./supabase/functions",
     "types": ["https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts"]
   },
-  "include": [
-    "supabase/functions/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["supabase/functions/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
