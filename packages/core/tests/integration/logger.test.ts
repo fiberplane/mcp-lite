@@ -4,9 +4,13 @@ import { McpServer } from "../../src/core.js";
 import type { MCPServerContext } from "../../src/types.js";
 
 describe("Logger", () => {
-  it("should use console as default logger", () => {
+  it("should use console.error as default logger for all levels", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
-    expect(server["logger"]).toBe(console);
+    const logger = server["logger"];
+    expect(logger.error).toBe(console.error);
+    expect(logger.warn).toBe(console.error);
+    expect(logger.info).toBe(console.error);
+    expect(logger.debug).toBe(console.error);
   });
 
   it("should use custom logger when provided", () => {

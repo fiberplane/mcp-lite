@@ -88,7 +88,17 @@ async function runMiddlewares(
 
 /**
  * Logger interface for MCP server internal logging.
- * Defaults to console if not provided.
+ * All log levels default to console.error (stderr) if not provided.
+ *
+ * @example Custom logger
+ * ```typescript
+ * const logger: Logger = {
+ *   error: (msg, ...args) => myLogger.error(msg, ...args),
+ *   warn: (msg, ...args) => myLogger.warn(msg, ...args),
+ *   info: (msg, ...args) => myLogger.info(msg, ...args),
+ *   debug: (msg, ...args) => myLogger.debug(msg, ...args),
+ * };
+ * ```
  */
 export interface Logger {
   error(message: string, ...args: unknown[]): void;
@@ -119,7 +129,7 @@ export interface McpServerOptions {
   schemaAdapter?: SchemaAdapter;
   /**
    * Logger for internal server messages.
-   * Defaults to console if not provided.
+   * Defaults to console.error (stderr) for all log levels if not provided.
    *
    * @example Using a custom logger
    * ```typescript
@@ -310,7 +320,13 @@ export class McpServer {
       version: options.version,
     };
     this.schemaAdapter = options.schemaAdapter;
-    this.logger = options.logger || console;
+    // Default logger writes all messages to stderr for better visibility
+    this.logger = options.logger || {
+      error: console.error,
+      warn: console.error,
+      info: console.error,
+      debug: console.error,
+    };
 
     this.methods = {
       [METHODS.INITIALIZE]: this.handleInitialize.bind(this),
