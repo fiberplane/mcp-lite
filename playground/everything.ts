@@ -529,6 +529,8 @@ mcp.tool("collectFormData", {
 
     try {
       // Create a comprehensive form schema
+      // NOTE: Elicitation schemas only support primitives (string, number, boolean) and string enums
+      // Arrays and nested objects are not supported and will be dropped with a warning
       const formSchema = z.object({
         name: z.string().min(1, "Name is required"),
         email: z.string().email("Please enter a valid email"),
@@ -539,10 +541,10 @@ mcp.tool("collectFormData", {
           : z.enum(["beginner", "intermediate", "advanced"]),
         interests: args.includeOptional
           ? z
-              .array(z.string())
+              .string()
               .optional()
-              .describe("List of interests (optional)")
-          : z.array(z.string()).min(1, "At least one interest is required"),
+              .describe("Comma-separated list of interests (optional)")
+          : z.string().min(1, "List your interests, separated by commas"),
         newsletter: args.includeOptional
           ? z.boolean().optional().default(false)
           : z.boolean().default(false),
@@ -554,16 +556,16 @@ Please fill out the following form:
 
 Required fields:
 - Name: Your full name
-- Email: Valid email address  
+- Email: Valid email address
 - Age: Your age (13-120)
 - Role: Your professional role (developer, designer, manager, other)
+${args.includeOptional ? "- Interests: Comma-separated list of your interests" : "- Interests: Comma-separated list of your interests"}
 
 ${
   args.includeOptional
     ? `
 Optional fields:
 - Experience: Your experience level (beginner, intermediate, advanced)
-- Interests: List of your interests
 - Newsletter: Whether you want to receive newsletters
 `
     : ""
@@ -618,7 +620,7 @@ Please provide all the requested information.`;
 - Role: ${formData.role}
 ${formData.experience ? `- Experience: ${formData.experience}` : ""}
 
-${formData.interests && formData.interests.length > 0 ? `**Interests:** ${formData.interests.join(", ")}` : ""}
+${formData.interests ? `**Interests:** ${formData.interests}` : ""}
 ${formData.newsletter !== undefined ? `**Newsletter:** ${formData.newsletter ? "Yes" : "No"}` : ""}
 
 Thank you for providing your information!`,
