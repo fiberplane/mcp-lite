@@ -1,0 +1,12 @@
+
+# Minimal config for running only Edge Functions (no DB, storage, or studio)
+project_id = "starter-mcp-supabase"
+
+[api]
+enabled = true
+port = 54321
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+deno_version = 2

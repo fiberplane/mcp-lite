@@ -1,0 +1,15 @@
+{
+  "name": "starter-mcp-supabase",
+  "type": "module",
+  "scripts": {
+    "dev": "supabase functions serve --no-verify-jwt mcp-server",
+    "deploy": "supabase functions deploy --no-verify-jwt mcp-server"
+  },
+  "dependencies": {
+    "hono": "^4.9.12",
+    "mcp-lite": "^0.8.1"
+  },
+  "devDependencies": {
+    "supabase": "^2.53.6"
+  }
+}

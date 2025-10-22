@@ -2,7 +2,7 @@
 
 A small, fetch-first implementation of the Model Context Protocol (MCP) server APIs.
 
-`mcp-lite` is a ground-up rewrite of the TypeScript MCP SDK. It keeps only the pieces you need to stand up a server: JSON-RPC handling, typed tool definitions, and an HTTP + SSE transport that works anywhere `Request` and `Response` are available (Node, Bun, Cloudflare Workers, Deno, browsers with Service Workers).
+`mcp-lite` is a ground-up rewrite of the TypeScript MCP SDK. It keeps only the pieces you need to stand up a server: JSON-RPC handling, typed tool definitions, and an HTTP + SSE transport that works anywhere `Request` and `Response` are available (Node, Bun, Cloudflare Workers, Deno, Supabase Edge Functions, browsers with Service Workers).
 
 You get:
 - A minimal core (`packages/core`) with zero runtime dependencies.

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+*.log
+*.lock
+
+# Supabase
+.branches
+.temp
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# Deno
+.deno/

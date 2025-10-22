@@ -15,6 +15,7 @@ import type { Template } from "../types";
 const TEMPLATE_URLS: Record<Template, string> = {
   bun: "github:fiberplane/mcp-lite/templates/starter-mcp-bun",
   cloudflare: "github:fiberplane/mcp-lite/templates/starter-mcp-cloudflare",
+  supabase: "github:fiberplane/mcp-lite/templates/starter-mcp-supabase",
   "chatgpt-app-sdk":
     "github:fiberplane/mcp-lite/templates/starter-chatgpt-app-sdk",
 };
@@ -32,7 +33,7 @@ function getLocalTemplatePath(template: Template): string | null {
 
   // Map template names to their directory names
   const templateDir =
-    template === "bun" || template === "cloudflare"
+    template === "bun" || template === "cloudflare" || template === "supabase"
       ? `starter-mcp-${template}`
       : `starter-${template}`;
 
