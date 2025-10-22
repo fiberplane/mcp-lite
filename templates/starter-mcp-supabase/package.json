@@ -2,8 +2,8 @@
   "name": "starter-mcp-supabase",
   "type": "module",
   "scripts": {
-    "dev": "supabase functions serve mcp-server",
-    "deploy": "supabase functions deploy mcp-server",
+    "dev": "supabase functions serve --no-verify-jwt mcp-server",
+    "deploy": "supabase functions deploy --no-verify-jwt mcp-server",
     "typecheck": "deno check supabase/functions/mcp-server/index.ts"
   },
   "dependencies": {
