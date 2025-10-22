@@ -314,16 +314,11 @@ describe("Per-request SSE", () => {
 
     // Read from session stream with a short timeout (should be empty of replayed data events)
     const sessionEvents = await collectSseEvents(response.body, 1000);
-    // Ignore ping event used for connection establishment
-    const dataEvents = sessionEvents.filter(
-      // biome-ignore lint/suspicious/noExplicitAny: tests
-      (e) => !(e.data && (e as any)?.data?.method === "ping"),
-    );
 
     // Close session after reading
     await closeSession(testServer.url, sessionId);
 
     // Should be empty - request stream events are ephemeral
-    expect(dataEvents).toHaveLength(0);
+    expect(sessionEvents).toHaveLength(0);
   });
 });

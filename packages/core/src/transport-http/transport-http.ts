@@ -58,6 +58,7 @@ export class StreamableHttpTransport {
   private allowedHosts?: string[];
   private sessionStreams = new Map<string, StreamWriter>(); // sessionId → GET stream writer
   private requestStreams = new Map<string, StreamWriter>(); // "sessionId:requestId" → POST stream writer
+  private boundServers = new WeakSet<McpServer>(); // Track which servers have been bound
 
   constructor(options: StreamableHttpTransportOptions = {}) {
     this.sessionAdapter = options.sessionAdapter;
@@ -206,7 +207,19 @@ export class StreamableHttpTransport {
     request: Request,
     options?: { authInfo?: AuthInfo },
   ) => Promise<Response> {
+    // Check if this server has already been bound to a transport
+    if (this.boundServers.has(server)) {
+      // Note: Using console.warn here (not server logger) because this is a transport-level
+      // warning that occurs during binding setup, before normal server operation
+      console.warn(
+        "[mcp-lite] WARNING: Binding an HTTP transport multiple times to the same server can break stateful servers. " +
+          "The transport overrides methods in the server for sending notifications and requests. " +
+          "Consider creating a new server instance or reusing the same transport instance.",
+      );
+    }
+
     this.server = server;
+    this.boundServers.add(server);
 
     // Wire up client request sender if adapter is available
     if (this.clientRequestAdapter) {
@@ -304,14 +317,40 @@ export class StreamableHttpTransport {
     if (this.allowedHosts) {
       const host = request.headers.get("Host");
       if (host && !this.allowedHosts.includes(host)) {
-        return new Response("Forbidden", { status: 403 });
+        return new Response(
+          JSON.stringify({
+            jsonrpc: JSON_RPC_VERSION,
+            error: {
+              code: -32000,
+              message: "Host header validation failed",
+            },
+            id: null,
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
     if (this.allowedOrigins) {
       const origin = request.headers.get("Origin");
       if (origin && !this.allowedOrigins.includes(origin)) {
-        return new Response("Forbidden", { status: 403 });
+        return new Response(
+          JSON.stringify({
+            jsonrpc: JSON_RPC_VERSION,
+            error: {
+              code: -32000,
+              message: "Origin header validation failed",
+            },
+            id: null,
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
@@ -796,11 +835,17 @@ export class StreamableHttpTransport {
     // Register the session stream
     this.sessionStreams.set(sessionId, writer);
 
+    // Send an SSE comment to establish the connection
+    // SSE streams need some initial data to properly establish the connection with the client.
+    // Without this, the client's SSE reader may not recognize the stream as "open" and will wait
+    // indefinitely for the first event. Comments (lines starting with ':') are part of the SSE spec
+    // and are ignored by clients but still flush the response and signal the stream is active.
+    // This is equivalent to Node.js's res.flushHeaders() but works in Fetch API environments.
+    writer.writeComment("stream ready");
+
     // Optional resume (store expects suffixed Last-Event-ID: "<n>#<streamId>")
     const lastEventId = request.headers.get(MCP_LAST_EVENT_ID_HEADER);
-    let attemptedReplay = false;
     if (lastEventId) {
-      attemptedReplay = true;
       try {
         await this.sessionAdapter.replay(sessionId, lastEventId, (eid, msg) => {
           writer.write(msg, eid);
@@ -811,22 +856,6 @@ export class StreamableHttpTransport {
           status: 500,
         });
       }
-    }
-
-    // Send a JSON-RPC ping to establish the SSE connection if we didn't attempt replay
-    // This is needed because SSE clients expect initial data to confirm the stream is working.
-    // If we attempted replay (even if it returned 0 events), we don't send ping because the
-    // client explicitly requested to resume from a specific point. If no replay was requested,
-    // we send a ping (not awaiting pong) just to establish the connection - this is not
-    // fully spec-compliant but ensures compatibility with MCP inspector (which expects
-    // valid JSON-RPC format) while maintaining SSE stream functionality.
-    if (!attemptedReplay) {
-      const pingNotification = {
-        jsonrpc: JSON_RPC_VERSION,
-        method: "ping",
-        params: {},
-      };
-      writer.write(pingNotification);
     }
 
     return new Response(stream as ReadableStream, {

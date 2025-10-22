@@ -215,7 +215,7 @@ describe("Sampling E2E Tests", () => {
     expect(sseResponse.status).toBe(200);
 
     // Set up event collection from the SSE stream
-    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call (without SSE - regular POST)
     const toolPromise = handler(
@@ -240,10 +240,10 @@ describe("Sampling E2E Tests", () => {
 
     // Wait for events from SSE stream
     const events = await sseEventPromise;
-    expect(events).toHaveLength(2); // ping + sampling
+    expect(events).toHaveLength(1); // sampling
 
-    // First event is ping, second is sampling
-    const samplingData = events[1].data as any;
+    // First event is sampling
+    const samplingData = events[0].data as any;
     expect(samplingData.method).toBe("sampling/createMessage");
     // We send a single user message
     expect(samplingData.params.messages).toHaveLength(1);
@@ -376,7 +376,7 @@ describe("Sampling E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     const toolPromise = handler(
       new Request("http://localhost:3000/", {
@@ -399,7 +399,7 @@ describe("Sampling E2E Tests", () => {
     );
 
     const events = await sseEventPromise;
-    const samplingData = events[1].data as any;
+    const samplingData = events[0].data as any;
 
     // Send response with image content
     await handler(
@@ -608,7 +608,7 @@ describe("Sampling E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -633,9 +633,9 @@ describe("Sampling E2E Tests", () => {
 
     // Get sampling request
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
-    const samplingData = events[1].data as any;
+    const samplingData = events[0].data as any;
     expect(samplingData.method).toBe("sampling/createMessage");
 
     // Respond with invalid data (missing required content field)
@@ -739,7 +739,7 @@ describe("Sampling E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const ssePromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const ssePromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     // Start tool call
     const toolPromise = handler(
@@ -764,9 +764,9 @@ describe("Sampling E2E Tests", () => {
 
     // Get sampling request
     const events = await ssePromise;
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
 
-    const samplingData = events[1].data as any;
+    const samplingData = events[0].data as any;
     expect(samplingData.method).toBe("sampling/createMessage");
 
     // Respond with JSON-RPC error instead of result
@@ -1088,7 +1088,7 @@ describe("Sampling E2E Tests", () => {
     );
     expect(sseResponse.status).toBe(200);
 
-    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 2, 5000);
+    const sseEventPromise = collectSseEventsCount(sseResponse.body!, 1, 5000);
 
     const toolPromise = handler(
       new Request("http://localhost:3000/", {
@@ -1111,7 +1111,7 @@ describe("Sampling E2E Tests", () => {
     );
 
     const events = await sseEventPromise;
-    const samplingData = events[1].data as any;
+    const samplingData = events[0].data as any;
 
     // Verify model preferences were passed through
     expect(samplingData.params.modelPreferences).toBeDefined();

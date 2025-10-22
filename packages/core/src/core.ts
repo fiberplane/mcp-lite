@@ -88,7 +88,19 @@ async function runMiddlewares(
 
 /**
  * Logger interface for MCP server internal logging.
- * Defaults to console if not provided.
+ *
+ * By default, the server is completely silent (all log levels are no-ops).
+ * Opt-in to logging by providing your own logger implementation.
+ *
+ * @example Custom logger
+ * ```typescript
+ * const logger: Logger = {
+ *   error: (msg, ...args) => myLogger.error(msg, ...args),
+ *   warn: (msg, ...args) => myLogger.warn(msg, ...args),
+ *   info: (msg, ...args) => myLogger.info(msg, ...args),
+ *   debug: (msg, ...args) => myLogger.debug(msg, ...args),
+ * };
+ * ```
  */
 export interface Logger {
   error(message: string, ...args: unknown[]): void;
@@ -119,7 +131,23 @@ export interface McpServerOptions {
   schemaAdapter?: SchemaAdapter;
   /**
    * Logger for internal server messages.
-   * Defaults to console if not provided.
+   *
+   * By default, the server is completely silent (all log levels are no-ops).
+   * Opt-in to logging by providing your own logger implementation.
+   *
+   * @example Using console for all logs
+   * ```typescript
+   * const server = new McpServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   logger: {
+   *     error: console.error,
+   *     warn: console.warn,
+   *     info: console.info,
+   *     debug: console.debug,
+   *   }
+   * });
+   * ```
    *
    * @example Using a custom logger
    * ```typescript
@@ -135,16 +163,16 @@ export interface McpServerOptions {
    * });
    * ```
    *
-   * @example Disabling logs
+   * @example Partial logging (errors and warnings only)
    * ```typescript
    * const server = new McpServer({
    *   name: "my-server",
    *   version: "1.0.0",
    *   logger: {
-   *     error: () => {},
-   *     warn: () => {},
-   *     info: () => {},
-   *     debug: () => {},
+   *     error: console.error,
+   *     warn: console.warn,
+   *     info: () => {},   // Silent
+   *     debug: () => {},  // Silent
    *   }
    * });
    * ```
@@ -310,7 +338,14 @@ export class McpServer {
       version: options.version,
     };
     this.schemaAdapter = options.schemaAdapter;
-    this.logger = options.logger || console;
+    // Default logger is completely silent - libraries should be quiet by default
+    // Users can opt-in to logging by providing their own logger
+    this.logger = options.logger || {
+      error: () => {}, // no-op
+      warn: () => {}, // no-op
+      info: () => {}, // no-op
+      debug: () => {}, // no-op
+    };
 
     this.methods = {
       [METHODS.INITIALIZE]: this.handleInitialize.bind(this),
@@ -1306,6 +1341,7 @@ export class McpServer {
       clientCapabilities: contextOptions.clientCapabilities,
       schemaAdapter: this.schemaAdapter,
       clientRequestSender: this.clientRequestSender,
+      logger: this.logger,
     });
 
     const method = (message as JsonRpcMessage).method;

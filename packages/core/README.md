@@ -193,6 +193,84 @@ const transport = new StreamableHttpTransport({
 })
 ```
 
+### Logging
+
+By default, `mcp-lite` is **completely silent** (all log levels are no-ops). This follows the adapter pattern used throughout mcp-lite - you opt-in when you need it.
+
+Enable logging by providing a `logger` option:
+
+```typescript
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: console.error,
+    warn: console.warn,
+    info: console.info,
+    debug: console.debug,
+  }
+});
+```
+
+**Common patterns:**
+
+```typescript
+// Errors and warnings only
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: console.error,
+    warn: console.warn,
+    info: () => {},   // Silent
+    debug: () => {},  // Silent
+  }
+});
+
+// Custom logger (e.g., pino, winston)
+const mcp = new McpServer({
+  name: "my-server",
+  version: "1.0.0",
+  logger: {
+    error: (msg, ...args) => myLogger.error(msg, ...args),
+    warn: (msg, ...args) => myLogger.warn(msg, ...args),
+    info: (msg, ...args) => myLogger.info(msg, ...args),
+    debug: (msg, ...args) => myLogger.debug(msg, ...args),
+  }
+});
+```
+
+The logger is used for internal server messages, including:
+- Schema validation warnings (when elicitation schemas are projected and properties are dropped)
+- Protocol version negotiation messages
+- Server composition warnings (when mounting child servers with duplicate tools/resources)
+
+### DNS Rebinding Protection
+
+When running MCP servers locally, you should protect against [DNS rebinding attacks](https://en.wikipedia.org/wiki/DNS_rebinding). An attacker can use DNS rebinding to make your browser send requests to your local MCP server from a malicious website.
+
+`StreamableHttpTransport` provides `allowedHosts` and `allowedOrigins` options to validate the `Host` and `Origin` headers:
+
+```typescript
+const transport = new StreamableHttpTransport({
+  // Validate Host header to prevent DNS rebinding
+  allowedHosts: ['127.0.0.1', 'localhost', 'localhost:3000'],
+
+  // Validate Origin header for CORS
+  allowedOrigins: ['https://yourdomain.com', 'https://www.yourdomain.com'],
+
+  sessionAdapter: new InMemorySessionAdapter(),
+})
+```
+
+**Best practices:**
+
+- **Local development:** Always set `allowedHosts` when running locally to prevent DNS rebinding attacks. Include only the specific host addresses you expect (e.g., `127.0.0.1`, `localhost:3000`).
+- **Production:** Use `allowedOrigins` to restrict which web applications can connect to your MCP server via CORS.
+- **Both together:** You can use both options simultaneously for defense in depth.
+
+If a request fails validation, the transport returns a JSON-RPC error response with code `-32000`.
+
 ### Built-in Adapters
 
 - `InMemorySessionAdapter` - Session storage in memory

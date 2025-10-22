@@ -8,7 +8,7 @@ type PackageJson = {
 };
 
 const packageJsonUrl = new URL("../package.json", import.meta.url);
-const packageJson = await Bun.file(packageJsonUrl).json() as PackageJson;
+const packageJson = (await Bun.file(packageJsonUrl).json()) as PackageJson;
 
 await $`rm -rf dist`;
 

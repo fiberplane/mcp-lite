@@ -1,5 +1,6 @@
 import type { AuthInfo } from "./auth.js";
 import { METHODS, SUPPORTED_MCP_PROTOCOL_VERSIONS } from "./constants.js";
+import type { Logger } from "./core.js";
 import { RpcError } from "./errors.js";
 import type {
   ElicitationResult,
@@ -42,6 +43,7 @@ export interface CreateContextOptions {
     request: JsonRpcReq,
     options?: { relatedRequestId?: string | number; timeout_ms?: number },
   ) => Promise<JsonRpcRes>;
+  logger?: Logger;
 }
 
 /**
@@ -114,6 +116,7 @@ export function createContext(
       const requestedSchema = toElicitationRequestedSchema(
         resolvedSchema,
         elicitOptions?.strict,
+        options.logger,
       );
 
       // 4. Build JSON-RPC request

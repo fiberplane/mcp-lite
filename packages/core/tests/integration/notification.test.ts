@@ -187,18 +187,12 @@ describe("List changed notifications over SSE", () => {
       handler: () => ({ content: [{ type: "text", text: "ok" }] }),
     });
 
-    const events = await collectSseEventsCount(sse, 2, 2000);
+    const events = await collectSseEventsCount(sse, 1, 2000);
     await closeSession(testServer.url, sessionId);
 
-    expect(events).toHaveLength(2);
-    // First event is ping to establish connection
+    expect(events).toHaveLength(1);
+    // First event is the notification
     expect(events[0].data).toEqual({
-      jsonrpc: "2.0",
-      method: "ping",
-      params: {},
-    });
-    // Second is the notification
-    expect(events[1].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
       params: undefined,
@@ -219,16 +213,11 @@ describe("List changed notifications over SSE", () => {
       handler: () => ({ messages: [] }),
     });
 
-    const events = await collectSseEventsCount(sse, 2, 2000);
+    const events = await collectSseEventsCount(sse, 1, 2000);
     await closeSession(testServer.url, sessionId);
 
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
     expect(events[0].data).toEqual({
-      jsonrpc: "2.0",
-      method: "ping",
-      params: {},
-    });
-    expect(events[1].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/prompts/list_changed",
       params: undefined,
@@ -252,16 +241,11 @@ describe("List changed notifications over SSE", () => {
       }),
     );
 
-    const events = await collectSseEventsCount(sse, 2, 2000);
+    const events = await collectSseEventsCount(sse, 1, 2000);
     await closeSession(testServer.url, sessionId);
 
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(1);
     expect(events[0].data).toEqual({
-      jsonrpc: "2.0",
-      method: "ping",
-      params: {},
-    });
-    expect(events[1].data).toEqual({
       jsonrpc: "2.0",
       method: "notifications/resources/list_changed",
       params: undefined,
