@@ -1,5 +1,11 @@
 # create-mcp-lite
 
+## 0.3.0
+
+### Minor Changes
+
+- 06d4aa8: Add a starter mcp supabase template
+
 ## 0.2.0
 
 ### Minor Changes
