@@ -66,18 +66,7 @@ async function main() {
     }
   }
 
-  const getDevCommand = (template: string) => {
-    switch (template) {
-      case "bun":
-        return "bun run dev";
-      case "supabase":
-        return "supabase functions serve --no-verify-jwt mcp-server";
-      default:
-        return "npm run dev";
-    }
-  };
-
-  const devCommand = getDevCommand(context.template || "bun");
+  const devCommand = context.template === "bun" ? "bun run dev" : "npm run dev";
 
   outro(`🚀 MCP project created successfully in ${context.path}!
 
