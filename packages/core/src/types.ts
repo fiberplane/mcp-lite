@@ -52,9 +52,11 @@ export interface JsonRpcError {
   data?: unknown;
 }
 
-export type OnError = (
+export type OnError<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> = (
   err: unknown,
-  ctx: MCPServerContext,
+  ctx: MCPServerContext<TConfig>,
 ) => JsonRpcError | undefined | Promise<JsonRpcError | undefined>;
 
 export interface InitializeParams {
@@ -90,12 +92,13 @@ export interface ProgressUpdate {
   message?: string;
 }
 
-export interface MCPServerContext {
+export interface MCPServerContext<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> {
   request: JsonRpcMessage;
   requestId: JsonRpcId | undefined;
   response: JsonRpcRes | null;
-  env: Record<string, unknown>;
-  state: Record<string, unknown>;
+  state: TConfig["State"];
   /**
    * Info on the authenticated user, if any
    */
@@ -123,14 +126,18 @@ export interface MCPClientFeatures {
   supports(feature: ClientCapabilities | string): boolean;
 }
 
-export type Middleware = (
-  ctx: MCPServerContext,
+export type Middleware<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> = (
+  ctx: MCPServerContext<TConfig>,
   next: () => Promise<void>,
 ) => Promise<void> | void;
 
-export type MethodHandler = (
+export type MethodHandler<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> = (
   params: unknown,
-  ctx: MCPServerContext,
+  ctx: MCPServerContext<TConfig>,
 ) => Promise<unknown> | unknown;
 
 export function isJsonRpcNotification(
@@ -308,14 +315,19 @@ export interface PromptMetadata {
   _meta?: { [key: string]: unknown };
 }
 
-export type PromptHandler<TArgs = unknown> = (
+export type PromptHandler<
+  TArgs = unknown,
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> = (
   args: TArgs,
-  ctx: MCPServerContext,
+  ctx: MCPServerContext<TConfig>,
 ) => Promise<PromptGetResult> | PromptGetResult;
 
-export interface PromptEntry {
+export interface PromptEntry<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> {
   metadata: PromptMetadata;
-  handler: PromptHandler;
+  handler: PromptHandler<unknown, TConfig>;
   validator?: unknown;
 }
 
@@ -338,16 +350,20 @@ export interface ResourceProvider {
   ) => unknown;
 }
 
-export interface ToolEntry {
+export interface ToolEntry<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> {
   metadata: Tool;
-  handler: MethodHandler;
+  handler: MethodHandler<TConfig>;
   validator?: unknown;
   outputValidator?: unknown;
 }
 
-export interface ResourceEntry {
+export interface ResourceEntry<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> {
   metadata: Resource | ResourceTemplate;
-  handler: ResourceHandler;
+  handler: ResourceHandler<TConfig>;
   validators?: ResourceVarValidators;
   matcher?: UriMatcher;
   type: "resource" | "resource_template";
@@ -513,10 +529,12 @@ export interface ResourceMeta {
 
 export type ResourceVarValidators = Record<string, unknown>;
 
-export type ResourceHandler = (
+export type ResourceHandler<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> = (
   uri: URL,
   vars: ResourceVars,
-  ctx: MCPServerContext,
+  ctx: MCPServerContext<TConfig>,
 ) => Promise<ResourceReadResult>;
 
 export interface NotificationSenderOptions {
