@@ -576,6 +576,345 @@ try {
 }
 ```
 
+## OAuth Authentication
+
+MCP clients can connect to OAuth 2.1-protected MCP servers using the built-in OAuth support. The client handles PKCE (Proof Key for Code Exchange), token storage, automatic token refresh, and multiple server authentication.
+
+### Basic OAuth Setup
+
+Connect to an OAuth-protected MCP server:
+
+```typescript
+import {
+  McpClient,
+  StreamableHttpClientTransport,
+  InMemoryOAuthAdapter,
+  StandardOAuthProvider
+} from "mcp-lite";
+
+// Create OAuth adapter for token storage
+const oauthAdapter = new InMemoryOAuthAdapter();
+
+// Create OAuth provider for handling OAuth flows
+const oauthProvider = new StandardOAuthProvider();
+
+// Configure OAuth settings
+const oauthConfig = {
+  clientId: "your-client-id",
+  redirectUri: "http://localhost:3000/callback",
+  onAuthorizationRequired: (authorizationUrl) => {
+    // Redirect user to authorization URL
+    console.log("Please authorize at:", authorizationUrl);
+    // In a web app: window.location.href = authorizationUrl;
+    // In a CLI app: open(authorizationUrl);
+  }
+};
+
+// Create client with OAuth support
+const client = new McpClient({
+  name: "oauth-client",
+  version: "1.0.0"
+});
+
+const transport = new StreamableHttpClientTransport({
+  oauthAdapter,
+  oauthProvider,
+  oauthConfig
+});
+
+const connect = transport.bind(client);
+
+try {
+  // First connection attempt may fail with 401
+  const connection = await connect("https://api.example.com/mcp");
+} catch (error) {
+  // If authentication required, user is redirected to OAuth server
+  console.log(error.message); // "Authentication required. Authorization flow started..."
+}
+```
+
+### Completing Authorization Flow
+
+After the user authorizes and is redirected back to your redirect URI:
+
+```typescript
+// Parse authorization code and state from callback URL
+// Example: http://localhost:3000/callback?code=abc123&state=xyz789
+const urlParams = new URLSearchParams(window.location.search);
+const code = urlParams.get("code");
+const state = urlParams.get("state");
+
+// Complete the authorization flow
+await transport.completeAuthorizationFlow(
+  "https://api.example.com/mcp",
+  code,
+  state
+);
+
+// Now connect successfully with stored token
+const connection = await connect("https://api.example.com/mcp");
+console.log("Connected:", connection.serverInfo.name);
+```
+
+### Persistent Token Storage
+
+The `InMemoryOAuthAdapter` stores tokens in memory, which are lost when the process exits. For production use, implement a persistent adapter:
+
+```typescript
+import { OAuthAdapter, OAuthTokens } from "mcp-lite";
+import fs from "fs/promises";
+
+class FileOAuthAdapter implements OAuthAdapter {
+  constructor(private tokenFile: string) {}
+
+  async storeTokens(resource: string, tokens: OAuthTokens): Promise<void> {
+    const allTokens = await this.loadAllTokens();
+    allTokens[resource] = tokens;
+    await fs.writeFile(this.tokenFile, JSON.stringify(allTokens, null, 2));
+  }
+
+  async getTokens(resource: string): Promise<OAuthTokens | undefined> {
+    const allTokens = await this.loadAllTokens();
+    return allTokens[resource];
+  }
+
+  async deleteTokens(resource: string): Promise<void> {
+    const allTokens = await this.loadAllTokens();
+    delete allTokens[resource];
+    await fs.writeFile(this.tokenFile, JSON.stringify(allTokens, null, 2));
+  }
+
+  async hasValidToken(resource: string): Promise<boolean> {
+    const tokens = await this.getTokens(resource);
+    if (!tokens) return false;
+
+    const now = Math.floor(Date.now() / 1000);
+    const BUFFER_SECONDS = 5 * 60; // 5 minute buffer
+    return tokens.expiresAt > now + BUFFER_SECONDS;
+  }
+
+  private async loadAllTokens(): Promise<Record<string, OAuthTokens>> {
+    try {
+      const data = await fs.readFile(this.tokenFile, "utf-8");
+      return JSON.parse(data);
+    } catch {
+      return {};
+    }
+  }
+}
+
+// Use file-based storage
+const oauthAdapter = new FileOAuthAdapter("./oauth-tokens.json");
+```
+
+### Database Token Storage
+
+For multi-user applications, store tokens in a database:
+
+```typescript
+import { OAuthAdapter, OAuthTokens } from "mcp-lite";
+
+class PostgresOAuthAdapter implements OAuthAdapter {
+  constructor(
+    private db: DatabaseConnection,
+    private userId: string
+  ) {}
+
+  async storeTokens(resource: string, tokens: OAuthTokens): Promise<void> {
+    await this.db.query(
+      `INSERT INTO oauth_tokens (user_id, resource, tokens, expires_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, resource)
+       DO UPDATE SET tokens = $3, expires_at = $4`,
+      [this.userId, resource, JSON.stringify(tokens), tokens.expiresAt]
+    );
+  }
+
+  async getTokens(resource: string): Promise<OAuthTokens | undefined> {
+    const result = await this.db.query(
+      `SELECT tokens FROM oauth_tokens
+       WHERE user_id = $1 AND resource = $2`,
+      [this.userId, resource]
+    );
+    return result.rows[0]?.tokens;
+  }
+
+  async deleteTokens(resource: string): Promise<void> {
+    await this.db.query(
+      `DELETE FROM oauth_tokens
+       WHERE user_id = $1 AND resource = $2`,
+      [this.userId, resource]
+    );
+  }
+
+  async hasValidToken(resource: string): Promise<boolean> {
+    const result = await this.db.query(
+      `SELECT expires_at FROM oauth_tokens
+       WHERE user_id = $1 AND resource = $2`,
+      [this.userId, resource]
+    );
+
+    if (!result.rows[0]) return false;
+
+    const now = Math.floor(Date.now() / 1000);
+    const BUFFER_SECONDS = 5 * 60;
+    return result.rows[0].expires_at > now + BUFFER_SECONDS;
+  }
+}
+
+// Use database storage
+const oauthAdapter = new PostgresOAuthAdapter(db, currentUserId);
+```
+
+### Automatic Token Refresh
+
+Tokens are automatically refreshed when they expire:
+
+```typescript
+const transport = new StreamableHttpClientTransport({
+  oauthAdapter,
+  oauthProvider,
+  oauthConfig
+});
+
+const connect = transport.bind(client);
+
+// First connection (uses existing token)
+const connection1 = await connect("https://api.example.com/mcp");
+await connection1.callTool("echo", { message: "Hello" });
+
+// Wait for token to expire...
+// (Tokens are checked with 5-minute buffer before expiry)
+
+// Next connection automatically refreshes the token
+const connection2 = await connect("https://api.example.com/mcp");
+await connection2.callTool("echo", { message: "Still works!" });
+```
+
+### Multiple OAuth Providers
+
+Connect to multiple OAuth-protected servers:
+
+```typescript
+// Each server can have its own tokens
+const adapter = new InMemoryOAuthAdapter();
+const provider = new StandardOAuthProvider();
+
+const config = {
+  clientId: "my-client-id",
+  redirectUri: "http://localhost:3000/callback",
+  onAuthorizationRequired: (url) => console.log("Authorize:", url)
+};
+
+const transport = new StreamableHttpClientTransport({
+  oauthAdapter: adapter,
+  oauthProvider: provider,
+  oauthConfig: config
+});
+
+const connect = transport.bind(client);
+
+// Connect to multiple servers with different OAuth tokens
+const github = await connect("https://github-mcp.example.com");
+const slack = await connect("https://slack-mcp.example.com");
+const gdrive = await connect("https://drive-mcp.example.com");
+
+// Each connection uses its own OAuth token
+await github.callTool("listRepos", {});
+await slack.callTool("postMessage", { channel: "#dev", text: "Hi" });
+await gdrive.callTool("listFiles", {});
+```
+
+### OAuth Discovery
+
+MCP servers advertise their OAuth endpoints using RFC 8707 (Resource Indicators) and RFC 8414 (Authorization Server Metadata):
+
+```typescript
+import { discoverOAuthEndpoints } from "mcp-lite";
+
+const endpoints = await discoverOAuthEndpoints("https://api.example.com/mcp");
+
+console.log(endpoints.authorizationServer);   // OAuth server URL
+console.log(endpoints.authorizationEndpoint); // Where to send users
+console.log(endpoints.tokenEndpoint);         // Where to exchange codes
+console.log(endpoints.scopes);                // Required scopes
+```
+
+The discovery process:
+1. Fetches `/.well-known/oauth-protected-resource` from MCP server
+2. Extracts authorization server URL
+3. Fetches authorization server metadata
+4. Verifies PKCE S256 support (required for OAuth 2.1)
+5. Returns endpoint information
+
+### Error Handling
+
+Handle OAuth-specific errors:
+
+```typescript
+try {
+  const connection = await connect("https://api.example.com/mcp");
+} catch (error) {
+  if (error.message.includes("Authentication required")) {
+    // User needs to authorize - wait for callback
+    console.log("Waiting for user authorization...");
+  } else {
+    console.error("Connection failed:", error);
+  }
+}
+
+// After callback
+try {
+  await transport.completeAuthorizationFlow(serverUrl, code, state);
+} catch (error) {
+  if (error.message.includes("State parameter mismatch")) {
+    // Possible CSRF attack
+    console.error("Security error: invalid state parameter");
+  } else if (error.message.includes("Token exchange failed")) {
+    // OAuth server rejected the code
+    console.error("Authorization failed:", error.message);
+  } else {
+    console.error("Unexpected error:", error);
+  }
+}
+```
+
+### Security Best Practices
+
+1. **Always use HTTPS** - OAuth flows must use HTTPS in production
+2. **PKCE is mandatory** - The client automatically uses PKCE S256 method
+3. **State validation** - State parameters are automatically validated to prevent CSRF
+4. **Secure token storage** - Use encrypted storage for production token adapters
+5. **Token expiry buffer** - Tokens are refreshed 5 minutes before expiry to prevent race conditions
+6. **Resource parameter** - RFC 8707 resource parameter is included in all OAuth requests
+
+### OAuth Configuration Summary
+
+Required configuration for OAuth:
+
+```typescript
+interface OAuthConfig {
+  clientId: string;                           // Your OAuth client ID
+  redirectUri: string;                        // Callback URL for authorization
+  onAuthorizationRequired: (url: string) => void;  // Redirect handler
+}
+
+interface OAuthAdapter {
+  storeTokens(resource: string, tokens: OAuthTokens): Promise<void> | void;
+  getTokens(resource: string): Promise<OAuthTokens | undefined> | OAuthTokens | undefined;
+  deleteTokens(resource: string): Promise<void> | void;
+  hasValidToken(resource: string): Promise<boolean> | boolean;
+}
+```
+
+Built-in adapters:
+- `InMemoryOAuthAdapter` - In-memory storage (for testing)
+- Implement `OAuthAdapter` for custom storage (files, database, etc.)
+
+Built-in providers:
+- `StandardOAuthProvider` - OAuth 2.1 with PKCE S256
+- Implement `OAuthProvider` for custom OAuth flows
+
 ## Error Handling
 
 ### RpcError
