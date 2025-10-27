@@ -8,6 +8,7 @@ export {
   type ClientSessionData,
   Connection,
   type ConnectionOptions,
+  type ConnectOptions,
   discoverOAuthEndpoints,
   type ElicitHandler,
   type ElicitationParams,

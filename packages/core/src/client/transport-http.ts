@@ -64,9 +64,14 @@ export interface StreamableHttpClientTransportOptions {
    * Required if connecting to OAuth-protected MCP servers.
    */
   oauthConfig?: OAuthConfig;
+}
 
+/**
+ * Options for connecting to a server
+ */
+export interface ConnectOptions {
   /**
-   * Optional custom headers to include in all requests.
+   * Optional custom headers to include in all requests to this server.
    * These will be merged with protocol-required headers.
    * Can be used for authentication tokens, API keys, etc.
    *
@@ -94,7 +99,17 @@ export interface StreamableHttpClientTransportOptions {
  * const client = new McpClient({ name: "my-client", version: "1.0.0" });
  * const transport = new StreamableHttpClientTransport();
  * const connect = transport.bind(client);
+ *
+ * // Connect without custom headers
  * const connection = await connect("http://localhost:3000");
+ *
+ * // Connect with custom headers (e.g., authentication)
+ * const connection = await connect("http://localhost:3000", {
+ *   headers: {
+ *     'Authorization': 'Bearer my-token',
+ *     'X-API-Key': 'my-key'
+ *   }
+ * });
  * ```
  */
 export class StreamableHttpClientTransport {
@@ -103,7 +118,6 @@ export class StreamableHttpClientTransport {
   private oauthAdapter?: OAuthAdapter;
   private oauthProvider?: OAuthProvider;
   private oauthConfig?: OAuthConfig;
-  private customHeaders?: Record<string, string>;
   private pendingAuthFlows = new Map<string, PendingAuthState>();
 
   constructor(options?: StreamableHttpClientTransportOptions) {
@@ -111,7 +125,6 @@ export class StreamableHttpClientTransport {
     this.oauthAdapter = options?.oauthAdapter;
     this.oauthProvider = options?.oauthProvider;
     this.oauthConfig = options?.oauthConfig;
-    this.customHeaders = options?.headers;
 
     // Validate OAuth configuration consistency
     if (this.oauthAdapter || this.oauthProvider || this.oauthConfig) {
@@ -129,13 +142,17 @@ export class StreamableHttpClientTransport {
    * @param client - The MCP client instance
    * @returns A connect function that initializes connections to servers
    */
-  bind(client: McpClient): (baseUrl: string) => Promise<Connection> {
+  bind(
+    client: McpClient,
+  ): (baseUrl: string, options?: ConnectOptions) => Promise<Connection> {
     this.client = client;
 
-    return async (baseUrl: string) => {
+    return async (baseUrl: string, options?: ConnectOptions) => {
       if (!this.client) {
         throw new Error("Transport not bound to a client");
       }
+
+      const customHeaders = options?.headers;
 
       // Try to get existing valid token if OAuth is configured
       const accessToken = await this.ensureValidToken(baseUrl);
@@ -163,8 +180,8 @@ export class StreamableHttpClientTransport {
       }
 
       // Merge custom headers (these override defaults if there are conflicts)
-      if (this.customHeaders) {
-        Object.assign(headers, this.customHeaders);
+      if (customHeaders) {
+        Object.assign(headers, customHeaders);
       }
 
       const response = await fetch(baseUrl, {
@@ -174,7 +191,12 @@ export class StreamableHttpClientTransport {
       });
 
       // Handle 401 Unauthorized - start OAuth flow
-      if (response.status === 401 && this.oauthAdapter && this.oauthProvider && this.oauthConfig) {
+      if (
+        response.status === 401 &&
+        this.oauthAdapter &&
+        this.oauthProvider &&
+        this.oauthConfig
+      ) {
         await this.handleAuthenticationRequired(baseUrl);
         throw new Error(
           "Authentication required. Authorization flow started. Please complete authorization and retry connection.",
@@ -228,9 +250,9 @@ export class StreamableHttpClientTransport {
         serverCapabilities: initResult.capabilities,
         sessionId,
         responseSender: sessionId
-          ? this.createResponseSender(baseUrl, sessionId)
+          ? this.createResponseSender(baseUrl, sessionId, customHeaders)
           : undefined,
-        headers: this.customHeaders,
+        headers: customHeaders,
       });
 
       // Set client instance for handling server requests
@@ -390,6 +412,7 @@ export class StreamableHttpClientTransport {
   private createResponseSender(
     baseUrl: string,
     sessionId: string,
+    customHeaders?: Record<string, string>,
   ): (response: JsonRpcRes) => Promise<void> {
     return async (response: JsonRpcRes) => {
       const headers: Record<string, string> = {
@@ -399,8 +422,8 @@ export class StreamableHttpClientTransport {
       };
 
       // Merge custom headers (these override defaults if there are conflicts)
-      if (this.customHeaders) {
-        Object.assign(headers, this.customHeaders);
+      if (customHeaders) {
+        Object.assign(headers, customHeaders);
       }
 
       await fetch(baseUrl, {

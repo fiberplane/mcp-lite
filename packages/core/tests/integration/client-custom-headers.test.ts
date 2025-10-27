@@ -45,14 +45,15 @@ describe("MCP Client - Custom Headers", () => {
 
     const transport = new StreamableHttpClientTransport({
       sessionAdapter: new InMemoryClientSessionAdapter(),
+    });
+
+    const connect = transport.bind(client);
+    const connection = await connect(serverUrl, {
       headers: {
         Authorization: "Bearer test-token-123",
         "X-API-Key": "my-api-key",
       },
     });
-
-    const connect = transport.bind(client);
-    const connection = await connect(serverUrl);
 
     // Should connect successfully even with custom headers
     expect(connection.serverInfo.name).toBe("test-server");
@@ -72,6 +73,10 @@ describe("MCP Client - Custom Headers", () => {
 
     const transport = new StreamableHttpClientTransport({
       sessionAdapter: new InMemoryClientSessionAdapter(),
+    });
+
+    const connect = transport.bind(client);
+    const connection = await connect(serverUrl, {
       headers: {
         Authorization: "Bearer test-token-456",
         "X-Custom-Header-1": "value1",
@@ -79,9 +84,6 @@ describe("MCP Client - Custom Headers", () => {
         "X-Request-ID": "req-123",
       },
     });
-
-    const connect = transport.bind(client);
-    const connection = await connect(serverUrl);
 
     // Connection should work
     expect(connection.serverInfo.name).toBe("test-server");
@@ -122,13 +124,14 @@ describe("MCP Client - Custom Headers", () => {
 
     const transport = new StreamableHttpClientTransport({
       sessionAdapter: new InMemoryClientSessionAdapter(),
+    });
+
+    const connect = transport.bind(client);
+    const connection = await connect(serverUrl, {
       headers: {
         Authorization: "Bearer comprehensive-test",
       },
     });
-
-    const connect = transport.bind(client);
-    const connection = await connect(serverUrl);
 
     // All these operations should work with headers
     await connection.listTools();
@@ -139,5 +142,69 @@ describe("MCP Client - Custom Headers", () => {
     await connection.listResources();
 
     await connection.close(true);
+  });
+
+  it("should support different headers for multiple servers", async () => {
+    // Create second server
+    const server2 = new McpServer({
+      name: "test-server-2",
+      version: "1.0.0",
+    });
+
+    server2.tool("echo2", {
+      description: "Echoes input",
+      handler: (args: { message: string }) => ({
+        content: [{ type: "text", text: args.message }],
+      }),
+    });
+
+    const testServer2 = await createTestHarness(server2, {
+      sessionAdapter: new InMemorySessionAdapter({ maxEventBufferSize: 1024 }),
+    });
+    const serverUrl2 = testServer2.url;
+
+    try {
+      const client = new McpClient({
+        name: "test-client",
+        version: "1.0.0",
+      });
+
+      const transport = new StreamableHttpClientTransport({
+        sessionAdapter: new InMemoryClientSessionAdapter(),
+      });
+
+      const connect = transport.bind(client);
+
+      // Connect to first server with one set of headers
+      const connection1 = await connect(serverUrl, {
+        headers: {
+          Authorization: "Bearer server-1-token",
+          "X-Server": "server-1",
+        },
+      });
+
+      // Connect to second server with different headers
+      const connection2 = await connect(serverUrl2, {
+        headers: {
+          Authorization: "Bearer server-2-token",
+          "X-Server": "server-2",
+        },
+      });
+
+      // Both connections should work independently
+      expect(connection1.serverInfo.name).toBe("test-server");
+      expect(connection2.serverInfo.name).toBe("test-server-2");
+
+      const result1 = await connection1.callTool("echo", { message: "test1" });
+      const result2 = await connection2.callTool("echo2", { message: "test2" });
+
+      expect(result1.content[0].text).toBe("test1");
+      expect(result2.content[0].text).toBe("test2");
+
+      await connection1.close(true);
+      await connection2.close(true);
+    } finally {
+      await testServer2.stop();
+    }
   });
 });

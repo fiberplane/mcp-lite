@@ -25,6 +25,7 @@ export {
   InMemoryClientSessionAdapter,
 } from "./session-adapter.js";
 export {
+  type ConnectOptions,
   type OAuthConfig,
   StreamableHttpClientTransport,
   type StreamableHttpClientTransportOptions,
