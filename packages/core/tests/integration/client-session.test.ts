@@ -108,6 +108,9 @@ describe("MCP Client - Session Management", () => {
     // Start collecting events (expect 1 ping + 3 progress = 4 events)
     const eventsPromise = collectSseEventsCount(stream, 4);
 
+    // Small delay to ensure stream is ready and ping is received
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     // Make a tool call with progress token
     await fetch(serverUrl, {
       method: "POST",
