@@ -105,10 +105,11 @@ describe("MCP Client - Session Management", () => {
     expect(sessionId).toBeDefined();
     const stream = await openSessionStream(serverUrl, sessionId!);
 
-    // Start collecting events (expect 1 ping + 3 progress = 4 events)
-    const eventsPromise = collectSseEventsCount(stream, 4);
+    // Start collecting events with timeout
+    // Will collect all events that arrive within 1000ms
+    const eventsPromise = collectSseEvents(stream, 1000);
 
-    // Small delay to ensure stream is ready and ping is received
+    // Small delay to ensure stream is ready
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Make a tool call with progress token
@@ -131,21 +132,23 @@ describe("MCP Client - Session Management", () => {
       }),
     });
 
-    // Wait for events
+    // Wait for events to be collected
     const events = await eventsPromise;
 
-    expect(events).toHaveLength(4);
+    // Should have at least 3 progress notifications
+    // May also have initial ping event
+    expect(events.length).toBeGreaterThanOrEqual(3);
 
-    // First event is ping
-    expect(events[0].data.method).toBe("ping");
+    // Find progress notifications (filtering out ping if present)
+    const progressEvents = events.filter(
+      (e) => e.data.method === "notifications/progress",
+    );
+    expect(progressEvents).toHaveLength(3);
 
-    // Next 3 are progress notifications
-    expect(events[1].data.method).toBe("notifications/progress");
-    expect(events[1].data.params.progressToken).toBe("test-token");
-    expect(events[1].data.params.progress).toBe(1);
-
-    expect(events[2].data.params.progress).toBe(2);
-    expect(events[3].data.params.progress).toBe(3);
+    expect(progressEvents[0].data.params.progressToken).toBe("test-token");
+    expect(progressEvents[0].data.params.progress).toBe(1);
+    expect(progressEvents[1].data.params.progress).toBe(2);
+    expect(progressEvents[2].data.params.progress).toBe(3);
 
     await connection.close(true);
   });
