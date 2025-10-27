@@ -35,6 +35,7 @@ export interface ConnectionOptions {
   sessionId?: string;
   responseSender?: (response: JsonRpcRes) => Promise<void>;
   logger?: Logger;
+  headers?: Record<string, string>;
 }
 
 /**
@@ -53,6 +54,7 @@ export class Connection {
   private responseSender?: (response: JsonRpcRes) => Promise<void>;
   private client?: McpClient;
   private logger?: Logger;
+  private customHeaders?: Record<string, string>;
 
   constructor(options: ConnectionOptions) {
     this.baseUrl = options.baseUrl;
@@ -61,6 +63,7 @@ export class Connection {
     this.serverCapabilities = options.serverCapabilities;
     this.responseSender = options.responseSender;
     this.logger = options.logger;
+    this.customHeaders = options.headers;
   }
 
   /**
@@ -178,6 +181,11 @@ export class Connection {
       headers[MCP_SESSION_ID_HEADER] = this.sessionId;
     }
 
+    // Merge custom headers (these override defaults if there are conflicts)
+    if (this.customHeaders) {
+      Object.assign(headers, this.customHeaders);
+    }
+
     const requestBody: JsonRpcReq = {
       jsonrpc: JSON_RPC_VERSION,
       id: Math.random().toString(36).substring(7),
@@ -234,6 +242,11 @@ export class Connection {
 
     if (lastEventId) {
       headers["Last-Event-ID"] = lastEventId;
+    }
+
+    // Merge custom headers (these override defaults if there are conflicts)
+    if (this.customHeaders) {
+      Object.assign(headers, this.customHeaders);
     }
 
     this.sessionStreamAbortController = new AbortController();

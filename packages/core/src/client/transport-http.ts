@@ -64,6 +64,23 @@ export interface StreamableHttpClientTransportOptions {
    * Required if connecting to OAuth-protected MCP servers.
    */
   oauthConfig?: OAuthConfig;
+
+  /**
+   * Optional custom headers to include in all requests.
+   * These will be merged with protocol-required headers.
+   * Can be used for authentication tokens, API keys, etc.
+   *
+   * @example
+   * ```typescript
+   * {
+   *   headers: {
+   *     'Authorization': 'Bearer my-token',
+   *     'X-API-Key': 'my-key'
+   *   }
+   * }
+   * ```
+   */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -86,6 +103,7 @@ export class StreamableHttpClientTransport {
   private oauthAdapter?: OAuthAdapter;
   private oauthProvider?: OAuthProvider;
   private oauthConfig?: OAuthConfig;
+  private customHeaders?: Record<string, string>;
   private pendingAuthFlows = new Map<string, PendingAuthState>();
 
   constructor(options?: StreamableHttpClientTransportOptions) {
@@ -93,6 +111,7 @@ export class StreamableHttpClientTransport {
     this.oauthAdapter = options?.oauthAdapter;
     this.oauthProvider = options?.oauthProvider;
     this.oauthConfig = options?.oauthConfig;
+    this.customHeaders = options?.headers;
 
     // Validate OAuth configuration consistency
     if (this.oauthAdapter || this.oauthProvider || this.oauthConfig) {
@@ -141,6 +160,11 @@ export class StreamableHttpClientTransport {
       // Add Authorization header if we have a token
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`;
+      }
+
+      // Merge custom headers (these override defaults if there are conflicts)
+      if (this.customHeaders) {
+        Object.assign(headers, this.customHeaders);
       }
 
       const response = await fetch(baseUrl, {
@@ -206,6 +230,7 @@ export class StreamableHttpClientTransport {
         responseSender: sessionId
           ? this.createResponseSender(baseUrl, sessionId)
           : undefined,
+        headers: this.customHeaders,
       });
 
       // Set client instance for handling server requests
@@ -367,13 +392,20 @@ export class StreamableHttpClientTransport {
     sessionId: string,
   ): (response: JsonRpcRes) => Promise<void> {
     return async (response: JsonRpcRes) => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
+        [MCP_SESSION_ID_HEADER]: sessionId,
+      };
+
+      // Merge custom headers (these override defaults if there are conflicts)
+      if (this.customHeaders) {
+        Object.assign(headers, this.customHeaders);
+      }
+
       await fetch(baseUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [MCP_PROTOCOL_HEADER]: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
-          [MCP_SESSION_ID_HEADER]: sessionId,
-        },
+        headers,
         body: JSON.stringify(response),
       });
     };
