@@ -212,17 +212,13 @@ export class Connection {
    * Open a GET SSE stream to receive server notifications.
    * Only available when using session-based transport.
    *
-   * The stream will automatically be processed to handle server-initiated
-   * requests (like elicitation). You can still read events from the stream
-   * by using tee() on the stream before it gets locked.
+   * The stream will automatically be processed in the background to handle
+   * server-initiated requests (like elicitation and sampling).
    *
    * @param lastEventId - Optional Last-Event-ID for replay from a specific event
-   * @returns ReadableStream of SSE data
    * @throws Error if connection does not have a session ID
    */
-  async openSessionStream(
-    lastEventId?: string,
-  ): Promise<ReadableStream<Uint8Array>> {
+  async openSessionStream(lastEventId?: string): Promise<void> {
     if (!this.sessionId) {
       throw new Error("Cannot open session stream without session ID");
     }
@@ -258,13 +254,8 @@ export class Connection {
       throw new Error("No response body for SSE stream");
     }
 
-    // Tee the stream so we can process it and also return it for the user
-    const [processStream, returnStream] = response.body.tee();
-
-    // Start processing the stream in the background
-    this.processSessionStream(processStream);
-
-    return returnStream;
+    // Process the stream in the background to handle server requests
+    this.processSessionStream(response.body);
   }
 
   /**

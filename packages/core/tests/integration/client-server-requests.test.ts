@@ -1,6 +1,11 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: tests */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { collectSseEventsCount } from "../../../test-utils/src/sse.js";
+import {
+  collectSseEventsCount,
+  createTestHarness,
+  openSessionStream,
+  type TestServer,
+} from "@internal/test-utils";
 import {
   InMemoryClientRequestAdapter,
   InMemoryClientSessionAdapter,
@@ -10,8 +15,6 @@ import {
   StreamableHttpClientTransport,
   StreamableHttpTransport,
 } from "../../src/index.js";
-import type { TestServer } from "../../../test-utils/src/types.js";
-import { createTestHarness } from "../../../test-utils/src/harness.js";
 
 describe("MCP Client - Server-Initiated Requests", () => {
   let testServer: TestServer;
@@ -90,20 +93,11 @@ describe("MCP Client - Server-Initiated Requests", () => {
     const connect = transport.bind(client);
     const connection = await connect(serverUrl);
 
-    // Open SSE stream to receive elicitation request
-    const stream = await connection.openSessionStream();
-    const ssePromise = collectSseEventsCount(stream, 2, 5000); // ping + elicitation
+    // Open SSE stream to enable server request handling
+    await connection.openSessionStream();
 
     // Call tool that will trigger elicitation
-    const toolPromise = connection.callTool("ask-user", {});
-
-    // Wait for SSE events
-    const events = await ssePromise;
-    expect(events).toHaveLength(2);
-    expect(events[1].data.method).toBe("elicitation/create");
-
-    // Wait for tool to complete
-    const result = await toolPromise;
+    const result = await connection.callTool("ask-user", {});
     expect(result.content[0].text).toBe("Hello, Alice!");
 
     await connection.close(true);

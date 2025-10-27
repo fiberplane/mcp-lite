@@ -3,6 +3,7 @@ import {
   collectSseEvents,
   collectSseEventsCount,
   createTestHarness,
+  openSessionStream,
   type TestServer,
 } from "@internal/test-utils";
 import {
@@ -98,16 +99,16 @@ describe("MCP Client - Session Management", () => {
     const connect = transport.bind(client);
     const connection = await connect(serverUrl);
 
-    // Open session stream
-    const stream = await connection.openSessionStream();
+    // For this test, we want to observe events, so use test-utils helper
+    // (don't use connection.openSessionStream() - server only allows one stream)
+    const sessionId = connection.sessionId;
+    expect(sessionId).toBeDefined();
+    const stream = await openSessionStream(serverUrl, sessionId!);
 
     // Start collecting events (expect 1 ping + 3 progress = 4 events)
     const eventsPromise = collectSseEventsCount(stream, 4);
 
     // Make a tool call with progress token
-    const sessionId = connection.sessionId;
-    expect(sessionId).toBeDefined();
-
     await fetch(serverUrl, {
       method: "POST",
       headers: {
@@ -184,8 +185,12 @@ describe("MCP Client - Session Management", () => {
     // Wait a bit for events to be stored
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Reconnect asking for replay from event 1
-    const stream = await connection.openSessionStream("1#_GET_stream");
+    // Reconnect asking for replay from event 1 (using test-utils for observation)
+    const stream = await openSessionStream(
+      serverUrl,
+      sessionId!,
+      "1#_GET_stream",
+    );
     const events = await collectSseEvents(stream, 1000);
 
     // Should receive events 2 and 3 (after event 1)
@@ -284,14 +289,13 @@ describe("MCP Client - Session Management", () => {
     const connect = transport.bind(client);
     const connection = await connect(serverUrl);
 
-    const _stream = await connection.openSessionStream();
+    await connection.openSessionStream();
 
     // Close the stream
     connection.closeSessionStream();
 
     // Should be able to open a new one
-    const stream2 = await connection.openSessionStream();
-    expect(stream2).toBeDefined();
+    await connection.openSessionStream();
 
     await connection.close(true);
   });

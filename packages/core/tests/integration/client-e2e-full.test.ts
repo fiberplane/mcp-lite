@@ -10,6 +10,7 @@ import {
 } from "../../src/index.js";
 import {
   createTestHarness,
+  openSessionStream,
   type TestServer,
 } from "../../../test-utils/src/index.js";
 
@@ -192,8 +193,12 @@ describe("MCP Client - End-to-End Full Workflows", () => {
       // Track progress events
       const progressEvents: any[] = [];
 
-      // Open session stream
-      const stream = await connection.openSessionStream();
+      // For this test, we want to observe progress events, so use test-utils helper
+      // (don't use connection.openSessionStream() - server only allows one stream)
+      const stream = await openSessionStream(
+        testServer.url,
+        connection.sessionId!,
+      );
       const reader = stream.getReader();
       const decoder = new TextDecoder();
 
