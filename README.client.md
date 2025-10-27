@@ -43,9 +43,11 @@ console.log(result.content[0].text);
 - **Simple API** - Connect to MCP servers and call tools, prompts, and resources
 - **Type-safe** - Full TypeScript support with inferred types
 - **Stateless or Stateful** - Start without sessions, add them when you need server-initiated requests
-- **Multi-server** - Connect to multiple servers simultaneously
+- **Multi-server** - Connect to multiple servers simultaneously with independent authentication
+- **Custom Headers** - Pass authentication tokens, API keys, or custom headers per-connection
 - **Server Requests** - Handle elicitation and sampling requests from servers
 - **SSE Streaming** - Receive server notifications and progress updates via Server-Sent Events
+- **OAuth 2.1** - Built-in OAuth support with PKCE, token refresh, and discovery
 - **Error Handling** - Clear error messages with RpcError support
 
 ## Client Setup
@@ -138,9 +140,38 @@ console.log(connection.sessionId); // "abc123..."
 const stream = await connection.openSessionStream();
 ```
 
+### Connection with Custom Headers
+
+Pass custom headers for authentication, API keys, or request tracking:
+
+```typescript
+const transport = new StreamableHttpClientTransport();
+const connect = transport.bind(client);
+
+// Connect with authentication headers
+const connection = await connect("http://localhost:3000/mcp", {
+  headers: {
+    'Authorization': 'Bearer my-secret-token',
+    'X-API-Key': 'my-api-key',
+    'X-Request-ID': 'req-123'
+  }
+});
+
+// Headers are included in all requests for this connection
+await connection.callTool("listRepos", {});
+```
+
+Custom headers are merged with protocol-required headers and included in:
+- The initial `initialize` request
+- All tool, prompt, and resource calls
+- SSE streams (when using session mode)
+- Response sends (for server-initiated requests)
+
+**Note**: Custom headers work alongside OAuth authentication. If both are configured, the OAuth `Authorization` header takes precedence, but other custom headers are still applied
+
 ### Multiple Server Connections
 
-A single client can connect to multiple servers:
+A single client can connect to multiple servers with different headers:
 
 ```typescript
 const client = new McpClient({
@@ -151,12 +182,27 @@ const client = new McpClient({
 const transport = new StreamableHttpClientTransport();
 const connect = transport.bind(client);
 
-// Connect to multiple servers
-const githubConn = await connect("http://localhost:3000/github");
-const slackConn = await connect("http://localhost:3001/slack");
-const dbConn = await connect("http://localhost:3002/db");
+// Connect to multiple servers with different authentication
+const githubConn = await connect("http://localhost:3000/github", {
+  headers: {
+    'Authorization': 'Bearer github-token-123'
+  }
+});
 
-// Each connection is independent
+const slackConn = await connect("http://localhost:3001/slack", {
+  headers: {
+    'Authorization': 'Bearer slack-token-456'
+  }
+});
+
+const dbConn = await connect("http://localhost:3002/db", {
+  headers: {
+    'Authorization': 'Bearer db-token-789',
+    'X-Database': 'production'
+  }
+});
+
+// Each connection uses its own headers independently
 const repos = await githubConn.callTool("listRepos", {});
 const message = await slackConn.callTool("postMessage", {
   channel: "#dev",
