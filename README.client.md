@@ -646,7 +646,7 @@ const oauthProvider = new StandardOAuthProvider();
 
 // Configure OAuth settings
 const oauthConfig = {
-  clientId: "your-client-id",
+  clientId: "your-client-id",           // Optional - can use DCR instead
   redirectUri: "http://localhost:3000/callback",
   onAuthorizationRequired: (authorizationUrl) => {
     // Redirect user to authorization URL
@@ -679,6 +679,67 @@ try {
 }
 ```
 
+### Dynamic Client Registration (DCR)
+
+If you don't have a pre-registered `clientId`, mcp-lite can automatically register with the authorization server using RFC 7591 Dynamic Client Registration:
+
+```typescript
+const oauthConfig = {
+  // No clientId needed - will use DCR automatically
+  redirectUri: "http://localhost:3000/callback",
+  clientName: "My MCP Client",  // Optional, used for DCR
+  onAuthorizationRequired: (authorizationUrl) => {
+    console.log("Please authorize at:", authorizationUrl);
+  }
+};
+
+const transport = new StreamableHttpClientTransport({
+  oauthAdapter,
+  oauthProvider,
+  oauthConfig
+});
+
+// Client automatically registers on first connection
+const connection = await connect("https://api.example.com/mcp");
+// Registered client credentials are stored and reused for future connections
+```
+
+**How DCR works:**
+
+1. Client attempts connection to OAuth-protected server
+2. Discovers authorization server supports DCR (via `registration_endpoint`)
+3. Checks if client credentials already exist for this authorization server
+4. If not, automatically registers using `registerOAuthClient()`
+5. Stores client credentials (clientId, clientSecret) per authorization server
+6. Reuses credentials for subsequent connections to servers using same auth server
+
+**Fallback behavior:**
+- If DCR is not supported and no `clientId` is provided, an error is thrown
+- You can manually register a client using `registerOAuthClient()`:
+
+```typescript
+import { registerOAuthClient, discoverOAuthEndpoints } from "mcp-lite";
+
+// Discover endpoints
+const endpoints = await discoverOAuthEndpoints("https://api.example.com/mcp");
+
+// Manually register client
+if (endpoints.registrationEndpoint) {
+  const credentials = await registerOAuthClient(
+    endpoints.registrationEndpoint,
+    {
+      clientName: "My MCP Client",
+      redirectUris: ["http://localhost:3000/callback"],
+      grantTypes: ["authorization_code", "refresh_token"],
+      tokenEndpointAuthMethod: "none"
+    }
+  );
+
+  console.log("Client ID:", credentials.clientId);
+  // Store and use this clientId in your OAuthConfig
+}
+```
+
 ### Completing Authorization Flow
 
 After the user authorizes and is redirected back to your redirect URI:
@@ -707,11 +768,14 @@ console.log("Connected:", connection.serverInfo.name);
 The `InMemoryOAuthAdapter` stores tokens in memory, which are lost when the process exits. For production use, implement a persistent adapter:
 
 ```typescript
-import { OAuthAdapter, OAuthTokens } from "mcp-lite";
+import { OAuthAdapter, OAuthTokens, StoredClientCredentials } from "mcp-lite";
 import fs from "fs/promises";
 
 class FileOAuthAdapter implements OAuthAdapter {
-  constructor(private tokenFile: string) {}
+  constructor(
+    private tokenFile: string,
+    private credentialsFile: string
+  ) {}
 
   async storeTokens(resource: string, tokens: OAuthTokens): Promise<void> {
     const allTokens = await this.loadAllTokens();
@@ -739,6 +803,28 @@ class FileOAuthAdapter implements OAuthAdapter {
     return tokens.expiresAt > now + BUFFER_SECONDS;
   }
 
+  async storeClientCredentials(
+    authorizationServer: string,
+    credentials: StoredClientCredentials
+  ): Promise<void> {
+    const allCredentials = await this.loadAllCredentials();
+    allCredentials[authorizationServer] = credentials;
+    await fs.writeFile(this.credentialsFile, JSON.stringify(allCredentials, null, 2));
+  }
+
+  async getClientCredentials(
+    authorizationServer: string
+  ): Promise<StoredClientCredentials | undefined> {
+    const allCredentials = await this.loadAllCredentials();
+    return allCredentials[authorizationServer];
+  }
+
+  async deleteClientCredentials(authorizationServer: string): Promise<void> {
+    const allCredentials = await this.loadAllCredentials();
+    delete allCredentials[authorizationServer];
+    await fs.writeFile(this.credentialsFile, JSON.stringify(allCredentials, null, 2));
+  }
+
   private async loadAllTokens(): Promise<Record<string, OAuthTokens>> {
     try {
       const data = await fs.readFile(this.tokenFile, "utf-8");
@@ -747,10 +833,22 @@ class FileOAuthAdapter implements OAuthAdapter {
       return {};
     }
   }
+
+  private async loadAllCredentials(): Promise<Record<string, StoredClientCredentials>> {
+    try {
+      const data = await fs.readFile(this.credentialsFile, "utf-8");
+      return JSON.parse(data);
+    } catch {
+      return {};
+    }
+  }
 }
 
 // Use file-based storage
-const oauthAdapter = new FileOAuthAdapter("./oauth-tokens.json");
+const oauthAdapter = new FileOAuthAdapter(
+  "./oauth-tokens.json",
+  "./oauth-credentials.json"
+);
 ```
 
 ### Database Token Storage
@@ -880,18 +978,27 @@ import { discoverOAuthEndpoints } from "mcp-lite";
 
 const endpoints = await discoverOAuthEndpoints("https://api.example.com/mcp");
 
-console.log(endpoints.authorizationServer);   // OAuth server URL
-console.log(endpoints.authorizationEndpoint); // Where to send users
-console.log(endpoints.tokenEndpoint);         // Where to exchange codes
-console.log(endpoints.scopes);                // Required scopes
+console.log(endpoints.authorizationServer);    // OAuth server URL
+console.log(endpoints.authorizationEndpoint);  // Where to send users
+console.log(endpoints.tokenEndpoint);          // Where to exchange codes
+console.log(endpoints.registrationEndpoint);   // DCR endpoint (if supported)
+console.log(endpoints.scopes);                 // Required scopes
 ```
 
 The discovery process:
-1. Fetches `/.well-known/oauth-protected-resource` from MCP server
-2. Extracts authorization server URL
-3. Fetches authorization server metadata
-4. Verifies PKCE S256 support (required for OAuth 2.1)
-5. Returns endpoint information
+1. Extracts origin from MCP server URL (per RFC 8707 Section 3)
+2. Fetches `/.well-known/oauth-protected-resource` from **origin** (not sub-path)
+   - Example: `https://example.com/mcp` → `https://example.com/.well-known/oauth-protected-resource`
+3. Extracts authorization server URL from resource metadata
+4. Fetches authorization server metadata
+5. Verifies PKCE S256 support (required for OAuth 2.1)
+6. Returns endpoint information including DCR endpoint if available
+
+**RFC 8707 Compliance:**
+Per RFC 8707, `.well-known` endpoints MUST be at the origin, not at sub-paths. If you have an MCP server at `https://greentea.fiberplane.io/mcp`, discovery will correctly query `https://greentea.fiberplane.io/.well-known/oauth-protected-resource`.
+
+**Fallback mechanism:**
+If origin-based discovery fails, the client attempts to read the `WWW-Authenticate` header's `as_uri` parameter as a hint for the authorization server metadata URL.
 
 ### Error Handling
 
@@ -940,21 +1047,28 @@ Required configuration for OAuth:
 
 ```typescript
 interface OAuthConfig {
-  clientId: string;                           // Your OAuth client ID
+  clientId?: string;                          // OAuth client ID (optional, uses DCR if not provided)
   redirectUri: string;                        // Callback URL for authorization
+  clientName?: string;                        // Client name for DCR (defaults to "MCP Client")
   onAuthorizationRequired: (url: string) => void;  // Redirect handler
 }
 
 interface OAuthAdapter {
+  // Token storage
   storeTokens(resource: string, tokens: OAuthTokens): Promise<void> | void;
   getTokens(resource: string): Promise<OAuthTokens | undefined> | OAuthTokens | undefined;
   deleteTokens(resource: string): Promise<void> | void;
   hasValidToken(resource: string): Promise<boolean> | boolean;
+
+  // Client credentials storage (for DCR)
+  storeClientCredentials(authorizationServer: string, credentials: StoredClientCredentials): Promise<void> | void;
+  getClientCredentials(authorizationServer: string): Promise<StoredClientCredentials | undefined> | StoredClientCredentials | undefined;
+  deleteClientCredentials(authorizationServer: string): Promise<void> | void;
 }
 ```
 
 Built-in adapters:
-- `InMemoryOAuthAdapter` - In-memory storage (for testing)
+- `InMemoryOAuthAdapter` - In-memory storage for tokens and client credentials (for testing)
 - Implement `OAuthAdapter` for custom storage (files, database, etc.)
 
 Built-in providers:
