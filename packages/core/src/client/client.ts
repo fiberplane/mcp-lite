@@ -2,16 +2,16 @@ import { METHODS } from "../constants.js";
 import type { Logger } from "../core.js";
 import { RpcError } from "../errors.js";
 import {
-  JSON_RPC_ERROR_CODES,
   createJsonRpcError,
   createJsonRpcResponse,
+  JSON_RPC_ERROR_CODES,
   type JsonRpcReq,
   type JsonRpcRes,
 } from "../types.js";
 import type {
   ClientConnectionInfo,
-  ElicitHandler,
   ElicitationParams,
+  ElicitHandler,
   SampleHandler,
   SamplingParams,
 } from "./types.js";

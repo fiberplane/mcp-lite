@@ -1,18 +1,18 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: tests */
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
-  McpServer,
-  McpClient,
-  StreamableHttpClientTransport,
-  InMemoryClientSessionAdapter,
-  InMemorySessionAdapter,
-  InMemoryClientRequestAdapter,
-} from "../../src/index.js";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   createTestHarness,
   openSessionStream,
   type TestServer,
 } from "../../../test-utils/src/index.js";
+import {
+  InMemoryClientRequestAdapter,
+  InMemoryClientSessionAdapter,
+  InMemorySessionAdapter,
+  McpClient,
+  McpServer,
+  StreamableHttpClientTransport,
+} from "../../src/index.js";
 
 describe("MCP Client - End-to-End Full Workflows", () => {
   describe("Multi-server workflow", () => {
@@ -170,7 +170,9 @@ describe("MCP Client - End-to-End Full Workflows", () => {
       });
 
       testServer = await createTestHarness(mcpServer, {
-        sessionAdapter: new InMemorySessionAdapter({ maxEventBufferSize: 1024 }),
+        sessionAdapter: new InMemorySessionAdapter({
+          maxEventBufferSize: 1024,
+        }),
       });
     });
 
@@ -320,7 +322,9 @@ describe("MCP Client - End-to-End Full Workflows", () => {
       });
 
       testServer = await createTestHarness(mcpServer, {
-        sessionAdapter: new InMemorySessionAdapter({ maxEventBufferSize: 1024 }),
+        sessionAdapter: new InMemorySessionAdapter({
+          maxEventBufferSize: 1024,
+        }),
         clientRequestAdapter: new InMemoryClientRequestAdapter(),
       });
     });

@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: tests */
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   collectSseEventsCount,
   createTestHarness,
@@ -45,7 +45,9 @@ describe("MCP Client - Server-Initiated Requests", () => {
       description: "Asks user for input",
       handler: async (_, ctx) => {
         if (!ctx.client.supports("elicitation")) {
-          return { content: [{ type: "text", text: "No elicitation support" }] };
+          return {
+            content: [{ type: "text", text: "No elicitation support" }],
+          };
         }
 
         const result = await ctx.elicit({
@@ -64,7 +66,9 @@ describe("MCP Client - Server-Initiated Requests", () => {
           };
         }
 
-        return { content: [{ type: "text", text: `Action: ${result.action}` }] };
+        return {
+          content: [{ type: "text", text: `Action: ${result.action}` }],
+        };
       },
     });
 

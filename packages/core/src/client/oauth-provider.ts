@@ -230,9 +230,7 @@ export class StandardOAuthProvider implements OAuthProvider {
     return this.parseTokenResponse(data);
   }
 
-  async refreshAccessToken(
-    params: RefreshTokenParams,
-  ): Promise<OAuthTokens> {
+  async refreshAccessToken(params: RefreshTokenParams): Promise<OAuthTokens> {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: params.refreshToken,

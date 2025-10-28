@@ -1,13 +1,13 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: tests */
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
-  McpServer,
-  McpClient,
-  StreamableHttpClientTransport,
-  InMemorySessionAdapter,
-  InMemoryClientSessionAdapter,
-} from "../../src/index.js";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { createTestHarness, type TestServer } from "@internal/test-utils";
+import {
+  InMemoryClientSessionAdapter,
+  InMemorySessionAdapter,
+  McpClient,
+  McpServer,
+  StreamableHttpClientTransport,
+} from "../../src/index.js";
 
 describe("MCP Client - Custom Headers", () => {
   let testServer: TestServer;

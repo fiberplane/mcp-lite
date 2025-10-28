@@ -10,7 +10,10 @@ export {
   type OAuthAdapter,
   type OAuthTokens,
 } from "./oauth-adapter.js";
-export { discoverOAuthEndpoints, type OAuthEndpoints } from "./oauth-discovery.js";
+export {
+  discoverOAuthEndpoints,
+  type OAuthEndpoints,
+} from "./oauth-discovery.js";
 export {
   type AuthorizationFlowResult,
   type ExchangeCodeParams,
@@ -32,9 +35,9 @@ export {
 } from "./transport-http.js";
 export type {
   ClientConnectionInfo,
-  ElicitHandler,
   ElicitationParams,
   ElicitationResult,
+  ElicitHandler,
   SampleHandler,
   SamplingParams,
   SamplingResult,

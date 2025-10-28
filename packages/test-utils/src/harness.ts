@@ -2,11 +2,7 @@
  * Optional in-process server harness for testing
  */
 
-import type {
-  ClientRequestAdapter,
-  McpServer,
-  SessionAdapter,
-} from "mcp-lite";
+import type { ClientRequestAdapter, McpServer, SessionAdapter } from "mcp-lite";
 import { InMemorySessionAdapter, StreamableHttpTransport } from "mcp-lite";
 import type { TestServer } from "./types.js";
 

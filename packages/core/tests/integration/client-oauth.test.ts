@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { serve, type Server } from "bun";
+import { type Server, serve } from "bun";
 import {
+  discoverOAuthEndpoints,
   InMemoryOAuthAdapter,
   McpClient,
   type OAuthConfig,
   StandardOAuthProvider,
   StreamableHttpClientTransport,
-  discoverOAuthEndpoints,
 } from "../../src/index.js";
 
 describe("MCP Client - OAuth Integration", () => {
@@ -60,14 +60,20 @@ describe("MCP Client - OAuth Integration", () => {
             if (!codeVerifier) {
               return new Response(
                 JSON.stringify({ error: "missing_code_verifier" }),
-                { status: 400, headers: { "Content-Type": "application/json" } },
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" },
+                },
               );
             }
 
             if (!resource) {
               return new Response(
                 JSON.stringify({ error: "missing_resource" }),
-                { status: 400, headers: { "Content-Type": "application/json" } },
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" },
+                },
               );
             }
 
@@ -83,14 +89,20 @@ describe("MCP Client - OAuth Integration", () => {
             if (!refreshToken) {
               return new Response(
                 JSON.stringify({ error: "missing_refresh_token" }),
-                { status: 400, headers: { "Content-Type": "application/json" } },
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" },
+                },
               );
             }
 
             if (!resource) {
               return new Response(
                 JSON.stringify({ error: "missing_resource" }),
-                { status: 400, headers: { "Content-Type": "application/json" } },
+                {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" },
+                },
               );
             }
 
@@ -104,10 +116,13 @@ describe("MCP Client - OAuth Integration", () => {
             );
           }
 
-          return new Response(JSON.stringify({ error: "unsupported_grant_type" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          });
+          return new Response(
+            JSON.stringify({ error: "unsupported_grant_type" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         }
 
         return new Response("Not Found", { status: 404 });
@@ -201,7 +216,9 @@ describe("MCP Client - OAuth Integration", () => {
     expect(result.authorizationUrl).toContain("redirect_uri=");
     expect(result.authorizationUrl).toContain("code_challenge=");
     expect(result.authorizationUrl).toContain("code_challenge_method=S256");
-    expect(result.authorizationUrl).toContain(`resource=${encodeURIComponent(mcpServerUrl)}`);
+    expect(result.authorizationUrl).toContain(
+      `resource=${encodeURIComponent(mcpServerUrl)}`,
+    );
     expect(result.authorizationUrl).toContain("scope=mcp%3Aaccess");
     expect(result.codeVerifier).toHaveLength(43);
     expect(result.state).toBeTruthy();
@@ -278,7 +295,9 @@ describe("MCP Client - OAuth Integration", () => {
     const connect = transport.bind(client);
 
     // First connection attempt should fail with 401 and start OAuth flow
-    await expect(connect(mcpServerUrl)).rejects.toThrow("Authentication required");
+    await expect(connect(mcpServerUrl)).rejects.toThrow(
+      "Authentication required",
+    );
 
     // Verify authorization callback was invoked
     expect(onAuthorizationRequired).toHaveBeenCalledTimes(1);
@@ -532,5 +551,103 @@ describe("MCP Client - OAuth Integration", () => {
         oauthProvider: new StandardOAuthProvider(),
       });
     }).toThrow("OAuth configuration incomplete");
+  });
+
+  it("should use origin for discovery when baseUrl has a path (RFC 8707)", async () => {
+    // Create a server that handles both /mcp endpoint and origin-based discovery
+    const serverWithPath = serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+
+        // Discovery MUST be at origin, not at /mcp/.well-known/...
+        if (url.pathname === "/.well-known/oauth-protected-resource") {
+          return new Response(
+            JSON.stringify({
+              resource: `http://localhost:${serverWithPath.port}/mcp`,
+              authorization_servers: [oauthServerUrl],
+              scopes_supported: ["mcp:access"],
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        // This should NOT be called for discovery
+        if (url.pathname === "/mcp/.well-known/oauth-protected-resource") {
+          return new Response("Wrong path - should use origin", {
+            status: 404,
+          });
+        }
+
+        return new Response("Not Found", { status: 404 });
+      },
+    });
+
+    const serverWithPathUrl = `http://localhost:${serverWithPath.port}/mcp`;
+
+    const endpoints = await discoverOAuthEndpoints(serverWithPathUrl);
+
+    expect(endpoints.authorizationServer).toBe(oauthServerUrl);
+    expect(endpoints.authorizationEndpoint).toBe(`${oauthServerUrl}/authorize`);
+    expect(endpoints.tokenEndpoint).toBe(`${oauthServerUrl}/token`);
+
+    serverWithPath.stop();
+  });
+
+  it("should fallback to WWW-Authenticate header when origin discovery fails", async () => {
+    // Create a server that doesn't have origin-based discovery
+    // but provides as_uri in WWW-Authenticate header
+    const serverWithoutDiscovery = serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+
+        // No resource metadata at origin
+        if (url.pathname === "/.well-known/oauth-protected-resource") {
+          return new Response("Not Found", { status: 404 });
+        }
+
+        // MCP endpoint returns 401 with WWW-Authenticate header
+        if (url.pathname === "/mcp" && request.method === "POST") {
+          return new Response("Unauthorized", {
+            status: 401,
+            headers: {
+              "WWW-Authenticate": `Bearer realm="MCP Server", as_uri="${oauthServerUrl}/.well-known/oauth-authorization-server"`,
+            },
+          });
+        }
+
+        return new Response("Not Found", { status: 404 });
+      },
+    });
+
+    const serverWithoutDiscoveryUrl = `http://localhost:${serverWithoutDiscovery.port}/mcp`;
+
+    const endpoints = await discoverOAuthEndpoints(serverWithoutDiscoveryUrl);
+
+    expect(endpoints.authorizationServer).toBe(oauthServerUrl);
+    expect(endpoints.authorizationEndpoint).toBe(`${oauthServerUrl}/authorize`);
+    expect(endpoints.tokenEndpoint).toBe(`${oauthServerUrl}/token`);
+    expect(endpoints.scopes).toEqual([]); // No scopes from resource metadata
+
+    serverWithoutDiscovery.stop();
+  });
+
+  it("should fail gracefully when neither discovery method works", async () => {
+    // Create a server that has no discovery mechanism
+    const serverWithNoDiscovery = serve({
+      port: 0,
+      async fetch(_request) {
+        return new Response("Not Found", { status: 404 });
+      },
+    });
+
+    const serverWithNoDiscoveryUrl = `http://localhost:${serverWithNoDiscovery.port}/mcp`;
+
+    await expect(
+      discoverOAuthEndpoints(serverWithNoDiscoveryUrl),
+    ).rejects.toThrow("Failed to fetch resource metadata");
+
+    serverWithNoDiscovery.stop();
   });
 });
