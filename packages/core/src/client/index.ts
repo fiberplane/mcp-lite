@@ -9,7 +9,13 @@ export {
   InMemoryOAuthAdapter,
   type OAuthAdapter,
   type OAuthTokens,
+  type StoredClientCredentials,
 } from "./oauth-adapter.js";
+export {
+  type ClientCredentials,
+  type ClientMetadata,
+  registerOAuthClient,
+} from "./oauth-dcr.js";
 export {
   discoverOAuthEndpoints,
   type OAuthEndpoints,

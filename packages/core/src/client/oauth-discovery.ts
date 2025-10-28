@@ -8,6 +8,8 @@ export interface OAuthEndpoints {
   authorizationEndpoint: string;
   /** Token endpoint URL for exchanging codes and refreshing tokens */
   tokenEndpoint: string;
+  /** Dynamic Client Registration endpoint (RFC 7591) */
+  registrationEndpoint?: string;
   /** Scopes required for accessing this resource server */
   scopes: string[];
 }
@@ -21,6 +23,7 @@ function validateAndReturnEndpoints(
   tokenEndpoint: string,
   codeChallenges: string[],
   scopes: string[],
+  registrationEndpoint?: string,
 ): OAuthEndpoints {
   if (!authorizationEndpoint || !tokenEndpoint) {
     throw new Error(
@@ -38,6 +41,7 @@ function validateAndReturnEndpoints(
     authorizationServer,
     authorizationEndpoint,
     tokenEndpoint,
+    registrationEndpoint,
     scopes,
   };
 }
@@ -121,6 +125,7 @@ export async function discoverOAuthEndpoints(
           authorization_endpoint?: string;
           token_endpoint?: string;
           code_challenge_methods_supported?: string[];
+          registration_endpoint?: string;
           issuer?: string;
         };
 
@@ -133,6 +138,7 @@ export async function discoverOAuthEndpoints(
           serverMetadata.token_endpoint ?? "",
           serverMetadata.code_challenge_methods_supported || [],
           [], // scopes from resource metadata not available
+          serverMetadata.registration_endpoint,
         );
       }
     }
@@ -177,11 +183,13 @@ export async function discoverOAuthEndpoints(
     authorization_endpoint?: string;
     token_endpoint?: string;
     code_challenge_methods_supported?: string[];
+    registration_endpoint?: string;
   };
 
   // Extract endpoints
   const authorizationEndpoint = serverMetadata.authorization_endpoint ?? "";
   const tokenEndpoint = serverMetadata.token_endpoint ?? "";
+  const registrationEndpoint = serverMetadata.registration_endpoint;
   const supportedChallengeMethods: string[] =
     serverMetadata.code_challenge_methods_supported || [];
 
@@ -191,5 +199,6 @@ export async function discoverOAuthEndpoints(
     tokenEndpoint,
     supportedChallengeMethods,
     scopes,
+    registrationEndpoint,
   );
 }

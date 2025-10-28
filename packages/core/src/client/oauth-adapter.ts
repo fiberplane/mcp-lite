@@ -15,6 +15,20 @@ export interface OAuthTokens {
 }
 
 /**
+ * OAuth client credentials from Dynamic Client Registration (RFC 7591)
+ */
+export interface StoredClientCredentials {
+  /** OAuth client identifier */
+  clientId: string;
+  /** Client secret (optional for public clients) */
+  clientSecret?: string;
+  /** Registration access token for updating client metadata */
+  registrationAccessToken?: string;
+  /** Registration client URI for updating/deleting client */
+  registrationClientUri?: string;
+}
+
+/**
  * Adapter interface for OAuth token persistence
  *
  * Implementations can store tokens in memory, localStorage, secure storage, database, etc.
@@ -53,12 +67,43 @@ export interface OAuthAdapter {
    * @returns True if a valid token exists, false otherwise
    */
   hasValidToken(resource: string): Promise<boolean> | boolean;
+
+  /**
+   * Store OAuth client credentials for a specific authorization server
+   *
+   * @param authorizationServer - Authorization server URL
+   * @param credentials - Client credentials to store
+   */
+  storeClientCredentials(
+    authorizationServer: string,
+    credentials: StoredClientCredentials,
+  ): Promise<void> | void;
+
+  /**
+   * Retrieve OAuth client credentials for a specific authorization server
+   *
+   * @param authorizationServer - Authorization server URL
+   * @returns Client credentials if found, undefined otherwise
+   */
+  getClientCredentials(
+    authorizationServer: string,
+  ):
+    | Promise<StoredClientCredentials | undefined>
+    | StoredClientCredentials
+    | undefined;
+
+  /**
+   * Delete OAuth client credentials for a specific authorization server
+   *
+   * @param authorizationServer - Authorization server URL
+   */
+  deleteClientCredentials(authorizationServer: string): Promise<void> | void;
 }
 
 /**
  * In-memory OAuth token adapter
  *
- * Stores tokens in memory. Tokens are lost when the process exits.
+ * Stores tokens and client credentials in memory. Data is lost when the process exits.
  * Suitable for testing and short-lived clients.
  *
  * For production use, implement a persistent adapter that stores tokens
@@ -66,6 +111,7 @@ export interface OAuthAdapter {
  */
 export class InMemoryOAuthAdapter implements OAuthAdapter {
   private tokens = new Map<string, OAuthTokens>();
+  private clientCredentials = new Map<string, StoredClientCredentials>();
 
   storeTokens(resource: string, tokens: OAuthTokens): void {
     this.tokens.set(resource, tokens);
@@ -89,5 +135,22 @@ export class InMemoryOAuthAdapter implements OAuthAdapter {
     const now = Math.floor(Date.now() / 1000);
     const BUFFER_SECONDS = 5 * 60;
     return tokens.expiresAt > now + BUFFER_SECONDS;
+  }
+
+  storeClientCredentials(
+    authorizationServer: string,
+    credentials: StoredClientCredentials,
+  ): void {
+    this.clientCredentials.set(authorizationServer, credentials);
+  }
+
+  getClientCredentials(
+    authorizationServer: string,
+  ): StoredClientCredentials | undefined {
+    return this.clientCredentials.get(authorizationServer);
+  }
+
+  deleteClientCredentials(authorizationServer: string): void {
+    this.clientCredentials.delete(authorizationServer);
   }
 }

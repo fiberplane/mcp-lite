@@ -9,6 +9,8 @@ import type { InitializeResult, JsonRpcRes } from "../types.js";
 import type { McpClient } from "./client.js";
 import { Connection } from "./connection.js";
 import type { OAuthAdapter } from "./oauth-adapter.js";
+import { registerOAuthClient } from "./oauth-dcr.js";
+import { discoverOAuthEndpoints } from "./oauth-discovery.js";
 import type { OAuthProvider } from "./oauth-provider.js";
 import type { ClientSessionAdapter } from "./session-adapter.js";
 
@@ -16,10 +18,20 @@ import type { ClientSessionAdapter } from "./session-adapter.js";
  * OAuth configuration for authenticated MCP servers
  */
 export interface OAuthConfig {
-  /** OAuth client ID */
-  clientId: string;
+  /**
+   * OAuth client ID (optional).
+   * If not provided, Dynamic Client Registration (RFC 7591) will be used
+   * to obtain a client ID automatically if the server supports it.
+   */
+  clientId?: string;
   /** OAuth redirect URI for authorization callback */
   redirectUri: string;
+  /**
+   * Client name for Dynamic Client Registration.
+   * Used when clientId is not provided and DCR is performed.
+   * Defaults to "MCP Client" if not specified.
+   */
+  clientName?: string;
   /**
    * Callback invoked when user authorization is required.
    * Implementation should redirect user to the authorization URL.
@@ -35,6 +47,7 @@ interface PendingAuthState {
   codeVerifier: string;
   state: string;
   tokenEndpoint: string;
+  clientId: string;
 }
 
 /**
@@ -132,6 +145,11 @@ export class StreamableHttpClientTransport {
         throw new Error(
           "OAuth configuration incomplete: oauthAdapter, oauthProvider, and oauthConfig must all be provided together",
         );
+      }
+
+      // Validate that redirectUri is always provided
+      if (!this.oauthConfig.redirectUri) {
+        throw new Error("OAuth configuration missing redirectUri");
       }
     }
   }
@@ -310,7 +328,7 @@ export class StreamableHttpClientTransport {
       tokenEndpoint: pendingAuth.tokenEndpoint,
       code,
       codeVerifier: pendingAuth.codeVerifier,
-      clientId: this.oauthConfig.clientId,
+      clientId: pendingAuth.clientId,
       redirectUri: this.oauthConfig.redirectUri,
       resource: baseUrl,
     });
@@ -357,7 +375,7 @@ export class StreamableHttpClientTransport {
       const newTokens = await this.oauthProvider.refreshAccessToken({
         tokenEndpoint: pendingAuth.tokenEndpoint,
         refreshToken: tokens.refreshToken,
-        clientId: this.oauthConfig.clientId,
+        clientId: pendingAuth.clientId,
         resource,
       });
 
@@ -379,16 +397,53 @@ export class StreamableHttpClientTransport {
       throw new Error("OAuth not configured for this transport");
     }
 
-    // Import discovery function dynamically to avoid circular dependency
-    const { discoverOAuthEndpoints } = await import("./oauth-discovery.js");
-
     // Discover OAuth endpoints
     const endpoints = await discoverOAuthEndpoints(baseUrl);
+
+    // Determine client ID to use (from config or DCR)
+    let clientId = this.oauthConfig.clientId;
+
+    // If no client ID provided, try Dynamic Client Registration
+    if (!clientId) {
+      // Check if we already have registered client credentials for this authorization server
+      const storedCredentials = await this.oauthAdapter.getClientCredentials(
+        endpoints.authorizationServer,
+      );
+
+      if (storedCredentials) {
+        clientId = storedCredentials.clientId;
+      } else if (endpoints.registrationEndpoint) {
+        // Perform Dynamic Client Registration
+        const credentials = await registerOAuthClient(
+          endpoints.registrationEndpoint,
+          {
+            clientName: this.oauthConfig.clientName || "MCP Client",
+            redirectUris: [this.oauthConfig.redirectUri],
+            grantTypes: ["authorization_code", "refresh_token"],
+            tokenEndpointAuthMethod: "none",
+            scope: endpoints.scopes.join(" "),
+          },
+        );
+
+        // Store registered client credentials
+        await this.oauthAdapter.storeClientCredentials(
+          endpoints.authorizationServer,
+          credentials,
+        );
+
+        clientId = credentials.clientId;
+      } else {
+        throw new Error(
+          "No client ID provided and Dynamic Client Registration not available. " +
+            "Either provide a clientId in OAuthConfig or ensure the server supports DCR.",
+        );
+      }
+    }
 
     // Start authorization flow
     const flowResult = await this.oauthProvider.startAuthorizationFlow({
       authorizationEndpoint: endpoints.authorizationEndpoint,
-      clientId: this.oauthConfig.clientId,
+      clientId,
       redirectUri: this.oauthConfig.redirectUri,
       scopes: endpoints.scopes,
       resource: baseUrl,
@@ -399,6 +454,7 @@ export class StreamableHttpClientTransport {
       codeVerifier: flowResult.codeVerifier,
       state: flowResult.state,
       tokenEndpoint: endpoints.tokenEndpoint,
+      clientId,
     });
 
     // Notify application to redirect user
