@@ -1,3 +1,5 @@
+import { SUPPORTED_MCP_PROTOCOL_VERSIONS } from "../constants.js";
+
 /**
  * OAuth endpoint information discovered from an MCP server
  */
@@ -99,7 +101,7 @@ export async function discoverOAuthEndpoints(
         id: "discovery",
         method: "initialize",
         params: {
-          protocolVersion: "2024-11-05",
+          protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS.V2025_06_18,
           clientInfo: { name: "discovery", version: "1.0.0" },
           capabilities: {},
         },
