@@ -283,6 +283,7 @@ export interface Tool {
   inputSchema: unknown;
   outputSchema?: unknown;
   title?: string;
+  annotations?: ToolAnnotations;
   _meta?: { [key: string]: unknown };
 }
 
@@ -383,6 +384,14 @@ export interface Annotations {
   audience?: Role[];
   lastModified?: string;
   priority?: number;
+}
+
+export interface ToolAnnotations extends Annotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 export type TextResourceContents = {

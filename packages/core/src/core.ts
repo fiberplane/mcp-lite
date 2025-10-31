@@ -39,6 +39,7 @@ import type {
   ResourceVarValidators,
   SchemaAdapter,
   Tool,
+  ToolAnnotations,
   ToolCallResult,
   ToolEntry,
 } from "./types.js";
@@ -441,6 +442,14 @@ export class McpServer {
    * @param def - Tool definition with schema, description, handler, and optional metadata
    * @param def.description - Human-readable description of what the tool does
    * @param def.title - Optional display title for the tool
+   * @param def.annotations - Optional annotations for tool behavior and usage hints
+   * @param def.annotations.audience - Intended users (e.g., ["assistant"], ["user"], or ["assistant", "user"])
+   * @param def.annotations.priority - Importance level from 0 (lowest) to 1 (highest)
+   * @param def.annotations.title - Alternative display title (prioritized over def.title)
+   * @param def.annotations.readOnlyHint - Whether the tool only reads data without modifications
+   * @param def.annotations.destructiveHint - Whether the tool makes potentially irreversible changes
+   * @param def.annotations.idempotentHint - Whether repeated calls produce the same result
+   * @param def.annotations.openWorldHint - Whether the tool interacts with external systems
    * @param def._meta - Optional arbitrary metadata object passed through to clients via tools/list
    * @param def.inputSchema - Schema for validating input arguments (JSON Schema or Standard Schema)
    * @param def.outputSchema - Schema for validating structured output (JSON Schema or Standard Schema)
@@ -520,6 +529,42 @@ export class McpServer {
    *   })
    * });
    * ```
+   *
+   * @example With annotations (read-only tool)
+   * ```typescript
+   * server.tool("getConfig", {
+   *   description: "Retrieves configuration settings",
+   *   annotations: {
+   *     readOnlyHint: true,
+   *     audience: ["assistant"],
+   *     priority: 0.8
+   *   },
+   *   handler: () => ({
+   *     content: [{ type: "text", text: JSON.stringify(config) }]
+   *   })
+   * });
+   * ```
+   *
+   * @example With annotations (destructive tool)
+   * ```typescript
+   * server.tool("deleteDatabase", {
+   *   description: "Permanently deletes the database",
+   *   annotations: {
+   *     destructiveHint: true,
+   *     readOnlyHint: false,
+   *     audience: ["user"],
+   *     priority: 0.3,
+   *     openWorldHint: true
+   *   },
+   *   inputSchema: z.object({ confirm: z.boolean() }),
+   *   handler: async (args) => {
+   *     if (args.confirm) {
+   *       await dropDatabase();
+   *     }
+   *     return { content: [{ type: "text", text: "Database deleted" }] };
+   *   }
+   * });
+   * ```
    */
   // Overload 1: Both input and output are Standard Schema (full type inference)
   tool<
@@ -530,6 +575,7 @@ export class McpServer {
     def: {
       description?: string;
       title?: string;
+      annotations?: ToolAnnotations;
       _meta?: { [key: string]: unknown };
       inputSchema: SInput;
       outputSchema: SOutput;
@@ -548,6 +594,7 @@ export class McpServer {
     def: {
       description?: string;
       title?: string;
+      annotations?: ToolAnnotations;
       _meta?: { [key: string]: unknown };
       inputSchema: S;
       outputSchema?: unknown;
@@ -564,6 +611,7 @@ export class McpServer {
     def: {
       description?: string;
       title?: string;
+      annotations?: ToolAnnotations;
       _meta?: { [key: string]: unknown };
       inputSchema?: unknown;
       outputSchema: S;
@@ -582,6 +630,7 @@ export class McpServer {
     def: {
       description?: string;
       title?: string;
+      annotations?: ToolAnnotations;
       _meta?: { [key: string]: unknown };
       inputSchema?: unknown;
       outputSchema?: unknown;
@@ -598,6 +647,7 @@ export class McpServer {
     def: {
       description?: string;
       title?: string;
+      annotations?: ToolAnnotations;
       _meta?: { [key: string]: unknown };
       inputSchema?: unknown | StandardSchemaV1<TArgs>;
       outputSchema?: unknown | StandardSchemaV1<unknown>;
@@ -630,6 +680,9 @@ export class McpServer {
     }
     if (def.title) {
       metadata.title = def.title;
+    }
+    if (def.annotations) {
+      metadata.annotations = def.annotations;
     }
     if (def._meta) {
       metadata._meta = def._meta;

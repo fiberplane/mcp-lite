@@ -496,6 +496,72 @@ server.tool("experimental-feature", {
 
 The `_meta` and `title` from the definition appear in `tools/list` responses. Tool handlers can also return `_meta` in the result for per-call metadata like execution time or cache status.
 
+### Tool with Annotations
+
+Annotations provide metadata about tool behavior and usage hints to help clients make informed decisions. Annotations include behavioral hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint), audience targeting, priority levels, and timestamps.
+
+```typescript
+// Read-only tool
+server.tool("getConfig", {
+  description: "Retrieves configuration settings",
+  annotations: {
+    readOnlyHint: true,
+    audience: ["assistant"],
+    priority: 0.8,
+  },
+  handler: () => ({
+    content: [{ type: "text", text: JSON.stringify(config) }],
+  }),
+});
+
+// Destructive tool
+server.tool("deleteDatabase", {
+  description: "Permanently deletes the database",
+  annotations: {
+    destructiveHint: true,
+    readOnlyHint: false,
+    audience: ["user"],
+    priority: 0.3,
+    openWorldHint: true,
+  },
+  inputSchema: z.object({ confirm: z.boolean() }),
+  handler: async (args) => {
+    if (args.confirm) {
+      await dropDatabase();
+    }
+    return { content: [{ type: "text", text: "Database deleted" }] };
+  },
+});
+
+// Idempotent tool
+server.tool("setConfig", {
+  description: "Updates a configuration value",
+  annotations: {
+    idempotentHint: true,
+    readOnlyHint: false,
+    priority: 0.5,
+    lastModified: "2025-01-15T10:00:00Z",
+  },
+  inputSchema: z.object({ key: z.string(), value: z.string() }),
+  handler: (args) => ({
+    content: [{ type: "text", text: `Set ${args.key} to ${args.value}` }],
+  }),
+});
+```
+
+**Annotation Fields:**
+
+- **`readOnlyHint`** (boolean): Tool only reads data without making modifications
+- **`destructiveHint`** (boolean): Tool makes potentially irreversible changes
+- **`idempotentHint`** (boolean): Repeated calls produce the same result
+- **`openWorldHint`** (boolean): Tool interacts with external systems beyond the server's control
+- **`audience`** (string[]): Intended users - `["assistant"]`, `["user"]`, or both
+- **`priority`** (number): Importance level from 0 (lowest) to 1 (highest)
+- **`lastModified`** (string): ISO 8601 timestamp of last modification
+- **`title`** (string): Human-readable display name (alternative to top-level `title`)
+
+Annotations appear in `tools/list` responses and help clients understand tool capabilities, risks, and appropriate usage patterns. See the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server/tools) for more details.
+
 ### Resources
 
 Resources are URI-identified content.
