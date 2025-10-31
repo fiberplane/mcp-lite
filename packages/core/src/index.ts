@@ -1,3 +1,41 @@
+export type { ToolAdapter } from "./client/adapters/index.js";
+// Client exports
+export {
+  type AuthorizationFlowResult,
+  type ClientCapabilities,
+  type ClientConnectionInfo,
+  type ClientCredentials,
+  type ClientMetadata,
+  type ClientSessionAdapter,
+  type ClientSessionData,
+  Connection,
+  type ConnectionOptions,
+  type ConnectOptions,
+  discoverOAuthEndpoints,
+  type ElicitationParams,
+  type ElicitationResult,
+  type ElicitHandler,
+  type ExchangeCodeParams,
+  InMemoryClientSessionAdapter,
+  InMemoryOAuthAdapter,
+  McpClient,
+  type McpClientOptions,
+  type OAuthAdapter,
+  type OAuthConfig,
+  type OAuthEndpoints,
+  type OAuthProvider,
+  type OAuthTokens,
+  type RefreshTokenParams,
+  registerOAuthClient,
+  type SampleHandler,
+  type SamplingParams,
+  type SamplingResult,
+  StandardOAuthProvider,
+  type StartAuthorizationFlowParams,
+  type StoredClientCredentials,
+  StreamableHttpClientTransport,
+  type StreamableHttpClientTransportOptions,
+} from "./client/index.js";
 export type { ClientRequestAdapter } from "./client-request-adapter.js";
 export { InMemoryClientRequestAdapter } from "./client-request-adapter.js";
 export {

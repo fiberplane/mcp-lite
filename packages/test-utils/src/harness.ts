@@ -2,7 +2,7 @@
  * Optional in-process server harness for testing
  */
 
-import type { McpServer, SessionAdapter } from "mcp-lite";
+import type { ClientRequestAdapter, McpServer, SessionAdapter } from "mcp-lite";
 import { InMemorySessionAdapter, StreamableHttpTransport } from "mcp-lite";
 import type { TestServer } from "./types.js";
 
@@ -11,6 +11,8 @@ export interface TestHarnessOptions {
   sessionId?: string;
   /** Session adapter instance */
   sessionAdapter?: SessionAdapter;
+  /** Client request adapter instance */
+  clientRequestAdapter?: ClientRequestAdapter;
   /** Port for server (defaults to 0 for random) */
   port?: number;
 }
@@ -22,7 +24,7 @@ export async function createTestHarness(
   server: McpServer,
   options: TestHarnessOptions = {},
 ): Promise<TestServer> {
-  const { sessionId, sessionAdapter, port = 0 } = options;
+  const { sessionId, sessionAdapter, clientRequestAdapter, port = 0 } = options;
 
   const transportOptions: ConstructorParameters<
     typeof StreamableHttpTransport
@@ -40,6 +42,11 @@ export async function createTestHarness(
   } else if (sessionAdapter !== undefined) {
     // Session-based with random IDs
     transportOptions.sessionAdapter = sessionAdapter;
+  }
+
+  // Add client request adapter if provided
+  if (clientRequestAdapter !== undefined) {
+    transportOptions.clientRequestAdapter = clientRequestAdapter;
   }
 
   // If neither sessionId nor sessionAdapter are provided, create stateless transport
