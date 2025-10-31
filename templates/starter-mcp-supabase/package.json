@@ -7,9 +7,9 @@
   },
   "dependencies": {
     "hono": "^4.9.12",
-    "mcp-lite": "^0.8.1"
+    "mcp-lite": "^0.9.0"
   },
   "devDependencies": {
-    "supabase": "^2.53.6"
+    "supabase": "^2.54.11"
   }
 }

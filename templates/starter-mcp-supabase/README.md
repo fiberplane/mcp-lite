@@ -9,14 +9,11 @@ Minimal MCP server built with mcp-lite and deployed as a Supabase Edge Function 
 
 ## Getting Started
 
-1. **Initialize Supabase project** (if not already done):
+1. **Start local development**:
 ```bash
-supabase init
-```
-
-2. **Start local development**:
-```bash
+# Start Supabase services
 supabase start
+# Serve your MCP function locally
 supabase functions serve --no-verify-jwt mcp-server
 ```
 
@@ -24,7 +21,7 @@ The MCP server will be available at:
 - Main endpoint: `http://localhost:54321/functions/v1/mcp-server/mcp`
 - Health check: `http://localhost:54321/functions/v1/mcp-server/health`
 
-3. **Deploy to Supabase**:
+2. **Deploy to Supabase**:
 ```bash
 supabase functions deploy --no-verify-jwt mcp-server
 ```
