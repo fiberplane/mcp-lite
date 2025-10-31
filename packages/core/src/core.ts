@@ -66,9 +66,11 @@ function isSupportedVersion(version: string): version is SupportedVersion {
   );
 }
 
-async function runMiddlewares(
-  middlewares: Middleware[],
-  ctx: MCPServerContext,
+async function runMiddlewares<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+>(
+  middlewares: Middleware<TConfig>[],
+  ctx: MCPServerContext<TConfig>,
   tail: () => Promise<void>,
 ): Promise<void> {
   const dispatch = async (i: number): Promise<void> => {
@@ -291,19 +293,21 @@ export interface McpServerOptions {
  * @see {@link ToolCallResult} For tool return value format
  * @see {@link MCPServerContext} For request context interface
  */
-export class McpServer {
-  private methods: Record<string, MethodHandler> = {};
+export class McpServer<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+> {
+  private methods: Record<string, MethodHandler<TConfig>> = {};
   private initialized = false;
   private serverInfo: { name: string; version: string };
-  private middlewares: Middleware[] = [];
+  private middlewares: Middleware<TConfig>[] = [];
   private capabilities: InitializeResult["capabilities"] = {};
-  private onErrorHandler?: OnError;
+  private onErrorHandler?: OnError<TConfig>;
   private schemaAdapter?: SchemaAdapter;
   private logger: Logger;
 
-  private tools = new Map<string, ToolEntry>();
-  private prompts = new Map<string, PromptEntry>();
-  private resources = new Map<string, ResourceEntry>();
+  private tools = new Map<string, ToolEntry<TConfig>>();
+  private prompts = new Map<string, PromptEntry<TConfig>>();
+  private resources = new Map<string, ResourceEntry<TConfig>>();
 
   private notificationSender?: (
     sessionId: string | undefined,
@@ -396,7 +400,7 @@ export class McpServer {
    * });
    * ```
    */
-  use(middleware: Middleware): this {
+  use(middleware: Middleware<TConfig>): this {
     this.middlewares.push(middleware);
     return this;
   }
@@ -424,7 +428,7 @@ export class McpServer {
    * });
    * ```
    */
-  onError(handler: OnError): this {
+  onError(handler: OnError<TConfig>): this {
     this.onErrorHandler = handler;
     return this;
   }
@@ -535,7 +539,7 @@ export class McpServer {
       outputSchema: SOutput;
       handler: (
         args: InferOutput<SInput>,
-        ctx: MCPServerContext,
+        ctx: MCPServerContext<TConfig>,
       ) =>
         | Promise<ToolCallResult<InferOutput<SOutput>>>
         | ToolCallResult<InferOutput<SOutput>>;
@@ -553,7 +557,7 @@ export class McpServer {
       outputSchema?: unknown;
       handler: (
         args: InferOutput<S>,
-        ctx: MCPServerContext,
+        ctx: MCPServerContext<TConfig>,
       ) => Promise<ToolCallResult> | ToolCallResult;
     },
   ): this;
@@ -569,7 +573,7 @@ export class McpServer {
       outputSchema: S;
       handler: (
         args: unknown,
-        ctx: MCPServerContext,
+        ctx: MCPServerContext<TConfig>,
       ) =>
         | Promise<ToolCallResult<InferOutput<S>>>
         | ToolCallResult<InferOutput<S>>;
@@ -587,7 +591,7 @@ export class McpServer {
       outputSchema?: unknown;
       handler: (
         args: TArgs,
-        ctx: MCPServerContext,
+        ctx: MCPServerContext<TConfig>,
       ) => Promise<ToolCallResult<TOutput>> | ToolCallResult<TOutput>;
     },
   ): this;
@@ -603,7 +607,7 @@ export class McpServer {
       outputSchema?: unknown | StandardSchemaV1<unknown>;
       handler: (
         args: TArgs,
-        ctx: MCPServerContext,
+        ctx: MCPServerContext<TConfig>,
       ) => Promise<ToolCallResult> | ToolCallResult;
     },
   ): this {
@@ -638,10 +642,10 @@ export class McpServer {
       metadata.outputSchema = outputSchemaResolved.resolvedSchema;
     }
 
-    const entry: ToolEntry = {
+    const entry: ToolEntry<TConfig> = {
       metadata,
       // TODO - We could avoid this cast if MethodHandler had a generic type for `params` that defaulted to unknown, but here we could pass TArgs
-      handler: def.handler as MethodHandler,
+      handler: def.handler as MethodHandler<TConfig>,
       validator,
       outputValidator: outputSchemaResolved.validator,
     };
@@ -714,7 +718,7 @@ export class McpServer {
   resource(
     template: string,
     meta: ResourceMeta,
-    handler: ResourceHandler,
+    handler: ResourceHandler<TConfig>,
   ): this;
 
   /**
@@ -742,20 +746,21 @@ export class McpServer {
     template: string,
     meta: ResourceMeta,
     validators: ResourceVarValidators,
-    handler: ResourceHandler,
+    handler: ResourceHandler<TConfig>,
   ): this;
 
   resource(
     template: string,
     meta: ResourceMeta,
-    validatorsOrHandler: ResourceVarValidators | ResourceHandler,
-    handler?: ResourceHandler,
+    validatorsOrHandler: ResourceVarValidators | ResourceHandler<TConfig>,
+    handler?: ResourceHandler<TConfig>,
   ): this {
     if (!this.capabilities.resources) {
       this.capabilities.resources = { listChanged: true };
     }
 
-    const actualHandler = handler || (validatorsOrHandler as ResourceHandler);
+    const actualHandler =
+      handler || (validatorsOrHandler as ResourceHandler<TConfig>);
     const validators = handler
       ? (validatorsOrHandler as ResourceVarValidators)
       : undefined;
@@ -775,7 +780,7 @@ export class McpServer {
           ...meta,
         };
 
-    const entry: ResourceEntry = {
+    const entry: ResourceEntry<TConfig> = {
       metadata,
       handler: actualHandler,
       validators,
@@ -873,7 +878,7 @@ export class McpServer {
       _meta?: { [key: string]: unknown };
       arguments?: unknown | StandardSchemaV1<TArgs>;
       inputSchema?: unknown | StandardSchemaV1<TArgs>;
-      handler: PromptHandler<TArgs>;
+      handler: PromptHandler<TArgs, TConfig>;
     },
   ): this {
     if (!this.capabilities.prompts) {
@@ -917,9 +922,9 @@ export class McpServer {
       metadata._meta = def._meta;
     }
 
-    const entry: PromptEntry = {
+    const entry: PromptEntry<TConfig> = {
       metadata,
-      handler: def.handler as PromptHandler,
+      handler: def.handler as PromptHandler<unknown, TConfig>,
       validator,
     };
 
@@ -961,7 +966,7 @@ export class McpServer {
    * See examples/composing-servers for a full working example with multiple
    * child servers, middleware composition, and real-world patterns.
    */
-  group(child: McpServer): this;
+  group(child: McpServer<TConfig>): this;
 
   /**
    * Mount a child server with namespaced tools and prompts.
@@ -986,7 +991,7 @@ export class McpServer {
    * See examples/composing-servers for a full working example with multiple
    * child servers, middleware composition, and real-world patterns.
    */
-  group(prefix: string, child: McpServer): this;
+  group(prefix: string, child: McpServer<TConfig>): this;
 
   /**
    * Mount a child server with flexible namespacing options.
@@ -1012,23 +1017,26 @@ export class McpServer {
    * .group({ prefix: 'ai', suffix: 'v2' }, server);  // 'ai/generateText_v2'
    * ```
    */
-  group(options: { prefix?: string; suffix?: string }, child: McpServer): this;
+  group(
+    options: { prefix?: string; suffix?: string },
+    child: McpServer<TConfig>,
+  ): this;
 
   group(
     prefixOrOptionsOrChild:
       | string
       | { prefix?: string; suffix?: string }
-      | McpServer,
-    child?: McpServer,
+      | McpServer<TConfig>,
+    child?: McpServer<TConfig>,
   ): this {
     let prefix = "";
     let suffix = "";
-    let childServer: McpServer;
+    let childServer: McpServer<TConfig>;
 
     if (typeof prefixOrOptionsOrChild === "string") {
       // .group("prefix", child)
       prefix = prefixOrOptionsOrChild;
-      childServer = child as McpServer;
+      childServer = child as McpServer<TConfig>;
     } else if (prefixOrOptionsOrChild instanceof McpServer) {
       // .group(child)
       childServer = prefixOrOptionsOrChild;
@@ -1036,7 +1044,7 @@ export class McpServer {
       // .group({ prefix?, suffix? }, child)
       prefix = prefixOrOptionsOrChild.prefix || "";
       suffix = prefixOrOptionsOrChild.suffix || "";
-      childServer = child as McpServer;
+      childServer = child as McpServer<TConfig>;
     }
 
     this.mountChild(prefix, suffix, childServer);
@@ -1049,9 +1057,9 @@ export class McpServer {
    * @internal
    */
   protected _exportRegistries(): {
-    tools: Array<{ name: string; entry: ToolEntry }>;
-    prompts: Array<{ name: string; entry: PromptEntry }>;
-    resources: Array<{ template: string; entry: ResourceEntry }>;
+    tools: Array<{ name: string; entry: ToolEntry<TConfig> }>;
+    prompts: Array<{ name: string; entry: PromptEntry<TConfig> }>;
+    resources: Array<{ template: string; entry: ResourceEntry<TConfig> }>;
   } {
     return {
       tools: Array.from(this.tools.entries()).map(([name, entry]) => ({
@@ -1073,7 +1081,7 @@ export class McpServer {
    * Used internally by .group() to compose middleware chains.
    * @internal
    */
-  protected _exportMiddlewares(): Middleware[] {
+  protected _exportMiddlewares(): Middleware<TConfig>[] {
     return [...this.middlewares];
   }
 
@@ -1084,9 +1092,9 @@ export class McpServer {
    * @internal
    */
   private wrapWithMiddlewares(
-    mws: Middleware[],
-    handler: MethodHandler,
-  ): MethodHandler {
+    mws: Middleware<TConfig>[],
+    handler: MethodHandler<TConfig>,
+  ): MethodHandler<TConfig> {
     return async (params, ctx) => {
       let result: unknown;
       let handlerCalled = false;
@@ -1117,9 +1125,9 @@ export class McpServer {
    * @internal
    */
   private wrapResourceHandler(
-    mws: Middleware[],
-    handler: ResourceHandler,
-  ): ResourceHandler {
+    mws: Middleware<TConfig>[],
+    handler: ResourceHandler<TConfig>,
+  ): ResourceHandler<TConfig> {
     return async (uri, vars, ctx) => {
       let result: ResourceReadResult | undefined;
       let handlerCalled = false;
@@ -1159,7 +1167,11 @@ export class McpServer {
    * duplicates are silently skipped.
    * @internal
    */
-  private mountChild(prefix: string, suffix: string, child: McpServer): void {
+  private mountChild(
+    prefix: string,
+    suffix: string,
+    child: McpServer<TConfig>,
+  ): void {
     /**
      * Adds prefix or suffix to a tool name before mounting
      */
@@ -1183,7 +1195,7 @@ export class McpServer {
             ? this.wrapWithMiddlewares(childMWs, entry.handler)
             : entry.handler;
 
-        const wrappedEntry: ToolEntry = {
+        const wrappedEntry: ToolEntry<TConfig> = {
           metadata: { ...entry.metadata, name: qualifiedName },
           handler: wrappedHandler,
           validator: entry.validator,
@@ -1207,11 +1219,11 @@ export class McpServer {
           childMWs.length > 0
             ? (this.wrapWithMiddlewares(
                 childMWs,
-                entry.handler as MethodHandler,
-              ) as PromptHandler)
+                entry.handler as MethodHandler<TConfig>,
+              ) as PromptHandler<unknown, TConfig>)
             : entry.handler;
 
-        const wrappedEntry: PromptEntry = {
+        const wrappedEntry: PromptEntry<TConfig> = {
           metadata: { ...entry.metadata, name: qualifiedName },
           handler: wrappedHandler,
           validator: entry.validator,
@@ -1234,7 +1246,7 @@ export class McpServer {
             ? this.wrapResourceHandler(childMWs, entry.handler)
             : entry.handler;
 
-        const wrappedEntry: ResourceEntry = {
+        const wrappedEntry: ResourceEntry<TConfig> = {
           ...entry,
           handler: wrappedHandler,
         };
@@ -1332,7 +1344,7 @@ export class McpServer {
             )
         : undefined;
 
-    const ctx = createContext(message as JsonRpcMessage, requestId, {
+    const ctx = createContext<TConfig>(message as JsonRpcMessage, requestId, {
       sessionId,
       sessionProtocolVersion: contextOptions.sessionProtocolVersion,
       progressToken,
@@ -1408,7 +1420,7 @@ export class McpServer {
 
   private async handleToolsList(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<ListToolsResult> {
     return {
       tools: Array.from(this.tools.values()).map((t) => t.metadata),
@@ -1417,7 +1429,7 @@ export class McpServer {
 
   private async handleToolsCall(
     params: unknown,
-    ctx: MCPServerContext,
+    ctx: MCPServerContext<TConfig>,
   ): Promise<ToolCallResult> {
     if (!isObject(params)) {
       throw new RpcError(
@@ -1482,7 +1494,7 @@ export class McpServer {
 
   private async handlePromptsList(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<ListPromptsResult> {
     return {
       prompts: Array.from(this.prompts.values()).map((p) => p.metadata),
@@ -1491,7 +1503,7 @@ export class McpServer {
 
   private async handlePromptsGet(
     params: unknown,
-    ctx: MCPServerContext,
+    ctx: MCPServerContext<TConfig>,
   ): Promise<PromptGetResult> {
     if (!isObject(params)) {
       throw new RpcError(
@@ -1531,7 +1543,7 @@ export class McpServer {
 
   private async handleResourcesList(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<ListResourcesResult> {
     const resources = Array.from(this.resources.values())
       .filter((entry) => entry.type === "resource")
@@ -1542,7 +1554,7 @@ export class McpServer {
 
   private async handleResourceTemplatesList(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<ListResourceTemplatesResult> {
     const resourceTemplates = Array.from(this.resources.values())
       .filter((entry) => entry.type === "resource_template")
@@ -1553,7 +1565,7 @@ export class McpServer {
 
   private async handleResourcesRead(
     params: unknown,
-    ctx: MCPServerContext,
+    ctx: MCPServerContext<TConfig>,
   ): Promise<ResourceReadResult> {
     if (typeof params !== "object" || params === null) {
       throw new RpcError(
@@ -1573,7 +1585,7 @@ export class McpServer {
 
     const uri = readParams.uri;
 
-    let matchedEntry: ResourceEntry | null = null;
+    let matchedEntry: ResourceEntry<TConfig> | null = null;
     let vars: Record<string, string> = {};
 
     const directEntry = this.resources.get(uri);
@@ -1642,7 +1654,7 @@ export class McpServer {
 
   private async handleInitialize(
     params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<InitializeResult> {
     if (!isInitializeParams(params)) {
       throw new RpcError(
@@ -1683,42 +1695,42 @@ export class McpServer {
 
   private async handleNotificationCancelled(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<Record<string, never>> {
     return {};
   }
 
   private async handleNotificationInitialized(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<Record<string, never>> {
     return {};
   }
 
   private async handleNotificationProgress(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<Record<string, never>> {
     return {};
   }
 
   private async handleNotificationRootsListChanged(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<Record<string, never>> {
     return {};
   }
 
   private async handleLoggingSetLevel(
     _params: unknown,
-    _ctx: MCPServerContext,
+    _ctx: MCPServerContext<TConfig>,
   ): Promise<Record<string, never>> {
     return {};
   }
 
   private async handleNotImplemented(
     _params: unknown,
-    ctx: MCPServerContext,
+    ctx: MCPServerContext<TConfig>,
   ): Promise<never> {
     throw new RpcError(JSON_RPC_ERROR_CODES.INTERNAL_ERROR, "Not implemented", {
       method: ctx.request.method,
