@@ -62,24 +62,25 @@ export function getProgressToken(
   return undefined;
 }
 
-export function createContext(
+export function createContext<
+  TConfig extends { State: unknown } = { State: Record<string, unknown> },
+>(
   message: JsonRpcMessage,
   requestId: JsonRpcId | undefined,
   options: CreateContextOptions = {},
-): MCPServerContext {
+): MCPServerContext<TConfig> {
   // Prefer explicit option, otherwise derive from the request message
   const progressToken =
     options.progressToken !== undefined
       ? options.progressToken
       : getProgressToken(message);
 
-  const context: MCPServerContext = {
+  const context: MCPServerContext<TConfig> = {
     request: message,
     authInfo: options.authInfo,
     requestId,
     response: null,
-    env: {},
-    state: {},
+    state: {} as TConfig["State"],
     progressToken,
     validate: <T>(validator: unknown, input: unknown): T =>
       createValidationFunction<T>(validator, input),
