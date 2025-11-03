@@ -708,6 +708,284 @@ export class McpServer {
   }
 
   /**
+   * Register an interactive UI widget as both a tool and a resource.
+   *
+   * This helper mirrors the ergonomics of "uiResource" systems found in other MCP stacks:
+   * - Registers a tool that accepts parameters (derived from a schema) and returns a resource link
+   * - Registers a static resource for default rendering, plus a dynamic template per invocation
+   *
+   * Supported types:
+   * - externalUrl: Wrap an external URL in an iframe
+   * - rawHtml: Serve raw HTML provided in the definition
+   * - remoteDom: Serve an HTML shell that runs the provided script with a root element
+   */
+  uiResource(
+    def:
+      | {
+          type: "externalUrl";
+          name: string;
+          title?: string;
+          description?: string;
+          /** Full URL to load in an iframe */
+          url: string;
+          /** Optional StandardSchema or JSON Schema for tool inputs */
+          inputSchema?: unknown;
+          /** Optional size tuple like ["900px", "600px"] */
+          size?: [string, string];
+          _meta?: { [key: string]: unknown };
+        }
+      | {
+          type: "rawHtml";
+          name: string;
+          title?: string;
+          description?: string;
+          /** Complete HTML document string */
+          htmlContent: string;
+          inputSchema?: unknown;
+          size?: [string, string];
+          _meta?: { [key: string]: unknown };
+        }
+      | {
+          type: "remoteDom";
+          name: string;
+          title?: string;
+          description?: string;
+          /** Inline script code to execute. Receives a global `root` element and `toolInput` */
+          script: string;
+          /** Optional hint for client frameworks; currently informational */
+          framework?: string;
+          inputSchema?: unknown;
+          size?: [string, string];
+          _meta?: { [key: string]: unknown };
+        },
+  ): this {
+    const name = def.name;
+    const baseUri = `ui://widget/${name}`;
+    const staticUri = `${baseUri}.html`;
+    const dynamicTemplate = `${baseUri}-{id}.html{?props}`; // id is random; props is base64 JSON in query param
+
+    // Register static resource for default rendering (no props)
+    this.resource(
+      staticUri,
+      {
+        name: def.title || name,
+        description: def.description,
+        mimeType: "text/html",
+        _meta: def._meta,
+      },
+      async (uri) => {
+        const html = this.renderWidgetHtml({ def });
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              type: "text",
+              text: html,
+              mimeType: "text/html",
+            },
+          ],
+        };
+      },
+    );
+
+    // Dynamic per-invocation resource with props encoded in query string
+    this.resource(
+      dynamicTemplate,
+      {
+        name: `${def.title || name} (invocation)`,
+        description: def.description,
+        mimeType: "text/html",
+        _meta: def._meta,
+      },
+      async (uri, vars) => {
+        // Decode props from query parameter when present (no DOM URL dependency)
+        let toolInput: unknown;
+        try {
+          const href = uri.href;
+          const idx = href.indexOf("?");
+          if (idx !== -1) {
+            const qs = href.slice(idx + 1);
+            const parts = qs.split("&");
+            for (const p of parts) {
+              const [k, v] = p.split("=");
+              if (k === "props" && v !== undefined) {
+                const json = decodeURIComponent(v);
+                toolInput = JSON.parse(json);
+                break;
+              }
+            }
+          }
+        } catch (_) {
+          // ignore malformed props
+        }
+        const html = this.renderWidgetHtml({ def, toolInput, id: vars.id });
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              type: "text",
+              text: html,
+              mimeType: "text/html",
+            },
+          ],
+        };
+      },
+    );
+
+    // Register a tool that returns a resource link pointing to the dynamic template
+    const inputSchema = (def as { inputSchema?: unknown }).inputSchema;
+
+    this.tool(name, {
+      description:
+        def.description ||
+        (def.type === "externalUrl"
+          ? `Open ${name} widget in an iframe`
+          : def.type === "rawHtml"
+            ? `Render ${name} widget as HTML`
+            : `Render ${name} interactive widget`),
+      title: def.title,
+      inputSchema,
+      handler: (args) => {
+        // Generate a unique id and encode props for the resource URI
+        const id = Math.random().toString(36).slice(2);
+        let propsParam = "";
+        try {
+          const json = JSON.stringify(args ?? {});
+          propsParam = `?props=${encodeURIComponent(json)}`;
+        } catch (_) {
+          // ignore encoding issues; omit props
+        }
+
+        const uri = `${baseUri}-${id}.html${propsParam}`;
+        return {
+          content: [
+            {
+              type: "resource_link",
+              uri,
+            },
+          ],
+          structuredContent: args ?? {},
+          _meta: {
+            widget: name,
+            type: def.type,
+            size: (def as { size?: [string, string] }).size,
+          },
+        };
+      },
+    });
+
+    return this;
+  }
+
+  // Internal: render HTML wrapper for a uiResource
+  private renderWidgetHtml(args: {
+    def:
+      | {
+          type: "externalUrl";
+          name: string;
+          url: string;
+          size?: [string, string];
+        }
+      | { type: "rawHtml"; name: string; htmlContent: string }
+      | {
+          type: "remoteDom";
+          name: string;
+          script: string;
+          framework?: string;
+          size?: [string, string];
+        };
+    toolInput?: unknown;
+    id?: string;
+  }): string {
+    const { def, toolInput } = args;
+    const size = (def as { size?: [string, string] }).size;
+    const [w, h] = size ?? ["100%", "100%"];
+
+    const baseStyle = `
+      html, body { margin:0; padding:0; height:100%; }
+      body { box-sizing: border-box; }
+      .root { width: ${w}; height: ${h}; }
+      iframe { width: ${w}; height: ${h}; border: 0; }
+      * { font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
+    `;
+
+    const injectToolInput = `
+      (function(){
+        try {
+          window.openai = window.openai || {};
+          window.openai.toolInput = ${JSON.stringify(toolInput ?? {})};
+        } catch (e) {}
+      })();
+    `;
+
+    if (def.type === "externalUrl") {
+      const src = def.url;
+      return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>${baseStyle}</style>
+    <title>${def.name}</title>
+  </head>
+  <body>
+    <div class="root">
+      <iframe src="${src}" allowfullscreen></iframe>
+    </div>
+    <script>${injectToolInput}</script>
+  </body>
+</html>`;
+    }
+
+    if (def.type === "rawHtml") {
+      // If full documents are provided, respect them; otherwise wrap
+      const isFullDoc = /<!doctype html>|<html[\s>]/i.test(def.htmlContent);
+      if (isFullDoc) return def.htmlContent;
+      return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>${baseStyle}</style>
+    <title>${def.name}</title>
+  </head>
+  <body>
+    <div class="root">${def.htmlContent}</div>
+    <script>${injectToolInput}</script>
+  </body>
+</html>`;
+    }
+
+    // remoteDom
+    const bootstrap = `
+      (function(){
+        ${injectToolInput}
+        const root = document.getElementById('root');
+        try { (function(){ ${def.script}\n})(); } catch(e) { 
+          const pre = document.createElement('pre');
+          pre.textContent = 'Widget error: ' + (e && e.message ? e.message : String(e));
+          pre.style.color = 'crimson';
+          root.appendChild(pre);
+        }
+      })();
+    `;
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>${baseStyle}</style>
+    <title>${def.name}</title>
+  </head>
+  <body>
+    <div id="root" class="root"></div>
+    <script>${bootstrap}</script>
+  </body>
+</html>`;
+  }
+
+  /**
    * Register a resource that clients can list and read.
    *
    * Resources are URI-identified content that can be static or template-based.

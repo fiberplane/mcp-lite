@@ -1,0 +1,20 @@
+{
+  "name": "@mcp-lite/example-react-widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "dev:widget": "cd widget-app && bun run dev",
+    "test:manual": "bun run scripts/test-manual.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "mcp-lite": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}

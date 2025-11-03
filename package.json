@@ -5,7 +5,8 @@
   "workspaces": [
     "packages/*",
     "playground",
-    "examples/*"
+    "examples/*",
+    "examples/*/widget-app"
   ],
   "repository": {
     "type": "git",

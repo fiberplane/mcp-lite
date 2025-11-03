@@ -49,6 +49,61 @@ mcp.tool("add", {
   }),
 });
 
+// Demonstrate uiResource: a raw HTML card
+mcp.uiResource({
+  type: "rawHtml",
+  name: "welcome-card",
+  title: "Welcome Card",
+  description: "Simple welcome widget rendered as HTML",
+  htmlContent: `
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;">
+      <div style="padding:16px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.06)">
+        <h1 style="margin:0 0 8px 0;font-size:20px;">Welcome!</h1>
+        <p style="margin:0;color:#6b7280;">This widget is served by mcp-lite uiResource()</p>
+      </div>
+    </div>
+  `,
+});
+
+// Demonstrate uiResource: a remote DOM script widget
+mcp.uiResource({
+  type: "remoteDom",
+  name: "quick-poll",
+  title: "Quick Poll",
+  description: "Interactive buttons rendered via script",
+  inputSchema: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "Poll question" },
+    },
+    required: ["question"],
+  },
+  script: `
+    const h2 = document.createElement('h2');
+    h2.textContent = (window.openai?.toolInput?.question ?? 'Do you like this demo?');
+    h2.style.margin = '12px 0';
+    h2.style.fontSize = '18px';
+    root.appendChild(h2);
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.gap = '8px';
+    const mkBtn = (label) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.padding = '8px 12px';
+      b.style.border = '1px solid #e5e7eb';
+      b.style.borderRadius = '8px';
+      b.style.cursor = 'pointer';
+      b.onclick = () => { b.textContent = label + ' ✓'; };
+      return b;
+    };
+    wrap.appendChild(mkBtn('Yes'));
+    wrap.appendChild(mkBtn('No'));
+    root.appendChild(wrap);
+  `,
+  size: ["500px", "220px"],
+});
+
 // Create HTTP transport in stateless mode (no session adapter)
 const transport = new StreamableHttpTransport();
 const httpHandler = transport.bind(mcp);

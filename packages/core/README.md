@@ -63,6 +63,93 @@ app.all("/mcp", async (c) => {
 });
 ```
 
+### UI Widgets (Experimental)
+
+`mcp-lite` includes a small helper to register an interactive widget as both a tool and a resource:
+
+```ts
+server.uiResource({
+  type: "remoteDom",
+  name: "quick-poll",
+  title: "Quick Poll",
+  description: "Render a simple yes/no poll",
+  inputSchema: {
+    type: "object",
+    properties: { question: { type: "string" } },
+    required: ["question"],
+  },
+  script: `
+    const h = document.createElement('h2');
+    h.textContent = window.openai?.toolInput?.question ?? 'Do you like this demo?';
+    root.appendChild(h);
+    const yes = document.createElement('button'); yes.textContent = 'Yes'; yes.onclick = () => yes.textContent = 'Yes ✓';
+    const no = document.createElement('button'); no.textContent = 'No'; no.onclick = () => no.textContent = 'No ✗';
+    root.appendChild(yes); root.appendChild(no);
+  `,
+  size: ["500px", "220px"],
+});
+```
+
+This automatically registers:
+
+- Tool: `quick-poll` – takes parameters defined by `inputSchema` and returns a `resource_link`
+- Resource: `ui://widget/quick-poll.html` – static access with defaults
+- Dynamic resource template: `ui://widget/quick-poll-{id}.html?props=...` used by the tool for per-call props
+
+Supported widget kinds:
+
+- `externalUrl` – wraps a URL in an iframe
+- `rawHtml` – serves provided HTML
+- `remoteDom` – runs your script in an HTML shell with a `root` element and `window.openai.toolInput`
+
+Note: This is a lightweight utility, not a full widget pipeline with HMR.
+
+### Building React Widgets
+
+For React-based widgets, use the `@mcp-lite/react` package with `type: "externalUrl"`:
+
+```tsx
+// WeatherWidget.tsx
+import { useWidget } from "@mcp-lite/react";
+
+interface WeatherProps {
+  city: string;
+  temperature: number;
+}
+
+export default function WeatherWidget() {
+  const { props, theme } = useWidget<WeatherProps>();
+  
+  return (
+    <div data-theme={theme}>
+      <h1>{props.city}</h1>
+      <p>{props.temperature}°C</p>
+    </div>
+  );
+}
+```
+
+Then register it pointing to your hosted React app:
+
+```ts
+server.uiResource({
+  type: "externalUrl",
+  name: "weather-widget",
+  url: "https://your-host.com/weather",  // Your built React app
+  inputSchema: {
+    type: "object",
+    properties: {
+      city: { type: "string" },
+      temperature: { type: "number" }
+    }
+  }
+});
+```
+
+The `useWidget()` hook automatically reads props from `window.openai.toolInput` (injected by the server).
+
+See [@mcp-lite/react](../react) for full React integration docs.
+
 > [!TIP]
 >
 > The Model Context Protocol (MCP) is an open standard that enables secure connections between host applications and external data sources and tools, allowing AI assistants to reason over information and execute functions with user permission.
@@ -75,6 +162,7 @@ app.all("/mcp", async (c) => {
 - HTTP + SSE transport built on the Fetch API.
 - Adapter interfaces for sessions, server-to-client requests, and persistence when you outgrow stateless mode.
 - Middleware hooks and server composition via `.group()` for modular setups and namespacing.
+- Helpers to register UI widgets as both tools and resources via `server.uiResource()` (experimental).
 
 
 ## Type Safety
