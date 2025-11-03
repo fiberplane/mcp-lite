@@ -12,7 +12,6 @@
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   //   }
   // ],
   // "r2_buckets": [
@@ -23,9 +22,7 @@
   // ],
   // "d1_databases": [
   //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
+  //     "binding": "MY_DB"
   //   }
   // ],
   // "ai": {
